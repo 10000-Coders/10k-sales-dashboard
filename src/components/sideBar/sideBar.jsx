@@ -8,15 +8,18 @@ import {
 } from "../../shared/svgImages/sideBarImages";
 import { useState } from "react";
 
-export default function SideBar() {
+export default function SideBar({ handleCallBack }) {
   const [activeItem, setActiveItem] = useState("All Requests");
-
+  const handleActiveItem = (text) => {
+    setActiveItem(text);
+    handleCallBack(text)
+  };
   const menu = [
     {
       text: "All Requests",
       imgBlack: <GgList />,
       imgWhite: <GgList fill="white" />,
-    },
+    },  
     {
       text: "Unread Requests",
       imgBlack: <GgList />,
@@ -43,7 +46,9 @@ export default function SideBar() {
       className={`py-[12px] cursor-pointer ${
         activeItem === text ? "bg-[#FF8000] text-white" : "hover:bg-[#B5B5B5]"
       } w-[250px] px-[30px] rounded-r-full`}
-      onClick={() => setActiveItem(text)}
+      onClick={() => {
+        handleActiveItem(text);
+      }}
     >
       <div className="flex w-[175px] justify-between">
         <p className="font-[500]">{text}</p>{" "}
