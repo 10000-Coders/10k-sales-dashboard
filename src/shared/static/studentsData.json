@@ -6,7 +6,7 @@
       "phone": "7887890986",
       "status": "Interested",
       "date": "22/12/23",
-      "email": "Jayadeep kulshekhar",
+      "email": "jayadeepkulshekhar@gmai.com",
       "highestDegree": "Mech Eng",
       "sales": "Suresh B.",
       "batch": "91cr",
@@ -35,6 +35,32 @@
       "sales": "Suresh B.",
       "batch": "91cr",
       "attendance": "100%"
+    }
+  ],
+  "statusOptions": [
+    {
+      "label": "Intrested",
+      "value": "Intrested",
+      "bgcolor": "#96E367",
+      "textColor": "black"
+    },
+    {
+      "label": "Unavailable",
+      "value": "Unavailable",
+      "bgcolor": "#3D3D3D",
+      "textColor": "white"
+    },
+    {
+      "label": "Ready to Pay",
+      "value": "Ready to Pay",
+      "bgcolor": "#F68737",
+      "textColor": "white"
+    },
+    {
+      "label": "Not Intrested",
+      "value": "Not Intested",
+      "bgcolor": "white",
+      "textColor": "black"
     }
   ]
 }
