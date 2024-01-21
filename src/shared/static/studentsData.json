@@ -62,5 +62,31 @@
       "bgcolor": "white",
       "textColor": "black"
     }
+  ],
+  "salesOptions": [
+    {
+      "label": "Suresh",
+      "value": "Suresh",
+      "bgcolor": "#96E367",
+      "textColor": "black"
+    },
+    {
+      "label": "Danial",
+      "value": "Danial",
+      "bgcolor": "#9E61DB",
+      "textColor": "white"
+    },
+    {
+      "label": "Rakesh",
+      "value": "Rakesh",
+      "bgcolor": "#F63737",
+      "textColor": "white"
+    },
+    {
+      "label": "Shreelata",
+      "value": "Shreelata",
+      "bgcolor": "#FFF",
+      "textColor": "black"
+    }
   ]
 }

@@ -5,7 +5,7 @@ import {
 } from "@/shared/svgImages/tableImages";
 import "./studentTable.module.css";
 import StudentRow from "../StudentRow";
-import {tableData} from "@/shared/static/studentsData.json"
+import { tableData } from "@/shared/static/studentsData.json";
 
 const StudetTable = () => {
   return (
@@ -22,14 +22,26 @@ const StudetTable = () => {
           <tr className="flex w-[100%] justify-between items-center">
             <th className="flex flex-shrink-0 items-center w-[8%] pl-[20px] gap-[20px] py-[16px]">
               <OrangeLable /> #{" "}
-            </th> 
-            <th className="py-[13px] flex-shrink-0 w-[20%] text-ellipsis text-center  whitespace-nowrap overflow-hidden ">Name</th>
-            <th className="py-[13px] flex-shrink-0 w-[6%] text-center">Batch</th>
-            <th className="py-[13px] flex-shrink-0 w-[10%] text-center">Attendance</th>
-            <th className="py-[13px] flex-shrink-0 w-[10%] text-ellipsis text-center whitespace-nowrap overflow-hidden ">Phone</th>
+            </th>
+            <th className="py-[13px] flex-shrink-0 w-[20%] text-ellipsis text-center  whitespace-nowrap overflow-hidden ">
+              Name
+            </th>
+            <th className="py-[13px] flex-shrink-0 w-[6%] text-center">
+              Batch
+            </th>
+            <th className="py-[13px] flex-shrink-0 w-[10%] text-center">
+              Attendance
+            </th>
+            <th className="py-[13px] flex-shrink-0 w-[10%] text-ellipsis text-center whitespace-nowrap overflow-hidden ">
+              Phone
+            </th>
             <th className="py-[13px] flex-shrink-0 w-[162px]">Status</th>
-            <th className="py-[13px] w-[15%] text-ellipsis text-center  whitespace-nowrap overflow-hidden">Sales person</th>
-            <th className="py-[13px] text-center flex-shrink-0 w-[15%]">Date</th>
+            <th className="py-[13px] w-[15%] text-ellipsis text-center  whitespace-nowrap overflow-hidden">
+              Sales person
+            </th>
+            <th className="py-[13px] text-center flex-shrink-0 w-[15%]">
+              Date
+            </th>
           </tr>
         </thead>
         <tbody>
