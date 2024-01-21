@@ -16,7 +16,7 @@ export default function TopBar() {
         />
       </div>
       <div className="flex w-[54px] items-center justify-center h-[54px] rounded-full bg-black text-white">
-       <p className="text-[12px] font-[400]">Admin</p>
+        <p className="text-[12px] font-[400]">Admin</p>
       </div>
     </nav>
   );
