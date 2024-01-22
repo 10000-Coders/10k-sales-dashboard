@@ -139,7 +139,7 @@ const StudentRow = (props) => {
       {activeRow === request && showCollapse ? (
         <tr className={`w-full ${activeRow && "bg-gray-100 "} flex`}>
           <td className="px-[50px] py-[10px] w-full" colSpan="10">
-            <CollapseData email={email} highestDegree={highestDegree} />
+            <CollapseData handleActiveRow={()=>handleActiveRow(request)} email={email} highestDegree={highestDegree} />
           </td>
         </tr>
       ) : (

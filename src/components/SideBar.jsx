@@ -3,6 +3,7 @@ import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { routeObject, MenuItems } from "@/shared/static/sidebarItems";
+import Link from "next/link";
 
 export default function SideBar() {
   const [activeItem, setActiveitem] = useState("");
@@ -49,13 +50,12 @@ export default function SideBar() {
         src="/sideBar_Images/logo.png"
         alt=""
       />
-      <div className="bg-[#B5B5B5] mb-[38px] ml-[10px] p-[12px] w-fit rounded-[16px] gap-[8px]  flex ">
+      <Link href="/batches" className="bg-[#B5B5B5] cursor-pointer items-center mb-[38px] ml-[10px] p-[12px] w-fit rounded-[16px] gap-[8px]  flex ">
         <Image width={18} height={18} alt="" src="/sideBar_Images/vector.svg" />
         <p className="text-white text-[16px] font-[700] leading-[normal] ">
-          New Student
+          Add Batch
         </p>
-      </div>
-
+      </Link>
       <div>
         <ul className=" w-fit flex flex-col items-center">
           {MenuItems.map((item, idx) => {

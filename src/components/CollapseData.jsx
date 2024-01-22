@@ -1,16 +1,22 @@
 "use client";
 import { usePathname } from "next/navigation";
-import dayjs from "dayjs";
 import { useState } from "react";
+import dayjs from "dayjs";
 import { DemoContainer } from "@mui/x-date-pickers/internals/demo";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { MobileDatePicker } from "@mui/x-date-pickers/MobileDatePicker";
 import Select from "react-select";
-import { EmailIcon, LinkIcon, LockIcon } from "@/shared/svgImages/tableImages";
+import {
+  CarretUp,
+  EditIcon,
+  LinkIcon,
+  LockIcon,
+} from "@/shared/svgImages/tableImages";
 import { salesOptions } from "@/shared/static/studentsData.json";
+import PayementDetailsStudent from "./PaymentTableStudent";
 
-const CollapseData = ({ email, highestDegree }) => {
+const CollapseData = ({ email, highestDegree, handleActiveRow }) => {
   const pathName = usePathname();
   const handlesellsPersonName = (selected) => {
     setsellsPersonName(selected);
@@ -181,14 +187,6 @@ const CollapseData = ({ email, highestDegree }) => {
           </div>
         </div>
       </div>
-      <div className="flex mx-auto gap-[60px]">
-        <button className="w-[300px] py-[10px] rounded-[16px] bg-vivid_orange flex justify-center gap-[10px] text-white font-bold">
-          <EmailIcon /> Send Payment Link on Email
-        </button>
-        <button className="w-[300px] py-[10px] rounded-[16px] bg-[#B5B5B5] flex justify-center gap-[10px] text-white font-bold">
-          <LockIcon /> Give Dashboard Access
-        </button>
-      </div>
       <div className="flex flex-col gap-[15px]">
         <p className="text-[10px] tracking-[3.6px] uppercase font-[700] text-vivid_orange">
           payment details
@@ -249,6 +247,21 @@ const CollapseData = ({ email, highestDegree }) => {
         <button className=" text-gray-600 border-gray-400 border px-[10px] py-[10px] w-fit  rounded-[16px]">
           + Add payment
         </button>
+      </div>
+      <div>
+        <PayementDetailsStudent />
+      </div>
+      <div className="flex mx-auto gap-[60px]">
+        <button className="w-[300px] py-[10px] items-center rounded-[16px] bg-vivid_orange flex justify-center gap-[10px] text-white font-bold">
+          <LockIcon /> Give Dashboard Access
+        </button>
+        <button className="w-[300px] py-[10px] items-center rounded-[16px] shadow flex justify-center text-vivid_orange gap-[10px] font-bold">
+          <EditIcon /> Edit Student Details
+        </button>
+      </div>
+      <div onClick={handleActiveRow} className="flex gap-[10px] cursor-pointer w-fit mx-auto text-gray-500 items-center font-semibold">
+        <CarretUp />
+        Close
       </div>
     </div>
   );
