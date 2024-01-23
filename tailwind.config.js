@@ -13,7 +13,8 @@ module.exports = {
           "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
       },
       colors: {
-        Vivid_Tangelo: "#FF8000",
+        fireRed: "#FF4A4A",
+        vivid_orange: "#FF8000"
       },
     },
   },

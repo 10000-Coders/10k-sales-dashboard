@@ -1,76 +1,64 @@
 "use client";
 import Image from "next/image";
-import { Block, GgList, Label, Tick } from "../shared/svgImages/sideBarImages";
-import { useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { routeObject, MenuItems } from "@/shared/static/sidebarItems";
+import Link from "next/link";
 
-export default function SideBar({ handleCallBack }) {
-  const [activeItem, setActiveItem] = useState("All Requests");
+export default function SideBar() {
+  const [activeItem, setActiveitem] = useState("");
+  const { push } = useRouter();
+  const path = usePathname();
+  const [pathName, setPathName] = useState(path);
+  useEffect(() => {
+    setActiveitem(routeObject[pathName]);
+    console.log();
+  }, []);
   const handleActiveItem = (text) => {
-    setActiveItem(text);
-    handleCallBack(text);
+    const slug = text.toLowerCase().replace(" ", "").replace("-", "");
+    text === "All Requests" ? push("/") : push(`/${slug}`);
+    setActiveitem(text);
   };
-  const menu = [
-    {
-      text: "All Requests",
-      imgBlack: <GgList />,
-      imgWhite: <GgList fill="white" />,
-    },
-    {
-      text: "Unread Requests",
-      imgBlack: <GgList />,
-      imgWhite: <GgList fill="white" />,
-    },
-    {
-      text: "Important",
-      imgBlack: <Label />,
-      imgWhite: <Label fill="white" />,
-    },
-    {
-      text: "Completed",
-      imgBlack: <Tick />,
-      imgWhite: <Tick stroke="white" />,
-    },
-    {
-      text: "Not Intrested",
-      imgBlack: <Block />,
-      imgWhite: <Block fill="white" />,
-    },
-  ];
   const SideBarItem = ({ text, imgWhite, imgBlack, itemNo }) => (
     <li
-      className={`py-[12px] cursor-pointer ${
-        activeItem === text
-          ? "bg-Vivid_Tangelo text-white"
-          : "hover:bg-[#B5B5B5]"
+      className={`py-[12px] relative cursor-pointer ${
+        activeItem === text ? "bg-[#FF8000] text-white" : "hover:bg-[#B5B5B5]"
       } w-[250px] px-[30px] rounded-r-full`}
       onClick={() => {
         handleActiveItem(text);
       }}
     >
-      <div className="flex w-[175px] justify-between">
-        <p className="font-[500]">{text}</p>{" "}
+      <div className="flex w-[175px] items-center justify-between">
+        <p className="font-[500]">{text}</p>
         {activeItem === text ? imgWhite : imgBlack}
+        {text === "Unread Requests" ? (
+          <div className="w-[25px] h-[25px] absolute right-[30px] top-[2px] flex rounded-full bg-fireRed items-center justify-center text-white">
+            0
+          </div>
+        ) : (
+          ""
+        )}
       </div>
     </li>
   );
   return (
-    <main className="flex flex-col">
+    <main className="flex w-fit flex-col">
       <Image
         className="flex-shrink-0 mt-[11px] mb-[13px]"
         width={133}
         height={64}
         src="/sideBar_Images/logo.png"
+        alt=""
       />
-      <div className=" bg-gray-400 mb-[38px] ml-[10px] p-[12px] w-fit rounded-[16px] gap-[8px] items-center flex ">
-        <Image width={18} height={18} src="/sideBar_Images/vector.svg" />
+      <Link href="/batches" className="bg-[#B5B5B5] cursor-pointer items-center mb-[38px] ml-[10px] p-[12px] w-fit rounded-[16px] gap-[8px]  flex ">
+        <Image width={18} height={18} alt="" src="/sideBar_Images/vector.svg" />
         <p className="text-white text-[16px] font-[700] leading-[normal] ">
-          New Student
+          Add Batch
         </p>
-      </div>
-
+      </Link>
       <div>
         <ul className=" w-fit flex flex-col items-center">
-          {menu.map((item, idx) => {
+          {MenuItems.map((item, idx) => {
             return (
               <SideBarItem
                 key={idx}
