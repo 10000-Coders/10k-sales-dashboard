@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
-import SideBar from "../sideBar/sideBar";
-import StudetTable from "../studentTable/studentTable";
-import TopBar from "../topBar/topBar";
+import SideBar from "./SideBar";
+import StudetTable from "./studentTable/StudentTable";
+import TopBar from "./TopBar";
 
 export default function SalesPageComponent() {
   const [selectedItem, setSelectedItem] = useState();

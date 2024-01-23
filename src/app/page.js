@@ -1,4 +1,4 @@
-import SalesPageComponent from "@/components/salesPageComponent/salesPageComponent";
+import SalesPageComponent from "@/components/SalesPageComponent";
 
 export default function Home() {
   return (
