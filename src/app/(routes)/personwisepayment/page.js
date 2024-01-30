@@ -1,5 +1,5 @@
 import TopBar from "@/components/TopBar";
-import StudetTable from "@/components/studentTable/StudentTable";
+import StudetTable from "@/components/StudentTable/StudentTable";
 
 const PersonWisePayment = () => {
   return (

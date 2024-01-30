@@ -28,7 +28,16 @@ export default function TopBar() {
           <div className="border-b cursor-pointer flex items-center gap-[10px]  pb-[3px] border-gray-100 hover:text-Vivid_Tangelo">
             <ProfileIcon fill="#FF8541" /> My Profile
           </div>
-          
+          <Link
+            href="/addSalesPerson"
+            className="border-b cursor-pointer flex items-center gap-[10px] pb-[3px] border-gray-100 hover:text-Vivid_Tangelo"
+          >
+            {" "}
+            <span className=" text-vivid_orange font-semibold text-[20px] rounded-full shadow w-[23px] h-[23px] flex items-center justify-center border">
+              &#x2b;
+            </span>{" "}
+            Add Sales Person
+          </Link>
           <Link
             href="/login"
             className="border-b cursor-pointer flex gap-[10px] pb-[3px] border-gray-100 hover:text-Vivid_Tangelo"

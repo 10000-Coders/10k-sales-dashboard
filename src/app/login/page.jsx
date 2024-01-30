@@ -21,7 +21,7 @@ const Login = () => {
           >
             Email ID
           </label>
-          <div className="border-silver focus-within:border-Vivid_Tangelo focus-within:border  w-full gap-[8px] rounded-[8px] py-1 px-[15px] border flex">
+          <div className="border-silver focus-within:border-vivid_orange focus-within:border  w-full gap-[8px] rounded-[8px] py-1 px-[15px] border flex">
             <MailIcon />{" "}
             <input
               required
@@ -59,20 +59,20 @@ const Login = () => {
             type="checkbox"
             name="Remember me"
             id="Remember me"
-            className=" checked:bg-Vivid_Tangelo"
+            className=" checked:bg-vivid_orange"
           />
           <label htmlFor="Remember me">Remember me</label>
         </div>
         <button
           onClick={(e) => e.preventDefault()}
           type="submit"
-          className="w-full p-[12px] font-[600] text-center bg-Vivid_Tangelo text-white text-[16px] rounded-[8px]"
+          className="w-full p-[12px] font-[600] text-center bg-vivid_orange text-white text-[16px] rounded-[8px]"
         >
           Login
         </button>
         <p className="text-[12px] text-boulder text-center font-[600]">
           Don't have account?{" "}
-          <Link href="/register" className="text-Vivid_Tangelo cursor-pointer">
+          <Link href="/register" className="text-vivid_orange cursor-pointer">
             Register
           </Link>
         </p>

@@ -97,7 +97,7 @@ const Register = () => {
           >
             Password
           </label>
-          <div className="border-silver px-[15px]  focus-within:border-Vivid_Tangelo w-full gap-[8px] rounded-[8px] py-1 border items-center flex ">
+          <div className="border-silver px-[15px] focus-within:border-vivid_orange w-full gap-[8px] rounded-[8px] py-1 border items-center flex ">
             <div onClick={handleShowPassword}>
               <PasswordIcon />
             </div>
@@ -117,7 +117,7 @@ const Register = () => {
               <p className="text-[12px] font-[600] leading-[normal]">
                 Upload Profile Pic
               </p>
-              <label className="w-full p-[12px] font-[400] text-center text-Vivid_Tangelo border border-Vivid_Tangelo text-[13px] rounded-[8px] cursor-pointer">
+              <label className="w-full p-[12px] font-[400] text-center text-vivid_orange border border-vivid_orange text-[13px] rounded-[8px] cursor-pointer">
                 {selectedFile ? "Selected File" : "Select File "}
                 <input
                   type="file"
@@ -162,7 +162,7 @@ const Register = () => {
           </div>
           <button
             type="submit"
-            className="w-full p-[12px] font-[600] text-center bg-Vivid_Tangelo text-white text-[16px] rounded-[8px]"
+            className="w-full p-[12px] font-[600] text-center bg-vivid_orange text-white text-[16px] rounded-[8px]"
           >
             Send Request
           </button>
