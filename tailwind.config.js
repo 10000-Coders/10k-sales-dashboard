@@ -14,7 +14,8 @@ module.exports = {
       },
       colors: {
         fireRed: "#FF4A4A",
-        vivid_orange: "#FF8000"
+        vivid_orange: "#FF8000",
+        Light_Cyan: "#DDF5FF",
       },
     },
   },
