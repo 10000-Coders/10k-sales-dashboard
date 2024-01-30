@@ -25,6 +25,7 @@ const StudentRow = (props) => {
     attendance,
     batch,
     setAlltrue,
+    labelColor,
   } = props;
   const handleStatusClick = (e) => {
     e.stopPropagation();
@@ -97,7 +98,7 @@ const StudentRow = (props) => {
       >
         <td className="flex flex-shrink-0 items-center w-[8%]  pl-[20px] gap-[20px] py-[16px]">
           <div className="drop-shadow ">
-            <OrangeLable />
+            <OrangeLable fill={labelColor} stroke={labelColor} />
           </div>
           <p>{request}</p>
         </td>
@@ -139,7 +140,11 @@ const StudentRow = (props) => {
       {activeRow === request && showCollapse ? (
         <tr className={`w-full ${activeRow && "bg-gray-100 "} flex`}>
           <td className="px-[50px] py-[10px] w-full" colSpan="10">
-            <CollapseData handleActiveRow={()=>handleActiveRow(request)} email={email} highestDegree={highestDegree} />
+            <CollapseData
+              handleActiveRow={() => handleActiveRow(request)}
+              email={email}
+              highestDegree={highestDegree}
+            />
           </td>
         </tr>
       ) : (
