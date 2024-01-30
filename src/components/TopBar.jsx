@@ -1,7 +1,7 @@
-"use client"
-import { useState } from "react";
-import Link from "next/link";
-import { LogOutIcon, ProfileIcon, Search } from "@/shared/svgImages/navBarImages";
+'use client';
+import {useState} from 'react';
+import Link from 'next/link';
+import {LogOutIcon, ProfileIcon, Search} from '@/shared/svgImages/navBarImages';
 
 export default function TopBar() {
   const [dropDown, setdropDown] = useState(false);
@@ -20,8 +20,10 @@ export default function TopBar() {
           id="search"
         />
       </div>
-      <div onClick={handleDropDown} className="flex cursor-pointer w-[54px] items-center shadow justify-center h-[54px] rounded-full bg-black text-white">
-       <p className="text-[12px] font-[400]">Admin</p>
+      <div
+        onClick={handleDropDown}
+        className="flex cursor-pointer w-[50px] items-center shadow justify-center h-[50px] rounded-full bg-black text-white hover:outline hover:outline-gray-200 hover:outline-8 transition-all duration-500">
+        <p className="text-[12px] font-[400]">Admin</p>
       </div>
       {dropDown && (
         <div className=" top-[70px] right-0 w-[180px] p-[15px]  pb-[3px] font-semibold py-[15px] border shadow z-10 absolute bg-white rounded-[16px] flex flex-col gap-[10px]">
@@ -30,18 +32,15 @@ export default function TopBar() {
           </div>
           <Link
             href="/addSalesPerson"
-            className="border-b cursor-pointer flex items-center gap-[10px] pb-[3px] border-gray-100 hover:text-Vivid_Tangelo"
-          >
-            {" "}
+            className="border-b cursor-pointer flex items-center gap-[10px] pb-[3px] border-gray-100 hover:text-Vivid_Tangelo">
             <span className=" text-vivid_orange font-semibold text-[20px] rounded-full shadow w-[23px] h-[23px] flex items-center justify-center border">
               &#x2b;
-            </span>{" "}
-            Add Sales Person
+            </span>
+            Salesperson
           </Link>
           <Link
             href="/login"
-            className="border-b cursor-pointer flex gap-[10px] pb-[3px] border-gray-100 hover:text-Vivid_Tangelo"
-          >
+            className="border-b cursor-pointer flex gap-[10px] pb-[3px] border-gray-100 hover:text-Vivid_Tangelo">
             <LogOutIcon stroke="#FF8541" /> Logout
           </Link>
         </div>
