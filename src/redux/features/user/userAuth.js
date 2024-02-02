@@ -7,7 +7,8 @@ import {setDynamicHeader} from '../../../interceptManager';
 export const registration = createAsyncThunk('userAuth/registration', async (formData, {rejectWithValue}) => {
   const formDataInputs = useFormData(formData);
   try {
-    const response = await axios.post('/salesperson/register-salesperson/', formDataInputs);
+    const response = await axios.post('/salesperson/register/', formDataInputs);
+    // console.log('Api register register - ', response);
     const {name, email, mobile} = formData;
     const updatedState = {
       name,
@@ -17,7 +18,7 @@ export const registration = createAsyncThunk('userAuth/registration', async (for
 
     return {responseData: response.data, updatedState};
   } catch (error) {
-    return rejectWithValue(error.response);
+    return rejectWithValue(error.response.data);
   }
 });
 
@@ -25,16 +26,11 @@ export const registration = createAsyncThunk('userAuth/registration', async (for
 export const login = createAsyncThunk('userAuth/login', async (formData, {rejectWithValue}) => {
   const formDataInputs = useFormData(formData);
   try {
-    const response = await axios.post('/salesperson/admin-login/', formDataInputs);
-    const {salesperson_auth_token} = response.data;
-    const updatedState = {
-      email: formData.email,
-      salesperson_auth_token,
-    };
+    const response = await axios.post('/salesperson/login/', formDataInputs);
 
-    return {responseData: response.data, updatedState};
+    return response.data;
   } catch (error) {
-    return rejectWithValue(error.response);
+    return rejectWithValue(error.response.data);
   }
 });
 
@@ -48,9 +44,9 @@ export const salesApproval = createAsyncThunk(
 
       const response = await axios.post(`/salesperson/add-salesperson/${formData.email}/`);
 
-      return {responseData: response.data};
+      return response.data;
     } catch (error) {
-      return rejectWithValue(error.response);
+      return rejectWithValue(error.response.data);
     }
   },
 );
@@ -71,6 +67,8 @@ export const userAuthSlice = createSlice({
       name: '',
       mobile: '',
       email: '',
+      role_type: '',
+      profile_pic: '',
       salesperson_auth_token: '',
     },
     isLoggedIn: false,
@@ -96,6 +94,8 @@ export const userAuthSlice = createSlice({
           name: '',
           mobile: '',
           email: '',
+          role_type: '',
+          profile_pic: '',
           salesperson_auth_token: '',
         };
         state.registerError = null;
@@ -120,6 +120,8 @@ export const userAuthSlice = createSlice({
           name: '',
           mobile: '',
           email: '',
+          role_type: '',
+          profile_pic: '',
           salesperson_auth_token: '',
         };
         state.loginError = null;
@@ -127,11 +129,11 @@ export const userAuthSlice = createSlice({
       .addCase(login.fulfilled, (state, action) => {
         state.loginLoading = false;
         state.isLoggedIn = true;
-        state.user = {...state.user, ...action.payload.updatedState};
+        state.user = {...state.user, ...action.payload};
       })
       .addCase(login.rejected, (state, action) => {
         state.loginLoading = false;
-        state.loginError = action.payload;
+        state.loginError = action.payload.error;
       })
       .addCase(salesApproval.pending, (state, action) => {
         state.salesApprovalLoading = true;
@@ -150,10 +152,18 @@ export const userAuthSlice = createSlice({
       .addCase(logout.fulfilled, state => {
         state.logoutLoading = false;
         state.isLoggedIn = false;
+        state.user = {
+          name: '',
+          mobile: '',
+          email: '',
+          role_type: '',
+          profile_pic: '',
+          salesperson_auth_token: '',
+        };
       })
       .addCase(logout.rejected, (state, action) => {
         state.logoutLoading = false;
-        state.logoutError = action.payload;
+        state.logoutError = action.payload.error;
       });
   },
 });

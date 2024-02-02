@@ -140,9 +140,10 @@ const Register = () => {
           email,
           mobile,
           password,
-          // profile_pic: profile_pic.url,
+          profile_pic: profile_pic.url,
         };
         let response = await dispatch(registration(userData));
+        // console.log('handleSubmit esponse- ', response);
         const {
           payload: {responseData},
         } = response;
@@ -150,7 +151,7 @@ const Register = () => {
         if (responseData.status) {
           showSuccessToast(responseData.message, 'top-right', 'light');
           if (isLoggedIn && user.salesperson_auth_token) {
-            router.push('/login');
+            router.push('/unreadrequests');
           }
         } else {
           showErrorToast(responseData.Error, 'top-right', 'light');

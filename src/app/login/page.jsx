@@ -14,7 +14,7 @@ const Login = () => {
   const [formData, setFormData] = useState({email: '', password: ''});
 
   const dispatch = useDispatch();
-  const {user, isLoggedIn, loginLoading} = useSelector(state => state.userAuth);
+  const {user, loginLoading} = useSelector(state => state.userAuth);
   const {showSuccessToast, showErrorToast} = useToast();
   const router = useRouter();
   useEffect(() => {
@@ -51,17 +51,16 @@ const Login = () => {
     e.preventDefault();
     try {
       let response = await dispatch(login(formData));
-      const {
-        payload: {responseData},
-      } = response;
-
-      if (responseData.status | responseData.success) {
-        showSuccessToast(responseData.message, 'top-right', 'light');
-        if (isLoggedIn && user.salesperson_auth_token) {
+      const {payload} = response;
+      // console.log('HandleSubmit login response - ', response);
+      const {status, salesperson_auth_token, message} = payload;
+      if (payload && status) {
+        showSuccessToast(message, 'top-right', 'light');
+        if (salesperson_auth_token) {
           router.push('/unreadrequests');
         }
       } else {
-        showErrorToast(responseData.Error, 'top-right', 'light');
+        showErrorToast(payload.error ? payload.error : 'Something went wrong', 'top-right', 'light');
       }
     } catch (error) {
       console.error('Login error:', error);
