@@ -33,7 +33,7 @@ export default function TopBar() {
           <Link
             href="/addSalesPerson"
             className="border-b cursor-pointer flex items-center gap-[10px] pb-[3px] border-gray-100 hover:text-Vivid_Tangelo">
-            <span className=" text-vivid_orange font-semibold text-[20px] rounded-full shadow w-[23px] h-[23px] flex items-center justify-center border">
+            <span className="text-vivid_orange font-bold text-[20px] rounded-full shadow w-[23px] h-[23px] flex items-center justify-center border">
               &#x2b;
             </span>
             Salesperson
