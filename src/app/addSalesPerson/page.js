@@ -81,14 +81,13 @@ const AddSalesPerson = () => {
     try {
       let response = await dispatch(salesApproval(formData));
 
-      const {
-        payload: {responseData},
-      } = response;
+      const {payload} = response;
+      const {status, message} = payload;
 
-      if (responseData.status | responseData.success) {
-        showSuccessToast(responseData.message, 'top-right', 'light');
+      if (payload && status) {
+        showSuccessToast(message, 'top-right', 'light');
       } else {
-        showErrorToast(responseData.Error, 'top-right', 'light');
+        showErrorToast(payload.error ? payload.error : 'Something went wrong', 'top-right', 'light');
       }
     } catch (error) {
       console.error('Login error:', error);
