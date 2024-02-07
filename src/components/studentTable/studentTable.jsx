@@ -5,9 +5,22 @@ import StudentRow from '../StudentRow';
 import Select from 'react-select';
 import {tableData} from '@/shared/static/studentsData.json';
 import {usePathname} from 'next/navigation';
+import {useEffect, useState} from 'react';
+import getData from '@/firestore/getData';
+import {envConfig} from '@/shared/helpers/envApi';
+import {getAllDocuments} from '@/firestore/getAllDocuments';
 
 const StudetTable = () => {
+  const [intrestedStudents, setIntrestedStudents] = useState([]);
   const path = usePathname();
+  useEffect(() => {
+    const fetchStudents = async () => {
+      const {documents, error} = await getAllDocuments(envConfig.interested_students);
+      setIntrestedStudents(documents);
+    };
+    fetchStudents();
+  }, []);
+  console.log(intrestedStudents);
   const filterPaths = ['/personwisepayment', '/monthwisepayment'];
   const MonthOptions = [
     {label: 'January', value: 'january'},
@@ -110,21 +123,22 @@ const StudetTable = () => {
           </tr>
         </thead>
         <tbody>
-          {tableData.map((item, idx) => (
-            <StudentRow
-              request={item.request}
-              name={item.name}
-              sales={item.sales}
-              batch={item.batch}
-              attendance={item.attendance}
-              phone={item.phone}
-              status={item.status}
-              date={item.date}
-              email={item.email}
-              highestDegree={item.highestDegree}
-              labelColor={labelColor}
-            />
-          ))}
+          {intrestedStudents.length > 0 &&
+            intrestedStudents.map((item, idx) => (
+              <StudentRow
+                // request={item.request}
+                name={item.name}
+                // sales={item.sales}
+                // batch={item.batch}
+                // attendance={item.attendance}
+                phone={item.mobile}
+                status={item.status}
+                // date={item.date}
+                email={item.email}
+                // highestDegree={item.highestDegree}
+                // labelColor={labelColor}
+              />
+            ))}
         </tbody>
       </table>
     </main>

@@ -1,5 +1,5 @@
-import TopBar from "@/components/TopBar";
-import StudetTable from "@/components/StudentTable/StudentTable";
+import TopBar from '@/components/TopBar';
+import StudetTable from '@/components/studentTable/StudentTable';
 
 const Completed = () => {
   return (
