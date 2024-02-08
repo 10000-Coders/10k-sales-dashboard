@@ -1,40 +1,28 @@
-"use client";
-import { useState } from "react";
-import { OrangeLable } from "@/shared/svgImages/tableImages";
-import Select from "react-select";
-import { statusOptions } from "@/shared/static/studentsData.json";
-import { usePathname } from "next/navigation";
-import CollapseData from "./CollapseData";
+'use client';
+import {useState} from 'react';
+import {OrangeLable} from '@/shared/svgImages/tableImages';
+import Select from 'react-select';
+import {statusOptions} from '@/shared/static/studentsData.json';
+import {usePathname} from 'next/navigation';
+import CollapseData from './CollapseData';
 
-const StudentRow = (props) => {
+const StudentRow = props => {
   const [activeRow, setActiveRow] = useState(0);
   const [showCollapse, setShowCollapse] = useState(false);
-  const handleActiveRow = (request) => {
+  const handleActiveRow = request => {
     setActiveRow(request);
-    setShowCollapse((prev) => (activeRow === request ? !prev : true));
+    setShowCollapse(prev => (activeRow === request ? !prev : true));
   };
   const pathName = usePathname();
-  const {
-    request,
-    name,
-    sales,
-    phone,
-    date,
-    email,
-    highestDegree,
-    attendance,
-    batch,
-    setAlltrue,
-    labelColor,
-  } = props;
-  const handleStatusClick = (e) => {
+  const {request, name, sales, phone, date, email, highestDegree, attendance, batch, setAlltrue, labelColor} = props;
+  const handleStatusClick = e => {
     e.stopPropagation();
   };
-  const [bgcolor, setbgcolor] = useState("#fff");
-  const [color, setcolor] = useState("#000");
-  const [status, setStatus] = useState({ label: "Status", value: "status" });
+  const [bgcolor, setbgcolor] = useState('#fff');
+  const [color, setcolor] = useState('#000');
+  const [status, setStatus] = useState({label: 'Status', value: 'status'});
 
-  const handleStatus = (selected) => {
+  const handleStatus = selected => {
     setStatus(selected);
     setbgcolor(selected.bgcolor);
     setcolor(selected.textColor);
@@ -43,43 +31,43 @@ const StudentRow = (props) => {
     option: (provided, state) => ({
       backgroundColor: state.data.bgcolor,
       color: state.data.textColor,
-      cursor: "pointer",
-      paddingBlock: "10px",
-      paddingInline: "15px",
-      fontWeight: "600",
-      textAlign: "center",
-      position: "relative",
+      cursor: 'pointer',
+      paddingBlock: '10px',
+      paddingInline: '15px',
+      fontWeight: '600',
+      textAlign: 'center',
+      position: 'relative',
     }),
     control: (provided, state) => ({
       ...provided,
-      border: "0",
-      boxShadow: "none",
-      "&:hover": {
-        borderColor: "none",
+      border: '0',
+      boxShadow: 'none',
+      '&:hover': {
+        borderColor: 'none',
       },
-      "&:active": {
-        outline: "none",
+      '&:active': {
+        outline: 'none',
       },
       backgroundColor: bgcolor,
       color: color,
-      cursor: "pointer",
-      fontWeight: "600",
-      textAlign: "center",
-      width: "160px",
-      height: "10px",
-      borderRadius: "16px",
-      boxShadow: "1px 1px 6px rgb(0,0,0,0.1)",
+      cursor: 'pointer',
+      fontWeight: '600',
+      textAlign: 'center',
+      width: '160px',
+      height: '10px',
+      borderRadius: '16px',
+      boxShadow: '1px 1px 6px rgb(0,0,0,0.1)',
     }),
-    singleValue: (provided) => ({
+    singleValue: provided => ({
       ...provided,
       color: color,
-      borderRadius: "16px",
+      borderRadius: '16px',
     }),
-    dropdownIndicator: (base) => ({
+    dropdownIndicator: base => ({
       ...base,
-      color: "black",
-      "&:hover": {
-        color: "black",
+      color: 'black',
+      '&:hover': {
+        color: 'black',
       },
     }),
   };
@@ -91,38 +79,29 @@ const StudentRow = (props) => {
           handleActiveRow(request);
         }}
         className={`text-[14px] cursor-pointer ${
-          activeRow === request && showCollapse
-            ? "border-b border-black border-dotted"
-            : ""
-        } flex items-center justify-between w-[100%] font-[400]`}
-      >
+          activeRow === request && showCollapse ? 'border-b border-black border-dotted' : ''
+        } flex items-center justify-between w-[100%] font-[400]`}>
         <td className="flex flex-shrink-0 items-center w-[8%]  pl-[20px] gap-[20px] py-[16px]">
           <div className="drop-shadow ">
             <OrangeLable fill={labelColor} stroke={labelColor} />
           </div>
-          <p>{request}</p>
+          <p>{!request ? '-' : request}</p>
         </td>
         <td
           title={name}
-          className="py-[16px] flex-shrink-0 w-[20%] text-ellipsis text-center  whitespace-nowrap overflow-hidden"
-        >
-          {name}
+          className="py-[16px] flex-shrink-0 w-[20%] text-ellipsis text-center  whitespace-nowrap overflow-hidden">
+          {!name ? '-' : name}
         </td>
-        <td className="py-[16px] flex-shrink-0 w-[6%] text-center">
-          {pathName === "/unreadrequests" ? "-" : batch}
-        </td>
+        <td className="py-[16px] flex-shrink-0 w-[6%] text-center">{pathName === '/unreadrequests'|| !batch ? '-' : batch}</td>
         <td className="py-[16px] flex-shrink-0 w-[10%] text-center">
-          {pathName === "/unreadrequests" ? "-" : attendance}
+          {pathName === '/unreadrequests' || !attendance ? '-' : attendance}
         </td>
         <td className="py-[16px] flex-shrink-0 w-[10%] text-center">{phone}</td>
         <td className="py-[16px] flex-shrink-0 w-fit">
           {
-            <div
-              onClick={handleStatusClick}
-              className={`font-[600] flex justify-center rounded-[16px] items-center`}
-            >
+            <div onClick={handleStatusClick} className={`font-[600] flex justify-center rounded-[16px] items-center`}>
               <Select
-                getOptionLabel={(option) => option.label}
+                getOptionLabel={option => option.label}
                 styles={statusStyles}
                 options={statusOptions}
                 onChange={handleStatus}
@@ -133,12 +112,12 @@ const StudentRow = (props) => {
           }
         </td>
         <td className="py-[16px] flex-shrink-0 w-[15%] text-ellipsis text-center  whitespace-nowrap overflow-hidden">
-          {pathName === "/unreadrequests" ? "-" : sales}
+          {pathName === '/unreadrequests' || !sales ? '-' : sales}
         </td>
-        <td className="text-center py-[16px] flex-shrink-0 w-[15%]">{date}</td>
+        <td className="text-center py-[16px] flex-shrink-0 w-[15%]">{!date ? '-' : date}</td>
       </tr>
       {activeRow === request && showCollapse ? (
-        <tr className={`w-full ${activeRow && "bg-gray-100 "} flex`}>
+        <tr className={`w-full ${activeRow && 'bg-gray-100 '} flex`}>
           <td className="px-[50px] py-[10px] w-full" colSpan="10">
             <CollapseData
               handleActiveRow={() => handleActiveRow(request)}
@@ -148,7 +127,7 @@ const StudentRow = (props) => {
           </td>
         </tr>
       ) : (
-        ""
+        ''
       )}
     </>
   );

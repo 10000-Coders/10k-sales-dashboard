@@ -49,14 +49,14 @@ export default function SideBar() {
         src="/sideBar_Images/logo.png"
         alt=""
       />
-      <Link
+      {/* <Link
         href="/batches"
         className={`${
           pathName === '/batches' ? ' bg-vivid_orange ' : 'bg-[#B5B5B5]'
         } cursor-pointer items-center hover:bg-vivid_orange mb-[38px] ml-[10px] p-[12px] w-fit rounded-[16px] gap-[8px] flex `}>
         <Image width={18} height={18} alt="" src="/sideBar_Images/vector.svg" />
         <p className="text-white text-[16px] font-[700] leading-[normal] ">Add Batch</p>
-      </Link>
+      </Link> */}
       <div>
         <ul className=" w-fit flex flex-col items-center">
           {MenuItems.map((item, idx) => {
