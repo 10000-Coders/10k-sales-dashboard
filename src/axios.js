@@ -1,34 +1,27 @@
-// axios.js
-import axios from 'axios';
-const baseUrl = process.env.NEXT_PUBLIC_baseUrl;
-import {getDynamicHeader} from './interceptManager';
+import axios from "axios";
+import { getDynamicHeader } from "./interceptManager";
 
+// Sales API: backend base (e.g. http://localhost:8000/api) + /sales → http://localhost:8000/api/sales
+const base = process.env.NEXT_PUBLIC_baseUrl || "";
+const salesBase = base ? `${base.replace(/\/$/, "")}/sales` : "/api/sales";
 const instance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_baseUrl,
+  baseURL: salesBase,
 });
 
 instance.interceptors.request.use(
-  config => {
-    const dynamicToken = getDynamicHeader();
-    const {token} = dynamicToken;
+  (config) => {
+    const { token } = getDynamicHeader();
     if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+      config.headers.Authorization = `Bearer ${token}`;
     }
-
     return config;
   },
-  error => {
-    return Promise.reject(error);
-  },
+  (error) => Promise.reject(error)
 );
 
 instance.interceptors.response.use(
-  response => {
-    return response;
-  },
-  error => {
-    return Promise.reject(error);
-  },
+  (response) => response,
+  (error) => Promise.reject(error)
 );
 
 export default instance;

@@ -1,169 +1,54 @@
-import {createSlice, createAsyncThunk} from '@reduxjs/toolkit';
-import axios from '../../../axios';
-import useFormData from '@/hooks/useFormData';
-import {setDynamicHeader} from '../../../interceptManager';
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import axios from "@/axios";
 
-// Registration action
-export const registration = createAsyncThunk('userAuth/registration', async (formData, {rejectWithValue}) => {
-  const formDataInputs = useFormData(formData);
-  try {
-    const response = await axios.post('/salesperson/register/', formDataInputs);
-    // console.log('Api register register - ', response);
-    const {name, email, mobile} = formData;
-    const updatedState = {
-      name,
-      email,
-      mobile,
-    };
-
-    return {responseData: response.data, updatedState};
-  } catch (error) {
-    return rejectWithValue(error.response.data);
-  }
-});
-
-// Login action
-export const login = createAsyncThunk('userAuth/login', async (formData, {rejectWithValue}) => {
-  const formDataInputs = useFormData(formData);
-  try {
-    const response = await axios.post('/salesperson/login/', formDataInputs);
-
-    return response.data;
-  } catch (error) {
-    return rejectWithValue(error.response.data);
-  }
-});
-
-// addSalesperson action
-export const salesApproval = createAsyncThunk(
-  'userAuth/salesApproval',
-  async (formData, {rejectWithValue, getState}) => {
+export const login = createAsyncThunk(
+  "userAuth/login",
+  async (payload, { rejectWithValue }) => {
     try {
-      const {salesperson_auth_token} = getState().userAuth.user;
-      setDynamicHeader(salesperson_auth_token);
-
-      const response = await axios.post(`/salesperson/add-salesperson/${formData.email}/`);
-
+      const response = await axios.post("/login/", {
+        email: payload.email?.trim()?.toLowerCase(),
+        password: payload.password,
+      });
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data);
+      return rejectWithValue(error.response?.data || { detail: "Login failed." });
     }
-  },
+  }
 );
 
-// Logout action
-export const logout = createAsyncThunk('userAuth/logout', async () => {
-  try {
-    return {responseData: null};
-  } catch (error) {
-    return rejectWithValue(error.response);
-  }
-});
+export const logout = createAsyncThunk("userAuth/logout", async () => ({}));
 
-export const userAuthSlice = createSlice({
-  name: 'userAuth',
+const userAuthSlice = createSlice({
+  name: "userAuth",
   initialState: {
-    user: {
-      name: '',
-      mobile: '',
-      email: '',
-      role_type: '',
-      profile_pic: '',
-      salesperson_auth_token: '',
-    },
+    user: null,
     isLoggedIn: false,
-
-    registerLoading: false,
     loginLoading: false,
-    logoutLoading: false,
-    salesApprovalLoading: false,
-
-    registerError: null,
     loginError: null,
-    logoutError: null,
   },
-  reducers: {
-    // Additional reducers if needed
-  },
-  extraReducers: builder => {
+  reducers: {},
+  extraReducers: (builder) => {
     builder
-      .addCase(registration.pending, state => {
-        state.registerLoading = true;
-        state.isLoggedIn = false;
-        state.user = {
-          name: '',
-          mobile: '',
-          email: '',
-          role_type: '',
-          profile_pic: '',
-          salesperson_auth_token: '',
-        };
-        state.registerError = null;
-      })
-      .addCase(registration.fulfilled, (state, action) => {
-        state.registerLoading = false;
-        state.isLoggedIn = true;
-        state.user = {
-          ...state.user,
-          ...action.payload.updatedState,
-          salesperson_auth_token: action.payload.responseData.salesperson_auth_token,
-        };
-      })
-      .addCase(registration.rejected, (state, action) => {
-        state.registerLoading = false;
-        state.registerError = action.payload;
-      })
-      .addCase(login.pending, state => {
+      .addCase(login.pending, (state) => {
         state.loginLoading = true;
-        state.isLoggedIn = false;
-        state.user = {
-          name: '',
-          mobile: '',
-          email: '',
-          role_type: '',
-          profile_pic: '',
-          salesperson_auth_token: '',
-        };
         state.loginError = null;
       })
       .addCase(login.fulfilled, (state, action) => {
         state.loginLoading = false;
         state.isLoggedIn = true;
-        state.user = {...state.user, ...action.payload};
+        state.user = action.payload;
+        state.loginError = null;
       })
       .addCase(login.rejected, (state, action) => {
         state.loginLoading = false;
-        state.loginError = action.payload.error;
-      })
-      .addCase(salesApproval.pending, (state, action) => {
-        state.salesApprovalLoading = true;
-      })
-      .addCase(salesApproval.fulfilled, (state, action) => {
-        state.salesApprovalLoading = false;
-      })
-      .addCase(salesApproval.rejected, (state, action) => {
-        state.salesApprovalLoading = false;
-      })
-      .addCase(logout.pending, state => {
-        state.logoutLoading = true;
         state.isLoggedIn = false;
-        state.logoutError = null;
+        state.user = null;
+        state.loginError = action.payload?.detail || action.payload?.message || "Login failed.";
       })
-      .addCase(logout.fulfilled, state => {
-        state.logoutLoading = false;
+      .addCase(logout.fulfilled, (state) => {
+        state.user = null;
         state.isLoggedIn = false;
-        state.user = {
-          name: '',
-          mobile: '',
-          email: '',
-          role_type: '',
-          profile_pic: '',
-          salesperson_auth_token: '',
-        };
-      })
-      .addCase(logout.rejected, (state, action) => {
-        state.logoutLoading = false;
-        state.logoutError = action.payload.error;
+        state.loginError = null;
       });
   },
 });

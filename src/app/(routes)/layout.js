@@ -1,4 +1,6 @@
 import SideBar from "@/components/SideBar";
+import TopNavbar from "@/components/TopNavbar";
+import { FollowUpProvider } from "@/context/FollowUpProvider";
 
 export const metadata = {
   title: "Create Next App",
@@ -7,9 +9,14 @@ export const metadata = {
 
 export default function GroupLayout({ children }) {
   return (
-    <main className="flex">
-      <SideBar />
-      {children}
-    </main>
+    <FollowUpProvider>
+      <main className="flex min-h-screen">
+        <SideBar />
+        <div className="ml-[250px] flex flex-1 flex-col min-w-0">
+          <TopNavbar />
+          {children}
+        </div>
+      </main>
+    </FollowUpProvider>
   );
 }

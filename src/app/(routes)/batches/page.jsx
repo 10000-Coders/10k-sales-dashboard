@@ -1,174 +1,733 @@
-'use client';
-import BatchModal from '@/components/modals/AddBatchModal';
-import ReleaseConfirmationModal from '@/components/modals/ReleaseConfirmationModal';
-import StudentTablebyBatch from '@/components/StudentTablebyBatch';
-import {Search} from '@/shared/svgImages/navBarImages';
-import {AddIcon} from '@/shared/svgImages/tableImages';
-import React, {useState} from 'react';
-import Select from 'react-select';
+"use client";
 
-export default function Batches() {
-  const [filteredData, setfilteredData] = useState([]);
-  const studentDataByBatch = [
-    {
-      name: 'Jayadeep kulshekhar',
-      phone: '7887890986',
-      date: '22/12/23',
-      email: 'jayadeepkulshekhar@gmai.com',
-      batch: '101',
-    },
-    {
-      name: 'Raghavendra Rao Kandula',
-      phone: '8373625125',
-      date: '22/12/23',
-      email: 'raghavendraraoKandula@gmail.com',
-      batch: '102',
-    },
-    {
-      name: 'Ananya Reddy Gaddam',
-      phone: '9083625362',
-      date: '22/12/23',
-      email: 'ananyareddygaddam@gmail.com',
-      batch: '103',
-    },
-  ];
-  const [selectedBatch, setselectedBatch] = useState({
-    label: 'Select batch',
-    value: 'select batch',
+import { useCallback, useEffect, useState } from "react";
+import { useSelector } from "react-redux";
+import withPrivateAuth from "@/components/withPrivateAuth";
+
+import axios from "@/axios";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import useToast from "@/hooks/useToast";
+import Select from "react-select";
+
+const COURSE_LABELS = {
+  python_fullstack: "Python Fullstack",
+  java_fullstack: "Java Fullstack",
+  mern: "MERN",
+  data_science: "Data Science",
+  devops: "DevOps",
+};
+
+const COURSE_OPTIONS = [
+  { value: "python_fullstack", label: "Python Fullstack" },
+  { value: "java_fullstack", label: "Java Fullstack" },
+  { value: "mern", label: "MERN" },
+  { value: "data_science", label: "Data Science" },
+  { value: "devops", label: "DevOps" },
+];
+
+function canManageSalesBatches(role) {
+  return role === "manager" || role === "super_admin";
+}
+
+function BatchesPage() {
+  const user = useSelector((state) => state.userAuth?.user);
+  const canManage = canManageSalesBatches(user?.role);
+  const { showSuccessToast, showErrorToast } = useToast();
+  const [salesBatches, setSalesBatches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editingBatch, setEditingBatch] = useState(null);
+  const [formError, setFormError] = useState(null);
+  const [form, setForm] = useState({
+    name: "",
+    course: "",
+    capacity: "",
+    status: "active",
   });
-  const [isBatchModal, setBatchModal] = useState(false);
-  const [SearchInput, setSearchInput] = useState('');
-  const [isReleaseModal, setReleaseModal] = useState(false);
-  const handleReleaseBatchModal = () => setReleaseModal(!isReleaseModal);
+  const [selectedSalesBatchId, setSelectedSalesBatchId] = useState("");
+  const [studentsModalOpen, setStudentsModalOpen] = useState(false);
+  const [batchStudents, setBatchStudents] = useState([]);
+  const [batchStudentsLoading, setBatchStudentsLoading] = useState(false);
+  const [batchStudentsError, setBatchStudentsError] = useState(null);
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [moveModalOpen, setMoveModalOpen] = useState(false);
+  const [mentorBatches, setMentorBatches] = useState([]);
+  const [mentorBatchesLoading, setMentorBatchesLoading] = useState(false);
+  const [targetBatch, setTargetBatch] = useState("");
+  const [moveSubmitting, setMoveSubmitting] = useState(false);
+  const [moveError, setMoveError] = useState(null);
+  const [paymentSummaryByStudent, setPaymentSummaryByStudent] = useState({});
+  const [paymentSummaryLoading, setPaymentSummaryLoading] = useState(false);
 
-  const handleSearchInput = e => {
-    setSearchInput(e.target.value);
-    const filterData = studentDataByBatch.filter(
-      ({name}) => name.toLowerCase().indexOf(SearchInput.toLowerCase()) !== -1,
+  const getHeaders = useCallback(() => {
+    const h = {};
+    if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
+    if (user?.role) h["X-Sales-Person-Role"] = user.role;
+    return h;
+  }, [user?.id, user?.role]);
+
+  const fetchSalesBatches = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const { data } = await axios.get("/sales-batches/", { headers: getHeaders() });
+      const list = data?.results ?? (Array.isArray(data) ? data : []);
+      setSalesBatches(list);
+    } catch (err) {
+      setSalesBatches([]);
+      setError(err.response?.data?.detail || "Failed to load sales batches.");
+    } finally {
+      setLoading(false);
+    }
+  }, [getHeaders]);
+
+  const fetchBatchStudents = useCallback(async (salesBatchId) => {
+    if (!salesBatchId) return;
+    try {
+      setBatchStudentsLoading(true);
+      setBatchStudentsError(null);
+      const params = new URLSearchParams();
+      params.set("sales_batch", String(salesBatchId));
+      const { data } = await axios.get(`/students/?${params.toString()}`, { headers: getHeaders() });
+      const list = data?.results ?? (Array.isArray(data) ? data : []);
+      setBatchStudents(list);
+    } catch (err) {
+      setBatchStudents([]);
+      setBatchStudentsError(err.response?.data?.detail || "Failed to load students in this sales batch.");
+    } finally {
+      setBatchStudentsLoading(false);
+    }
+  }, [getHeaders]);
+
+  const fetchPaymentSummaries = useCallback(async (studentsList) => {
+    if (!Array.isArray(studentsList) || studentsList.length === 0) {
+      setPaymentSummaryByStudent({});
+      return;
+    }
+    setPaymentSummaryLoading(true);
+    try {
+      const entries = await Promise.all(
+        studentsList.map(async (s) => {
+          if (!s?.id) return [null, { verified: 0, pending: 0 }];
+          try {
+            const { data } = await axios.get(`/students/${s.id}/payments/`, { headers: getHeaders() });
+            const payments = Array.isArray(data) ? data : [];
+            const verified = payments
+              .filter((p) => p?.status === "verified")
+              .reduce((sum, p) => sum + Number(p?.amount || 0), 0);
+            const pending = payments
+              .filter((p) => p?.status === "pending")
+              .reduce((sum, p) => sum + Number(p?.amount || 0), 0);
+            return [s.id, { verified, pending }];
+          } catch {
+            return [s.id, { verified: 0, pending: 0 }];
+          }
+        })
+      );
+      const mapped = Object.fromEntries(entries.filter(([id]) => id != null));
+      setPaymentSummaryByStudent(mapped);
+    } finally {
+      setPaymentSummaryLoading(false);
+    }
+  }, [getHeaders]);
+
+  const fetchMentorBatches = useCallback(async () => {
+    try {
+      setMentorBatchesLoading(true);
+      const { data } = await axios.get("/batches/", { headers: getHeaders() });
+      const list = data?.results ?? (Array.isArray(data) ? data : []);
+      setMentorBatches(list);
+    } catch {
+      setMentorBatches([]);
+    } finally {
+      setMentorBatchesLoading(false);
+    }
+  }, [getHeaders]);
+
+  useEffect(() => {
+    fetchSalesBatches();
+  }, [fetchSalesBatches]);
+
+  useEffect(() => {
+    if (moveModalOpen) fetchMentorBatches();
+  }, [moveModalOpen, fetchMentorBatches]);
+
+  useEffect(() => {
+    if (!selectedSalesBatchId) {
+      setBatchStudents([]);
+      setBatchStudentsError(null);
+      setSelectedStudentIds([]);
+      setPaymentSummaryByStudent({});
+      setStudentsModalOpen(false);
+      return;
+    }
+    fetchBatchStudents(selectedSalesBatchId);
+    setSelectedStudentIds([]);
+    setMoveError(null);
+    setTargetBatch("");
+    setStudentsModalOpen(true);
+  }, [selectedSalesBatchId, fetchBatchStudents]);
+
+  const openCreateModal = () => {
+    setEditingBatch(null);
+    setForm({ name: "", course: "", capacity: "", status: "active" });
+    setFormError(null);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (batch) => {
+    setEditingBatch(batch);
+    setForm({
+      name: batch.name || "",
+      course: batch.course || "",
+      capacity: batch.capacity != null ? String(batch.capacity) : "",
+      status: batch.status || "active",
+    });
+    setFormError(null);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingBatch(null);
+    setFormError(null);
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.course || !String(form.capacity).trim()) {
+      setFormError("Name, course, and capacity are required.");
+      return;
+    }
+    const capacityNumber = Number(form.capacity);
+    if (!Number.isFinite(capacityNumber)) {
+      setFormError("Capacity must be a number.");
+      return;
+    }
+    if (capacityNumber <= 10) {
+      setFormError("Capacity must be greater than 10.");
+      return;
+    }
+    if (capacityNumber > 150) {
+      setFormError("Capacity cannot exceed 150.");
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    try {
+      const payload = {
+        name: form.name.trim(),
+        course: form.course,
+        capacity: capacityNumber,
+        status: form.status || "active",
+      };
+      if (editingBatch?.id) {
+        await axios.patch(`/sales-batches/${editingBatch.id}/`, payload, { headers: getHeaders() });
+      } else {
+        await axios.post("/sales-batches/", payload, { headers: getHeaders() });
+      }
+      closeModal();
+      fetchSalesBatches();
+    } catch (err) {
+      const data = err.response?.data;
+      setFormError(
+        data?.detail ||
+          (data && typeof data === "object" ? Object.values(data).flat().join(" ") : "Failed to save sales batch.")
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (batchId) => {
+    if (!confirm("Delete this sales batch?")) return;
+    try {
+      await axios.delete(`/sales-batches/${batchId}/`, { headers: getHeaders() });
+      fetchSalesBatches();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Failed to delete sales batch.");
+    }
+  };
+
+  const toggleStudentSelection = (studentId) => {
+    setSelectedStudentIds((prev) =>
+      prev.includes(studentId) ? prev.filter((id) => id !== studentId) : [...prev, studentId]
     );
-    setfilteredData(filterData);
   };
-  const handleBatchModal = () => setBatchModal(!isBatchModal);
-  const handleSetbatch = selectedItem => setselectedBatch(selectedItem);
-  const batchOptions = [
-    {label: '101', value: '101'},
-    {label: '102', value: '102'},
-    {label: '103', value: '103'},
-    {label: '104', value: '104'},
-    {label: '105', value: '105'},
-  ];
-  const batchStyles = {
-    option: (provided, state) => ({
-      cursor: 'pointer',
-      paddingBlock: '10px',
-      paddingInline: '15px',
-      fontWeight: '600',
-      textAlign: 'center',
-      position: 'relative',
-      '&:hover': {
-        background: 'rgb(0,0,0,0.05)',
-      },
-    }),
-    control: (provided, state) => ({
-      ...provided,
-      border: '0',
-      boxShadow: 'none',
-      '&:hover': {
-        borderColor: 'none',
-      },
-      '&:active': {
-        outline: 'none',
-      },
-      // backgroundColor: salesBgcolor,
-      // color: salesColor,
-      cursor: 'pointer',
-      fontWeight: '600',
-      textAlign: 'center',
-      height: '100%',
-      borderRadius: '16px',
-      boxShadow: '1px 1px 6px rgb(0,0,0,0.1)',
-      width: '200px',
-    }),
-    singleValue: provided => ({
-      ...provided,
-      // color: salesColor,
-      borderRadius: '16px',
-    }),
-    dropdownIndicator: base => ({
-      ...base,
-      color: 'black',
-      '&:hover': {
-        color: 'black',
-      },
-    }),
+
+  const toggleSelectAll = (checked) => {
+    if (checked) {
+      const ids = batchStudents
+        .filter((s) => !s?.is_moved_to_batch)
+        .map((s) => s.id)
+        .filter((id) => id != null);
+      setSelectedStudentIds(ids);
+      return;
+    }
+    setSelectedStudentIds([]);
   };
+
+  const openBatchStudents = async (batchId) => {
+    if (!batchId) return;
+    const nextId = String(batchId);
+    setSelectedSalesBatchId(nextId);
+    setMoveError(null);
+    setTargetBatch("");
+    setStudentsModalOpen(true);
+    await fetchBatchStudents(nextId);
+  };
+
+  const handleMoveSelectedStudents = async (e) => {
+    e.preventDefault();
+    if (!selectedSalesBatchId || selectedStudentIds.length === 0 || !targetBatch.trim()) return;
+    setMoveSubmitting(true);
+    setMoveError(null);
+    try {
+      const { data } = await axios.post(
+        `/sales-batches/${selectedSalesBatchId}/move-selected-to-batch/`,
+        { student_ids: selectedStudentIds, target_batch: targetBatch.trim() },
+        { headers: getHeaders() }
+      );
+      const movedCount = Number(data?.moved_count ?? 0);
+      const skippedCount = Array.isArray(data?.skipped) ? data.skipped.length : Number(data?.skipped ?? 0);
+      showSuccessToast(`Moved ${movedCount} student(s). Skipped ${skippedCount}.`);
+      setMoveModalOpen(false);
+      setTargetBatch("");
+      setSelectedStudentIds([]);
+      await Promise.all([fetchBatchStudents(selectedSalesBatchId), fetchSalesBatches()]);
+    } catch (err) {
+      const data = err.response?.data;
+      const msg =
+        data?.detail ||
+        (Array.isArray(data?.non_field_errors) ? data.non_field_errors[0] : null) ||
+        (typeof data === "string" ? data : null) ||
+        "Failed to move selected students.";
+      setMoveError(msg);
+      showErrorToast(msg);
+    } finally {
+      setMoveSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedSalesBatchId) return;
+    fetchPaymentSummaries(batchStudents);
+  }, [selectedSalesBatchId, batchStudents, fetchPaymentSummaries]);
+
+  const selectedSalesBatch = salesBatches.find((b) => String(b.id) === String(selectedSalesBatchId)) || null;
+  const salesBatchOptions = salesBatches.map((b) => ({
+    value: String(b.id),
+    label: `${b.name} (${COURSE_LABELS[b.course] ?? b.course ?? "—"} · ${b.total_students ?? 0} total)`,
+  }));
+  const selectedSalesBatchOption =
+    salesBatchOptions.find((o) => o.value === String(selectedSalesBatchId)) ?? null;
 
   return (
-    <main className="w-[calc(100%-251.6px)] flex flex-col gap-[40px] h-[100vh] py-[30px] px-[40px] float-right">
-      <div className="flex justify-between">
-        <div className="w-[180px] gap-[20px] flex-shrink-0 flex">
-          <Select
-            styles={batchStyles}
-            placeholder="Select Batch"
-            options={batchOptions}
-            value={selectedBatch}
-            onChange={handleSetbatch}
-            isSearchable={false}
-          />
-          <button
-            onClick={handleBatchModal}
-            className="flex font-semibold flex-shrink-0 items-center gap-[10px] px-[10px] shadow rounded-[16px]">
-            Add Batch <AddIcon fill="#FF8000" />
-          </button>
-        </div>
-        <div className="w-[200px] px-[15px] bg-[#ECECEC] rounded-[32px] gap-[10px] items-center flex h-[53px]">
-          <label htmlFor="search">
-            <Search />
-          </label>
-          <input
-            type="text"
-            placeholder="Search Student"
-            className="placeholder:text-[16px] bg-inherit w-full placeholder:text-black focus:outline-none font-[400]"
-            name="search"
-            id="search"
-            onChange={handleSearchInput}
-            value={SearchInput}
-          />
-        </div>
-      </div>
-      <div className="border relative overflow-hidden rounded-[16px] shadow w-full flex-shrink-0 h-[200px]">
-        {!SearchInput ? (
-          ''
-        ) : (
-          <StudentTablebyBatch
-            searchInput={SearchInput}
-            studentDataByBatch={studentDataByBatch}
-            filteredData={filteredData}
-            assignBatchTable={true}
-          />
-        )}
-      </div>
-      <div className="flex  gap-[10px] flex-col">
-        <p className="text-[20px] font-semibold">
-          Assigned students for the Batch : {selectedBatch.value === 'select batch' ? '' : selectedBatch.value}
-        </p>
+    <div className="flex flex-1 flex-col gap-6 p-8">
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="text-2xl">Sales Batches</CardTitle>
+                <CardDescription>
+                  Manage sales batch capacity and movement summary before mentor batch assignment.
+                </CardDescription>
+              </div>
+              {canManage && (
+                <Button onClick={openCreateModal}>Create Sales Batch</Button>
+              )}
+            </div>
+            <div>
+              <div className="sm:max-w-2xl">
+                <Select
+                  options={salesBatchOptions}
+                  value={selectedSalesBatchOption}
+                  onChange={(option) => {
+                    if (!option?.value) {
+                      setSelectedSalesBatchId("");
+                      setStudentsModalOpen(false);
+                      return;
+                    }
+                    openBatchStudents(option.value);
+                  }}
+                  isSearchable
+                  isClearable
+                  placeholder="Search and select sales batch (opens modal)"
+                />
+                {!loading && salesBatchOptions.length === 0 && (
+                  <p className="mt-1 text-xs text-muted-foreground">No sales batches available.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : error ? (
+            <p className="py-6 text-center text-destructive">{error}</p>
+          ) : salesBatches.length === 0 ? (
+            <p className="py-6 text-center text-muted-foreground">No sales batches found.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Batch Name</TableHead>
+                  <TableHead>Course</TableHead>
+                  <TableHead>Capacity</TableHead>
+                  <TableHead>Total</TableHead>
+                  <TableHead>Moved</TableHead>
+                  <TableHead>Not Moved</TableHead>
+                  <TableHead>Remaining Seats</TableHead>
+                  <TableHead>Status</TableHead>
+                  {canManage && <TableHead className="w-[140px] text-right">Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {salesBatches.map((b) => (
+                  <TableRow
+                    key={b.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openBatchStudents(b.id)}
+                  >
+                    <TableCell className="font-medium">{b.name || "—"}</TableCell>
+                    <TableCell>{COURSE_LABELS[b.course] ?? b.course ?? "—"}</TableCell>
+                    <TableCell>{b.capacity ?? "—"}</TableCell>
+                    <TableCell>{b.total_students ?? 0}</TableCell>
+                    <TableCell>{b.moved_students ?? 0}</TableCell>
+                    <TableCell>{b.not_moved_students ?? 0}</TableCell>
+                    <TableCell>{b.remaining_seats ?? 0}</TableCell>
+                    <TableCell>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-xs font-medium",
+                          b.status === "active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-700"
+                        )}
+                      >
+                        {b.status ?? "—"}
+                      </span>
+                    </TableCell>
+                    {canManage && (
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditModal(b);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        {Number(b.total_students ?? 0) === 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(b.id);
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        )}
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
-        <div className="border overflow-auto scroll-style relative rounded-[16px] shadow w-full flex-shrink-0 h-[220px]">
-          <StudentTablebyBatch
-            searchInput={SearchInput}
-            assignBatchTable={false}
-            studentDataByBatch={studentDataByBatch}
-            filteredData={filteredData}
-          />
+      {modalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={closeModal}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sales-batch-modal-title"
+        >
+          <div
+            className="relative w-full max-w-md rounded-xl border bg-background p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 id="sales-batch-modal-title" className="text-lg font-semibold">
+                {editingBatch ? "Edit Sales Batch" : "Create Sales Batch"}
+              </h2>
+              <Button variant="ghost" size="icon" className="rounded-full" onClick={closeModal} aria-label="Close">
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            {formError && (
+              <p className="mb-3 text-sm text-destructive">{formError}</p>
+            )}
+            <form onSubmit={handleSave} className="space-y-3">
+              <div>
+                <Label>Batch name *</Label>
+                <Input
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <Label>Course *</Label>
+                <select
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={form.course}
+                  onChange={(e) => setForm((f) => ({ ...f, course: e.target.value }))}
+                  required
+                >
+                  <option value="">Select course</option>
+                  {COURSE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Capacity *</Label>
+                <Input
+                  type="number"
+                  min={11}
+                  max={150}
+                  value={form.capacity}
+                  onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <Label>Status</Label>
+                <select
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={form.status}
+                  onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button type="submit" disabled={saving}>
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                </Button>
+                <Button type="button" variant="outline" onClick={closeModal}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
         </div>
-        <button
-          onClick={handleReleaseBatchModal}
-          className="flex ml-auto font-semibold flex-shrink-0 items-center gap-[10px] p-[10px] shadow rounded-[16px]">
-          Release Batch <AddIcon fill="#FF8000" />
-        </button>
-      </div>
-      <BatchModal handleModal={handleBatchModal} isModal={isBatchModal} />
-      <ReleaseConfirmationModal handleModal={handleReleaseBatchModal} isModal={isReleaseModal} />
-    </main>
+      )}
+
+      {studentsModalOpen && selectedSalesBatch && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 md:p-6"
+          onClick={() => setStudentsModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sales-batch-students-title"
+        >
+          <div
+            className="relative flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border bg-background shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b bg-muted/30 px-5 py-4">
+              <div>
+                <h2 id="sales-batch-students-title" className="text-xl font-semibold tracking-tight">
+                  {selectedSalesBatch.name} students
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Review details and move selected students to actual mentor batch.
+                </p>
+              </div>
+              <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setStudentsModalOpen(false)} aria-label="Close">
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  Batch: {selectedSalesBatch?.name ?? "—"} · Selected: {selectedStudentIds.length}
+                </span>
+                {canManage && (
+                  <Button
+                    variant="outline"
+                    disabled={selectedStudentIds.length === 0}
+                    onClick={() => {
+                      setMoveError(null);
+                      setTargetBatch("");
+                      setMoveModalOpen(true);
+                    }}
+                  >
+                    Move Selected to Actual Batch
+                  </Button>
+                )}
+              </div>
+              {batchStudentsLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : batchStudentsError ? (
+                <p className="py-6 text-center text-destructive">{batchStudentsError}</p>
+              ) : batchStudents.length === 0 ? (
+                <p className="py-6 text-center text-muted-foreground">No students found in this sales batch.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {canManage && (
+                        <TableHead className="w-[40px]">
+                          <input
+                            type="checkbox"
+                            checked={
+                              batchStudents.some((s) => !s?.is_moved_to_batch) &&
+                              selectedStudentIds.length === batchStudents.filter((s) => !s?.is_moved_to_batch).length
+                            }
+                            onChange={(e) => toggleSelectAll(e.target.checked)}
+                            aria-label="Select all students"
+                          />
+                        </TableHead>
+                      )}
+                      <TableHead>Name</TableHead>
+                      <TableHead>Student Owner</TableHead>
+                      <TableHead>Course</TableHead>
+                      <TableHead>Mobile</TableHead>
+                      <TableHead>Offered</TableHead>
+                      <TableHead>Verified Paid</TableHead>
+                      <TableHead>Pending Verification</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {batchStudents.map((s) => (
+                      <TableRow key={s.id}>
+                      {canManage && (
+                        <TableCell>
+                          {!s.is_moved_to_batch ? (
+                            <input
+                              type="checkbox"
+                              checked={selectedStudentIds.includes(s.id)}
+                              onChange={() => toggleStudentSelection(s.id)}
+                              aria-label={`Select ${s.student_name}`}
+                            />
+                          ) : null}
+                        </TableCell>
+                      )}
+                        <TableCell className="font-medium">{s.student_name ?? "—"}</TableCell>
+                        <TableCell>{s.sales_person_name ?? "—"}</TableCell>
+                        <TableCell>{COURSE_LABELS[s.course] ?? s.course ?? "—"}</TableCell>
+                        <TableCell>{s.student_mobile ?? "—"}</TableCell>
+                        <TableCell>
+                          {s.payment_offered != null ? `₹ ${Number(s.payment_offered).toLocaleString()}` : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {paymentSummaryLoading
+                            ? "..."
+                            : `₹ ${Number(paymentSummaryByStudent[s.id]?.verified || 0).toLocaleString()}`}
+                        </TableCell>
+                        <TableCell>
+                          {paymentSummaryLoading
+                            ? "..."
+                            : `₹ ${Number(paymentSummaryByStudent[s.id]?.pending || 0).toLocaleString()}`}
+                        </TableCell>
+                        <TableCell>
+                          {s.is_moved_to_batch ? (
+                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">Moved</span>
+                          ) : (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Not moved</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {moveModalOpen && selectedSalesBatch && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setMoveModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="move-selected-modal-title"
+        >
+          <div
+            className="relative w-full max-w-md rounded-xl border bg-background p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="move-selected-modal-title" className="mb-3 text-lg font-semibold">
+              Move Selected to Actual Batch
+            </h2>
+            {moveError && (
+              <p className="mb-3 text-sm text-destructive">{moveError}</p>
+            )}
+            <form onSubmit={handleMoveSelectedStudents} className="space-y-3">
+              <div>
+                <label className="text-sm font-medium">Target mentor batch</label>
+                <select
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={targetBatch}
+                  onChange={(e) => setTargetBatch(e.target.value)}
+                  disabled={mentorBatchesLoading}
+                >
+                  <option value="">{mentorBatchesLoading ? "Loading batches..." : "Select target batch"}</option>
+                  {mentorBatches.map((b) => {
+                    const value = typeof b === "string" ? b : b?.name;
+                    if (!value) return null;
+                    return (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button type="submit" disabled={moveSubmitting || !targetBatch.trim() || selectedStudentIds.length === 0}>
+                  {moveSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Move"}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setMoveModalOpen(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
+export default withPrivateAuth(BatchesPage);

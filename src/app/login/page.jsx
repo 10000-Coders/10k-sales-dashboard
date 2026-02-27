@@ -1,144 +1,164 @@
-'use client';
-import React, {useState, useEffect} from 'react';
-import Link from 'next/link';
-import {EyeIcon, MailIcon, PasswordIcon} from '@/shared/svgImages/navBarImages/index';
-import {useSelector, useDispatch} from 'react-redux';
-import {login} from '@/redux/features/user/userAuth';
-import useToast from '@/hooks/useToast';
-import SpinnerLoader from '@/components/SpinnerLoader';
-import {useRouter} from 'next/navigation';
+"use client";
 
-const Login = () => {
+import { useState } from "react";
+import Image from "next/image";
+import { Mail, Lock, Eye, EyeOff, Loader2, LayoutDashboard, Users, Target } from "lucide-react";
+import { useDispatch, useSelector } from "react-redux";
+import { login } from "@/redux/features/user/userAuth";
+import useToast from "@/hooks/useToast";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
-  const handleShowPassword = () => setShowPassword(!showPassword);
-  const [formData, setFormData] = useState({email: '', password: ''});
-
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const dispatch = useDispatch();
-  const {user, loginLoading} = useSelector(state => state.userAuth);
-  const {showSuccessToast, showErrorToast} = useToast();
+  const { loginLoading } = useSelector((state) => state.userAuth);
+  const { showSuccessToast, showErrorToast } = useToast();
   const router = useRouter();
-  useEffect(() => {
-    const redirectTo = window.location.search ? new URLSearchParams(window.location.search).get('redirectTo') : null;
-    if (redirectTo) {
-      showErrorToast('Please login to access this page', 'top-right', 'light');
 
-      const currentUrl = window.location.href;
-      const updatedUrl = currentUrl.replace(`?redirectTo=${encodeURIComponent(redirectTo)}`, '');
-      window.history.replaceState({}, document.title, updatedUrl);
-    }
-  }, []);
-  const handleChange = e => {
-    const {name, value} = e.target;
-    setFormData(prevState => ({
-      ...prevState,
-      [name]: value,
-    }));
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  useEffect(() => {
-    setFormData(
-      prevState => ({
-        ...prevState,
-        email: user.email,
-      }),
-      [],
-    );
-  }, []);
-
-  const {email, password} = formData;
-
-  const handleFormSubmit = async e => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      let response = await dispatch(login(formData));
-      const {payload} = response;
-      // console.log('HandleSubmit login response - ', response);
-      const {status, salesperson_auth_token, message} = payload;
-      if (payload && status) {
-        showSuccessToast(message, 'top-right', 'light');
-        if (salesperson_auth_token) {
-          router.push('/unreadrequests');
-        }
-      } else {
-        showErrorToast(payload.error ? payload.error : 'Something went wrong', 'top-right', 'light');
-      }
-    } catch (error) {
-      console.error('Login error:', error);
+    const res = await dispatch(login(formData));
+    if (login.fulfilled.match(res)) {
+      showSuccessToast("Logged in successfully.", "top-right", "light");
+      router.push("/");
+    } else {
+      showErrorToast(res.payload?.detail || "Invalid email or password.", "top-right", "light");
     }
   };
+
   return (
-    <main className="h-[100vh] flex items-center justify-center">
-      <form
-        className={` h-[450px] rounded-[16px] px-[40px] py-[38px] border shadow flex flex-col w-[454px] gap-[24px] bg-white`}
-        onSubmit={handleFormSubmit}>
-        <p className="text-center w-full text-[24px] font-[600] leading-[normal]">Login</p>
-        <div className="flex flex-col gap-[8px]">
-          <label className="block text-[13px] font-semibold  text-gray-900" htmlFor="Email">
-            Email ID
-          </label>
-          <div className="border-silver focus-within:border-vivid_orange focus-within:border  w-full gap-[8px] rounded-[8px] py-1 px-[15px] border flex">
-            <MailIcon />
-            <input
-              required
-              type="email"
-              id="email"
-              name="email"
-              value={email}
-              className="focus:outline-none w-full"
-              onChange={handleChange}
+    <main className="flex min-h-screen">
+      {/* Left: Brand panel */}
+      <div className="hidden lg:flex lg:w-[48%] flex-col justify-between bg-[hsl(24,95%,53%)] p-10 text-white">
+        <div>
+          <div className="relative h-10 w-[133px]">
+            <Image
+              src="/sideBar_Images/logo.png"
+              alt="10k Coders"
+              fill
+              className="object-contain object-left"
+              priority
             />
           </div>
-          <div className="flex w-full flex-col gap-[8px]">
-            <label className="block text-[13px] font-semibold  text-gray-900" htmlFor="Password">
-              Password
-            </label>
-            <div className="border-silver px-[15px]  w-full gap-[8px] rounded-[8px] py-1 border items-center flex ">
-              <PasswordIcon />
-              <input
-                required
-                type={showPassword ? 'password' : 'text'}
-                id="Password"
-                name="password"
-                value={password}
-                className="focus:outline-none w-full"
-                onChange={handleChange}
+        </div>
+        <div className="space-y-8">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Sales Dashboard</h1>
+            <p className="mt-2 text-white/90 text-lg">Manage leads, track activities, and close more deals.</p>
+          </div>
+          <ul className="space-y-4">
+            {[
+              { icon: Target, text: "Track leads from first contact to enrollment" },
+              { icon: Users, text: "Assign and manage your sales team" },
+              { icon: LayoutDashboard, text: "One place for all your sales operations" },
+            ].map(({ icon: Icon, text }) => (
+              <li key={text} className="flex items-center gap-3 text-white/95">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/20">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span>{text}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <p className="text-sm text-white/80">© 10k Coders · Sales team portal</p>
+      </div>
+
+      {/* Right: Login form */}
+      <div className="flex flex-1 flex-col items-center justify-center bg-[hsl(0,0%,98%)] px-4 py-12">
+        <div className="w-full max-w-[400px]">
+          {/* Mobile logo */}
+          <div className="mb-8 flex justify-center lg:hidden">
+            <div className="relative h-9 w-[120px]">
+              <Image
+                src="/sideBar_Images/logo.png"
+                alt="10k Coders"
+                fill
+                className="object-contain"
+                priority
               />
-              <div onClick={handleShowPassword}>
-                <EyeIcon />
-              </div>
             </div>
           </div>
-        </div>
-        <div className="cursor-pointer flex justify-between text-[13px] font-[600]"></div>
-        <div className="flex text-[13px] font-[600] gap-[8px]">
-          <input required type="checkbox" name="Remember me" id="Remember me" className=" checked:bg-vivid_orange" />
-          <label htmlFor="Remember me">Remember me</label>
-        </div>
-        {loginLoading ? (
-          <button
-            type="button"
-            className="w-full p-[12px] font-[600] text-center bg-vivid_orange  text-white text-[16px] rounded-[8px]">
-            <center>
-              <SpinnerLoader />
-            </center>
-          </button>
-        ) : (
-          <button
-            type="submit"
-            className="w-full p-[12px] font-[600] text-center bg-vivid_orange  text-white text-[16px] rounded-[8px]">
-            Login
-          </button>
-        )}
 
-        <p className="text-[12px] text-boulder text-center font-[600]">
-          Don't have account?{' '}
-          <Link href="/register" className="text-vivid_orange cursor-pointer">
-            Register
-          </Link>
-        </p>
-      </form>
+          <div className="mb-8">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground">Welcome back</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Sign in with your sales account</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-foreground">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="you@company.com"
+                  className="h-11 border-border bg-background pl-10 focus-visible:ring-2 focus-visible:ring-primary/20"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-foreground">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="••••••••"
+                  className="h-11 border-border bg-background pl-10 pr-11"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-1/2 h-11 w-11 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <Button
+              type="submit"
+              className="h-11 w-full font-semibold"
+              size="lg"
+              disabled={loginLoading}
+            >
+              {loginLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                "Sign in"
+              )}
+            </Button>
+          </form>
+
+          <p className="mt-8 text-center text-xs text-muted-foreground">
+            Use the email and password provided by your manager.
+          </p>
+        </div>
+      </div>
     </main>
   );
-};
-
-export default Login;
+}

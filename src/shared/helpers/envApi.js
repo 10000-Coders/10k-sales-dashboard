@@ -1,26 +1,6 @@
-//  dev | uat | prod
-const envType = 'dev';
-let envConfig;
+// API base URL is set via NEXT_PUBLIC_baseUrl (e.g. http://localhost:8000/api/sales)
+const envConfig = {
+  apiBaseUrl: process.env.NEXT_PUBLIC_baseUrl || "/api/sales",
+};
 
-switch (envType) {
-  case 'dev':
-    envConfig = {
-      interested_students: 'interested_students_dev',
-      // base url will put here
-    };
-    break;
-  case 'uat':
-    envConfig = {
-      interested_students: 'interested_students_uat',
-    };
-    break;
-  case 'prod':
-    envConfig = {
-      interested_students: 'interested_students',
-    };
-    break;
-  default:
-    throw new Error(`Unsupported environment type: ${envType}`);
-}
-
-export {envConfig};
+export { envConfig };

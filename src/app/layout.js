@@ -3,6 +3,7 @@ import './globals.css';
 import {Providers} from '@/redux/provider';
 import {ToastContainer} from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { FollowUpProvider } from "@/context/FollowUpProvider";
 
 const poppins = Poppins({
   weight: ['700','600', '400'],
@@ -18,8 +19,10 @@ export default function RootLayout({children}) {
     <html lang="en">
       <body className={poppins.className}>
         <Providers>
-          <ToastContainer />
-          {children}
+          <FollowUpProvider>
+            <ToastContainer />
+            {children}
+          </FollowUpProvider>
         </Providers>
       </body>
     </html>

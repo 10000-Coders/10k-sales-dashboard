@@ -1,0 +1,5 @@
+# Cloudflare Pages: rewrite dynamic route segments to the single built page (static export).
+# Client-side router reads the real id from the URL (useParams). Build outputs students/0.html etc.
+/students/*  /students/0  200
+/leads/*     /leads/0  200
+/activities/*  /activities/0  200

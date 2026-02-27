@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../product-10k-public-challenge-ui"
+		},
+		{
+			"path": "../product-10k-mentor-ui"
+		},
+		{
+			"path": "../product-10k-student-ui"
+		},
+		{
+			"path": "../../back-end/10kCoders"
+		}
+	],
+	"settings": {}
+}

@@ -1,7 +1,0 @@
-.text_linear_gradient {
-  background: linear-gradient(270deg, #000 9.61%, #ff8541 52.53%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-align: center;
-}
