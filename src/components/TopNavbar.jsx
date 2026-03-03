@@ -139,7 +139,7 @@ export default function TopNavbar() {
 
                 <div className="border-t border-gray-50 bg-gray-50/50 p-4">
                   <p className="text-center text-[10px] font-medium text-gray-400">
-                    Product 10K Sales Dashboard v1.0
+                    Product 10000 Coders Sales Dashboard v1.0
                   </p>
                 </div>
               </div>
