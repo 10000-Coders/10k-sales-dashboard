@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { ActivityCharts, TeamComparisonChart, ActivityTypeChart } from "@/components/ActivityCharts";
 import { Loader2, BarChart3, Calendar, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getRangeForPreset, todayStr } from "@/lib/dateUtils";
 
 function isManagerOrAdmin(role) {
   return role === "manager" || role === "super_admin";
@@ -34,50 +35,10 @@ function isManagerOnly(role) {
   return role === "manager" || role === "super_admin";
 }
 
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function getRangeForPreset(preset) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const to = new Date(today);
-  let from = new Date(today);
-
-  switch (preset) {
-    case "today":
-      return { from: todayStr(), to: todayStr() };
-    case "yesterday": {
-      const y = new Date(today);
-      y.setDate(y.getDate() - 1);
-      const ys = y.toISOString().slice(0, 10);
-      return { from: ys, to: ys };
-    }
-    case "last7": {
-      from.setDate(from.getDate() - 6);
-      return { from: from.toISOString().slice(0, 10), to: todayStr() };
-    }
-    case "this_month": {
-      from.setDate(1);
-      return { from: from.toISOString().slice(0, 10), to: todayStr() };
-    }
-    case "last_month": {
-      from.setMonth(from.getMonth() - 1);
-      from.setDate(1);
-      const toLast = new Date(from.getFullYear(), from.getMonth() + 1, 0);
-      return {
-        from: from.toISOString().slice(0, 10),
-        to: toLast.toISOString().slice(0, 10),
-      };
-    }
-    default:
-      return { from: todayStr(), to: todayStr() };
-  }
-}
-
 const PRESETS = [
   { value: "today", label: "Today" },
   { value: "yesterday", label: "Yesterday" },
+  { value: "this_week", label: "This week" },
   { value: "last7", label: "Last 7 days" },
   { value: "this_month", label: "This month" },
   { value: "last_month", label: "Last month" },
@@ -138,14 +99,14 @@ function ActivitiesPage() {
       } else if (!isManager && user?.id) {
         params.set("sales_person", user.id);
       }
-      const { data } = await axios.get(`/stats/range/?${params.toString()}`);
+      const { data } = await axios.get(`/stats/range/?${params.toString()}`, { headers: getHeaders() });
       setRangeStats(data);
     } catch {
       setRangeStats(null);
     } finally {
       setLoading(false);
     }
-  }, [fromDate, toDate, personId, canFetchPersons, isManager, user?.id]);
+  }, [fromDate, toDate, personId, canFetchPersons, isManager, user?.id, getHeaders]);
 
   useEffect(() => {
     if (fromDate && toDate) fetchRangeStats();
@@ -247,6 +208,8 @@ function ActivitiesPage() {
                       <TableHead className="text-right">Activities</TableHead>
                       <TableHead className="text-right">Calls</TableHead>
                       <TableHead className="text-right">WhatsApp</TableHead>
+                      <TableHead className="text-right">Verified (₹)</TableHead>
+                      <TableHead className="text-right">Pending (₹)</TableHead>
                       <TableHead className="w-[120px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -259,6 +222,8 @@ function ActivitiesPage() {
                         <TableCell className="text-right font-medium">{row.activities_total}</TableCell>
                         <TableCell className="text-right">{row.calls}</TableCell>
                         <TableCell className="text-right">{row.whatsapp}</TableCell>
+                        <TableCell className="text-right">{(row.verified_payment_amount ?? 0).toLocaleString("en-IN")}</TableCell>
+                        <TableCell className="text-right">{(row.pending_payment_amount ?? 0).toLocaleString("en-IN")}</TableCell>
                         <TableCell>
                           <Button
                             variant="outline"

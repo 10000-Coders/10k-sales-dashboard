@@ -24,6 +24,7 @@ import {
   normalizeMobile,
   EDU_STATUS_OPTIONS,
 } from "@/lib/studentFormValidations";
+import { sendMentorOtp, verifyMentorOtp } from "@/lib/mentorOtpApi";
 
 const MODE_OPTIONS = [
   { value: "Offline", label: "Offline" },
@@ -69,6 +70,10 @@ function validateEnrollmentForm(form) {
   if (!mobileDigits) errors.student_mobile = "Student mobile is required.";
   else if (mobileDigits.length !== 10) errors.student_mobile = "Mobile must be exactly 10 digits.";
   else if (!formMobileRegex.test(mobileDigits)) errors.student_mobile = "Please provide a valid 10-digit mobile number.";
+
+  const password = (form.password || "").trim();
+  if (!password) errors.password = "Password is required.";
+  else if (password.length < 8) errors.password = "Password must be at least 8 characters.";
 
   const course = (form.course || "").trim();
   if (!course || !COURSE_VALUES.has(course)) errors.course = "Course is required.";
@@ -209,6 +214,22 @@ export default function NewStudentPage() {
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
 
+  // OTP verification (mentor APIs)
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [mobileVerified, setMobileVerified] = useState(false);
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [mobileOtpSent, setMobileOtpSent] = useState(false);
+  const [emailOtp, setEmailOtp] = useState("");
+  const [mobileOtp, setMobileOtp] = useState("");
+  const [emailOtpLoading, setEmailOtpLoading] = useState(false);
+  const [mobileOtpLoading, setMobileOtpLoading] = useState(false);
+  const [emailVerifyLoading, setEmailVerifyLoading] = useState(false);
+  const [mobileVerifyLoading, setMobileVerifyLoading] = useState(false);
+  const [emailOtpError, setEmailOtpError] = useState("");
+  const [mobileOtpError, setMobileOtpError] = useState("");
+  const [emailResendAt, setEmailResendAt] = useState(0);
+  const [mobileResendAt, setMobileResendAt] = useState(0);
+
   const getHeaders = useCallback(() => {
     const h = {};
     if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
@@ -292,11 +313,124 @@ export default function NewStudentPage() {
     }
   }, [availableSalesBatches, form.sales_batch]);
 
+  // Resend OTP countdown (re-render every second)
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const emailResendSeconds = Math.max(0, Math.ceil((emailResendAt - now) / 1000));
+  const mobileResendSeconds = Math.max(0, Math.ceil((mobileResendAt - now) / 1000));
+
+  const handleSendEmailOtp = async () => {
+    const email = (form.student_email || "").trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailOtpError("Enter a valid email first.");
+      return;
+    }
+    setEmailOtpError("");
+    setEmailOtpLoading(true);
+    try {
+      const result = await sendMentorOtp({ channel: "email", email });
+      if (result.success) {
+        setEmailOtpSent(true);
+        setEmailOtp("");
+        setEmailResendAt(Date.now() + 60000);
+      } else {
+        setEmailOtpError(result.error || "Failed to send OTP.");
+      }
+    } finally {
+      setEmailOtpLoading(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async () => {
+    const email = (form.student_email || "").trim().toLowerCase();
+    const otp = (emailOtp || "").trim();
+    if (!email || !otp) {
+      setEmailOtpError("Enter the OTP sent to your email.");
+      return;
+    }
+    setEmailOtpError("");
+    setEmailVerifyLoading(true);
+    try {
+      const result = await verifyMentorOtp({ channel: "email", email, otp });
+      if (result.success) {
+        setEmailVerified(true);
+        setEmailOtpSent(false);
+        setEmailOtp("");
+      } else {
+        setEmailOtpError(result.error || "Invalid OTP.");
+      }
+    } finally {
+      setEmailVerifyLoading(false);
+    }
+  };
+
+  const handleSendMobileOtp = async () => {
+    const mobile = normalizeMobile(form.student_mobile);
+    if (!mobile || mobile.length !== 10 || !formMobileRegex.test(mobile)) {
+      setMobileOtpError("Enter a valid 10-digit mobile first.");
+      return;
+    }
+    setMobileOtpError("");
+    setMobileOtpLoading(true);
+    try {
+      const result = await sendMentorOtp({ channel: "mobile", mobile });
+      if (result.success) {
+        setMobileOtpSent(true);
+        setMobileOtp("");
+        setMobileResendAt(Date.now() + 60000);
+      } else {
+        setMobileOtpError(result.error || "Failed to send OTP.");
+      }
+    } finally {
+      setMobileOtpLoading(false);
+    }
+  };
+
+  const handleVerifyMobileOtp = async () => {
+    const mobile = normalizeMobile(form.student_mobile);
+    const otp = (mobileOtp || "").trim();
+    if (!mobile || !otp) {
+      setMobileOtpError("Enter the OTP sent to your mobile.");
+      return;
+    }
+    setMobileOtpError("");
+    setMobileVerifyLoading(true);
+    try {
+      const result = await verifyMentorOtp({ channel: "mobile", mobile, otp });
+      if (result.success) {
+        setMobileVerified(true);
+        setMobileOtpSent(false);
+        setMobileOtp("");
+      } else {
+        setMobileOtpError(result.error || "Invalid OTP.");
+      }
+    } finally {
+      setMobileVerifyLoading(false);
+    }
+  };
+
   const validateBeforeSubmit = () => {
     if (!leadIdParam) return;
     setError(null);
     setFieldErrors({});
     setPaymentFieldErrors({});
+
+    if (!emailVerified || !mobileVerified) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        ...(emailVerified ? {} : { student_email: "Verify email with OTP to continue." }),
+        ...(mobileVerified ? {} : { student_mobile: "Verify mobile with OTP to continue." }),
+      }));
+      if (!emailVerified && typeof document !== "undefined") {
+        document.getElementById("field-student_email")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else if (!mobileVerified && typeof document !== "undefined") {
+        document.getElementById("field-student_mobile")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      return false;
+    }
 
     const errors = validateEnrollmentForm(form);
     if (Object.keys(errors).length > 0) {
@@ -500,7 +634,23 @@ export default function NewStudentPage() {
                 <p className="mt-1 text-sm text-destructive">{fieldErrors.student_name}</p>
               )}
             </div>
-            <div id="field-student_email">
+            <div id="field-password">
+              <Label>Password <span className="text-destructive">*</span></Label>
+              <Input
+                type="password"
+                value={form.password}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, password: e.target.value }));
+                  if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                }}
+                placeholder="12345678"
+                className={fieldErrors.password ? "border-destructive" : ""}
+              />
+              {fieldErrors.password && (
+                <p className="mt-1 text-sm text-destructive">{fieldErrors.password}</p>
+              )}
+            </div>
+            <div id="field-student_email" className="space-y-2">
               <Label>Email <span className="text-destructive">*</span></Label>
               <Input
                 type="email"
@@ -508,15 +658,53 @@ export default function NewStudentPage() {
                 onChange={(e) => {
                   setForm((f) => ({ ...f, student_email: e.target.value }));
                   if (fieldErrors.student_email) setFieldErrors((prev) => ({ ...prev, student_email: undefined }));
+                  setEmailVerified(false);
+                  setEmailOtpSent(false);
+                  setEmailOtp("");
+                  setEmailOtpError("");
                 }}
                 placeholder="email@example.com"
                 className={fieldErrors.student_email ? "border-destructive" : ""}
+                disabled={emailVerified}
               />
-              {fieldErrors.student_email && (
-                <p className="mt-1 text-sm text-destructive">{fieldErrors.student_email}</p>
+              {!emailVerified && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSendEmailOtp}
+                    disabled={emailOtpLoading || emailResendSeconds > 0}
+                  >
+                    {emailOtpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : emailResendSeconds > 0 ? `Resend in ${emailResendSeconds}s` : emailOtpSent ? "Resend OTP" : "Send OTP"}
+                  </Button>
+                  {emailOtpSent && (
+                    <>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="Enter OTP"
+                        value={emailOtp}
+                        onChange={(e) => {
+                          setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
+                          setEmailOtpError("");
+                        }}
+                        className="w-28"
+                      />
+                      <Button type="button" size="sm" onClick={handleVerifyEmailOtp} disabled={emailVerifyLoading || !emailOtp.trim()}>
+                        {emailVerifyLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+              {emailVerified && <p className="text-sm text-green-600 dark:text-green-400">Email verified</p>}
+              {(fieldErrors.student_email || emailOtpError) && (
+                <p className="mt-1 text-sm text-destructive">{fieldErrors.student_email || emailOtpError}</p>
               )}
             </div>
-            <div id="field-student_mobile">
+            <div id="field-student_mobile" className="space-y-2">
               <Label>Mobile <span className="text-destructive">*</span></Label>
               <Input
                 inputMode="numeric"
@@ -526,22 +714,51 @@ export default function NewStudentPage() {
                   const v = normalizeMobile(e.target.value);
                   setForm((f) => ({ ...f, student_mobile: v }));
                   if (fieldErrors.student_mobile) setFieldErrors((prev) => ({ ...prev, student_mobile: undefined }));
+                  setMobileVerified(false);
+                  setMobileOtpSent(false);
+                  setMobileOtp("");
+                  setMobileOtpError("");
                 }}
                 placeholder="10 digits only"
                 className={fieldErrors.student_mobile ? "border-destructive" : ""}
+                disabled={mobileVerified}
               />
-              {fieldErrors.student_mobile && (
-                <p className="mt-1 text-sm text-destructive">{fieldErrors.student_mobile}</p>
+              {!mobileVerified && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSendMobileOtp}
+                    disabled={mobileOtpLoading || mobileResendSeconds > 0}
+                  >
+                    {mobileOtpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : mobileResendSeconds > 0 ? `Resend in ${mobileResendSeconds}s` : mobileOtpSent ? "Resend OTP" : "Send OTP"}
+                  </Button>
+                  {mobileOtpSent && (
+                    <>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="Enter OTP"
+                        value={mobileOtp}
+                        onChange={(e) => {
+                          setMobileOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
+                          setMobileOtpError("");
+                        }}
+                        className="w-28"
+                      />
+                      <Button type="button" size="sm" onClick={handleVerifyMobileOtp} disabled={mobileVerifyLoading || !mobileOtp.trim()}>
+                        {mobileVerifyLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+                      </Button>
+                    </>
+                  )}
+                </div>
               )}
-            </div>
-            <div>
-              <Label>Password</Label>
-              <Input
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                placeholder="Optional"
-              />
+              {mobileVerified && <p className="text-sm text-green-600 dark:text-green-400">Mobile verified</p>}
+              {(fieldErrors.student_mobile || mobileOtpError) && (
+                <p className="mt-1 text-sm text-destructive">{fieldErrors.student_mobile || mobileOtpError}</p>
+              )}
             </div>
             <div id="field-course">
               <Label>Course <span className="text-destructive">*</span></Label>
@@ -977,13 +1194,18 @@ export default function NewStudentPage() {
           </CardContent>
         </Card>
 
-        <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" onClick={() => setCancelConfirmOpen(true)} disabled={saving || loadingLead}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={saving || loadingLead}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Review & Submit"}
-          </Button>
+        <div className="flex flex-col items-end gap-2">
+          {(!emailVerified || !mobileVerified) && (
+            <p className="text-sm text-muted-foreground">Verify student email and mobile with OTP above to continue.</p>
+          )}
+          <div className="flex gap-4">
+            <Button type="button" variant="outline" onClick={() => setCancelConfirmOpen(true)} disabled={saving || loadingLead}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving || loadingLead || !emailVerified || !mobileVerified}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Review & Submit"}
+            </Button>
+          </div>
         </div>
       </form>
 

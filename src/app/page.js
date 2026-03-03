@@ -19,54 +19,126 @@ import {
   Phone,
   MessageCircle,
   Users,
-  Target,
-  Calendar,
   TrendingUp,
+  CheckCircle2,
+  Clock,
+  Info,
 } from "lucide-react";
 import axios from "@/axios";
-
+import { cn } from "@/lib/utils";
+import { getRangeForPreset, todayStr } from "@/lib/dateUtils";
 import withPrivateAuth from "@/components/withPrivateAuth";
 
 function isManagerOrAdmin(role) {
   return role === "manager" || role === "admin";
 }
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
+const PRESETS = [
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "this_week", label: "This week" },
+  { value: "this_month", label: "This month" },
+  { value: "last_month", label: "Last month" },
+];
+
+const SINGLE_DAY_PRESETS = new Set(["today", "yesterday"]);
+
+/** Step-by-step responsibilities by role (lead tracking, follow-up, enrollment, payments). */
+const ROLE_RESPONSIBILITIES = {
+  counselor: [
+    "Add and track your leads; update lead status as you engage (Leads).",
+    "Log every call and WhatsApp on the lead page with outcome and notes.",
+    "Set and update the next follow-up date so you don’t miss follow-ups; use the navbar reminder.",
+    "When a lead is ready, enroll them as a student (Enroll from lead) and add initial payment with proof.",
+    "Keep track of your activities and payment stats here; ensure pending payments are followed up.",
+  ],
+  admin: [
+    "Track your leads; log calls and WhatsApp and set next follow-up on each lead page.",
+    "Enroll qualified leads as students and add the first payment with proof (Manager will verify).",
+    "Add any follow-up payments for your students; upload proof so Manager can verify.",
+    "Monitor your lead pipeline and activity so no follow-up is missed.",
+  ],
+  manager: [
+    "Monitor team performance: leads, activities, and payments; support counselors as needed.",
+    "Verify or reject student payments submitted by counselors (Payments).",
+    "Manage sales persons and their roles; manage batches and payment receiver accounts.",
+    "Oversee the lead pipeline; filter by counselor and date to follow up with the team.",
+    "Review Activities by period and by person to keep the team on track.",
+  ],
+  super_admin: [
+    "Monitor team stats and lead/activity/payment performance across the org.",
+    "Verify or reject student payments; review payment summaries by batch.",
+    "Oversee leads, students, activities, and batches (Sales persons are managed by Manager).",
+    "Use Activities to review productivity by period and by person.",
+  ],
+};
 
 function HomePage() {
   const user = useSelector((state) => state.userAuth?.user);
   const isManager = isManagerOrAdmin(user?.role);
-  const [statsDate, setStatsDate] = useState(todayISO());
+  const [preset, setPreset] = useState("today");
+  const [fromDate, setFromDate] = useState(todayStr());
+  const [toDate, setToDate] = useState(todayStr());
   const [myStats, setMyStats] = useState(null);
   const [teamStats, setTeamStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const applyPreset = useCallback((p) => {
+    setPreset(p);
+    const { from, to } = getRangeForPreset(p);
+    setFromDate(from);
+    setToDate(to);
+  }, []);
+
+  const getHeaders = useCallback(() => {
+    const h = {};
+    if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
+    if (user?.role) h["X-Sales-Person-Role"] = user.role;
+    return h;
+  }, [user?.id, user?.role]);
+
   const fetchMyStats = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const { data } = await axios.get(`/stats/?date=${statsDate}&sales_person=${user.id}`);
-      setMyStats(data);
+      if (SINGLE_DAY_PRESETS.has(preset)) {
+        const date = preset === "today" ? todayStr() : getRangeForPreset("yesterday").from;
+        const { data } = await axios.get(`/stats/?date=${date}&sales_person=${user.id}`, { headers: getHeaders() });
+        setMyStats(data);
+      } else {
+        const { data } = await axios.get(`/stats/range/?from=${fromDate}&to=${toDate}&sales_person=${user.id}`, { headers: getHeaders() });
+        setMyStats(data);
+      }
     } catch {
       setMyStats(null);
     }
-  }, [user?.id, statsDate]);
+  }, [user?.id, preset, fromDate, toDate, getHeaders]);
 
   const fetchTeamStats = useCallback(async () => {
     if (!isManager) return;
     try {
-      const { data } = await axios.get(`/stats/?date=${statsDate}`);
-      setTeamStats(data);
+      if (SINGLE_DAY_PRESETS.has(preset)) {
+        const date = preset === "today" ? todayStr() : getRangeForPreset("yesterday").from;
+        const { data } = await axios.get(`/stats/?date=${date}`, { headers: getHeaders() });
+        setTeamStats(data);
+      } else {
+        const { data } = await axios.get(`/stats/range/?from=${fromDate}&to=${toDate}`, { headers: getHeaders() });
+        setTeamStats(data);
+      }
     } catch {
       setTeamStats(null);
     }
-  }, [isManager, statsDate]);
+  }, [isManager, preset, fromDate, toDate, getHeaders]);
 
   useEffect(() => {
     setLoading(true);
     Promise.all([fetchMyStats(), fetchTeamStats()]).finally(() => setLoading(false));
   }, [fetchMyStats, fetchTeamStats]);
+
+  const isSingleDay = SINGLE_DAY_PRESETS.has(preset);
+  const myLeads = myStats?.leads_total ?? myStats?.leads_created ?? 0;
+  const myActivities = myStats?.activities_today ?? myStats?.activities_total ?? 0;
+  const myCalls = myStats?.calls_today ?? myStats?.calls ?? 0;
+  const myWhatsapp = myStats?.whatsapp_today ?? myStats?.whatsapp ?? 0;
 
   return (
     <main className="flex min-h-screen w-full">
@@ -80,32 +152,45 @@ function HomePage() {
                 <LayoutDashboard className="h-8 w-8 text-primary" />
                 <CardTitle className="text-2xl">Dashboard</CardTitle>
               </div>
-              <CardDescription>Welcome to the 10k Coders sales dashboard. Track leads and daily activity here.</CardDescription>
+              <CardDescription>Track leads, activities, and payments by date range.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="rounded-lg border bg-muted/30 p-4">
-                <h3 className="font-semibold flex items-center gap-2 mb-2">
-                  <Target className="h-4 w-4" />
-                  How it works
-                </h3>
-                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                  <li><strong>Leads:</strong> Counselors add leads (no manual assign). Each lead is yours; you see only &quot;My leads&quot;. Managers see all leads and who owns each.</li>
-                  <li><strong>Activity:</strong> On a lead&apos;s page, log every call or WhatsApp (type + outcome + notes). That updates the lead&apos;s status and last activity.</li>
-                  <li><strong>Per day:</strong> Every logged activity is stored with the date. Below you see how many activities each person did on the selected day (calls, WhatsApp, etc.) and total lead count.</li>
-                  <li><strong>Managers:</strong> Use &quot;Team performance&quot; to see everyone&apos;s leads and activities for the day. Use Leads → filter by &quot;All counselors&quot; and date to drill down.</li>
-                </ul>
-              </div>
-
               {user && (
                 <>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <label className="text-sm font-medium">Date for stats:</label>
-                    <input
-                      type="date"
-                      value={statsDate}
-                      onChange={(e) => setStatsDate(e.target.value)}
-                      className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                    />
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium">Period:</span>
+                      {PRESETS.map((p) => (
+                        <button
+                          key={p.value}
+                          type="button"
+                          onClick={() => applyPreset(p.value)}
+                          className={cn(
+                            "rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
+                            preset === p.value
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-input bg-background hover:bg-muted"
+                          )}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="date"
+                        value={fromDate}
+                        onChange={(e) => { setFromDate(e.target.value); setPreset(""); }}
+                        className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                      />
+                      <span className="text-muted-foreground">to</span>
+                      <input
+                        type="date"
+                        value={toDate}
+                        onChange={(e) => { setToDate(e.target.value); setPreset(""); }}
+                        className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -118,22 +203,32 @@ function HomePage() {
                         <Loader2 className="h-4 w-4 animate-spin" /> Loading…
                       </div>
                     ) : myStats ? (
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-8">
                         <div className="rounded-lg border bg-card p-3">
-                          <p className="text-xs text-muted-foreground">Total leads</p>
-                          <p className="text-xl font-semibold">{myStats.leads_total}</p>
+                          <p className="text-xs text-muted-foreground">Leads</p>
+                          <p className="text-xl font-semibold">{myLeads}</p>
                         </div>
                         <div className="rounded-lg border bg-card p-3">
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">Activities on day</p>
-                          <p className="text-xl font-semibold">{myStats.activities_today}</p>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">Activities</p>
+                          <p className="text-xl font-semibold">{myActivities}</p>
                         </div>
                         <div className="rounded-lg border bg-card p-3">
                           <p className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" /> Calls</p>
-                          <p className="text-xl font-semibold">{myStats.calls_today}</p>
+                          <p className="text-xl font-semibold">{myCalls}</p>
                         </div>
                         <div className="rounded-lg border bg-card p-3">
                           <p className="text-xs text-muted-foreground flex items-center gap-1"><MessageCircle className="h-3 w-3" /> WhatsApp</p>
-                          <p className="text-xl font-semibold">{myStats.whatsapp_today}</p>
+                          <p className="text-xl font-semibold">{myWhatsapp}</p>
+                        </div>
+                        <div className="rounded-lg border bg-card p-3">
+                          <p className="text-xs text-muted-foreground flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Verified payments</p>
+                          <p className="text-xl font-semibold">{myStats.verified_payment_count ?? 0}</p>
+                          <p className="text-xs text-muted-foreground">₹ {(myStats.verified_payment_amount ?? 0).toLocaleString("en-IN")}</p>
+                        </div>
+                        <div className="rounded-lg border bg-card p-3">
+                          <p className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Pending payments</p>
+                          <p className="text-xl font-semibold">{myStats.pending_payment_count ?? 0}</p>
+                          <p className="text-xs text-muted-foreground">₹ {(myStats.pending_payment_amount ?? 0).toLocaleString("en-IN")}</p>
                         </div>
                       </div>
                     ) : (
@@ -158,10 +253,12 @@ function HomePage() {
                               <TableRow>
                                 <TableHead>Name</TableHead>
                                 <TableHead>Role</TableHead>
-                                <TableHead className="text-right">Total leads</TableHead>
-                                <TableHead className="text-right">Activities (day)</TableHead>
+                                <TableHead className="text-right">Leads</TableHead>
+                                <TableHead className="text-right">Activities</TableHead>
                                 <TableHead className="text-right">Calls</TableHead>
                                 <TableHead className="text-right">WhatsApp</TableHead>
+                                <TableHead className="text-right">Verified (₹)</TableHead>
+                                <TableHead className="text-right">Pending (₹)</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -169,25 +266,41 @@ function HomePage() {
                                 <TableRow key={p.sales_person_id}>
                                   <TableCell className="font-medium">{p.sales_person_name}</TableCell>
                                   <TableCell className="capitalize">{p.role}</TableCell>
-                                  <TableCell className="text-right">{p.leads_total}</TableCell>
-                                  <TableCell className="text-right">{p.activities_today}</TableCell>
-                                  <TableCell className="text-right">{p.calls_today}</TableCell>
-                                  <TableCell className="text-right">{p.whatsapp_today}</TableCell>
+                                  <TableCell className="text-right">{p.leads_total ?? p.leads_created ?? 0}</TableCell>
+                                  <TableCell className="text-right">{p.activities_today ?? p.activities_total ?? 0}</TableCell>
+                                  <TableCell className="text-right">{p.calls_today ?? p.calls ?? 0}</TableCell>
+                                  <TableCell className="text-right">{p.whatsapp_today ?? p.whatsapp ?? 0}</TableCell>
+                                  <TableCell className="text-right">{(p.verified_payment_amount ?? 0).toLocaleString("en-IN")}</TableCell>
+                                  <TableCell className="text-right">{(p.pending_payment_amount ?? 0).toLocaleString("en-IN")}</TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
                           </Table>
                         </div>
                       ) : (
-                        <p className="text-sm text-muted-foreground">No team data for this date.</p>
+                        <p className="text-sm text-muted-foreground">No team data for this period.</p>
                       )}
+                    </div>
+                  )}
+
+                  {user?.role && ROLE_RESPONSIBILITIES[user.role] && (
+                    <div className="rounded-lg border bg-muted/30 p-4 pt-3">
+                      <h3 className="font-semibold flex items-center gap-2 mb-2">
+                        <Info className="h-4 w-4 text-muted-foreground" />
+                        Your responsibilities — {user.role.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                      </h3>
+                      <ol className="text-sm text-muted-foreground space-y-1.5 list-decimal list-inside">
+                        {ROLE_RESPONSIBILITIES[user.role].map((item, i) => (
+                          <li key={i}>{item}</li>
+                        ))}
+                      </ol>
                     </div>
                   )}
                 </>
               )}
 
               {!user && (
-                <p className="text-muted-foreground">Sign in to see your performance and activity stats.</p>
+                <p className="text-muted-foreground">Sign in to see your performance and payment stats.</p>
               )}
             </CardContent>
           </Card>

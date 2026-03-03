@@ -19,7 +19,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Phone, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -83,7 +82,6 @@ function StudentsPage() {
   const router = useRouter();
   const user = useSelector((state) => state.userAuth?.user);
   const canSeeAll = canSeeAllStudents(user?.role);
-  const isManagerRole = user?.role === "manager";
 
   const [students, setStudents] = useState([]);
   const [persons, setPersons] = useState([]);
@@ -175,7 +173,7 @@ function StudentsPage() {
             <CardTitle className="text-2xl">{canSeeAll ? "All students" : "My students"}</CardTitle>
             <CardDescription>
               {canSeeAll
-                ? "Enrolled students. Filter by name, mobile, email, added by, or date range."
+                ? "Enrolled students. Choose whose students to show (by sales person), then filter by name, mobile, email, sales batch, or date range."
                 : "Enrolled students from your leads. Filter by name, mobile, email or date."}
             </CardDescription>
           </div>
@@ -194,11 +192,12 @@ function StudentsPage() {
               <select
                 value={filterPerson}
                 onChange={(e) => setFilterPerson(e.target.value)}
-                className="h-9 min-w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-9 min-w-[180px] rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                title="Show students added by this sales person"
               >
-                <option value="">All (added by)</option>
+                <option value="">All students</option>
                 {persons.map((p) => (
-                  <option key={p.id} value={String(p.id)}>{p.name}</option>
+                  <option key={p.id} value={String(p.id)}>Students of {p.name}</option>
                 ))}
               </select>
             )}
@@ -241,85 +240,72 @@ function StudentsPage() {
           ) : students.length === 0 ? (
             <p className="py-6 text-center text-muted-foreground">No students yet. Add one from a lead or as walk-in.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Course & Batch</TableHead>
-                  <TableHead>College / TPo</TableHead>
-                  <TableHead>Mobile / Email</TableHead>
-                  {(canSeeAll || user?.role === "super_admin") && <TableHead>Uploaded by</TableHead>}
-                  <TableHead className="whitespace-nowrap">Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {students.map((s) => (
-                <TableRow
-                  key={s.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => router.push(`/students/${s.id}`)}
-                >
-                  <TableCell className="font-medium">{s.student_name}</TableCell>
-                    <TableCell className="text-muted-foreground whitespace-nowrap">
-                      <div className="flex flex-col gap-1">
-                        <span>{formatCourseLabel(s.course)}</span>
-                        {s.sales_batch_name && (
-                          <span className="w-fit rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 border border-blue-100">
-                            {s.sales_batch_name}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {s.college_name || "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {s.student_mobile}</span>
-                    </TableCell>
+            <div className="overflow-x-auto -mx-2 sm:mx-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[120px]">Name</TableHead>
+                    <TableHead className="min-w-[140px]">Course & Batch</TableHead>
+                    <TableHead className="hidden md:table-cell min-w-[120px]">College</TableHead>
+                    <TableHead className="min-w-[120px]">Mobile</TableHead>
                     {(canSeeAll || user?.role === "super_admin") && (
-                      <TableCell className="text-sm text-muted-foreground">
-                        {s.sales_person_name || s.uploaded_by_name || "—"}
-                      </TableCell>
+                      <TableHead className="hidden lg:table-cell min-w-[100px]">Student of</TableHead>
                     )}
-
-                    <TableCell className="whitespace-nowrap">
-                      <div className="flex flex-wrap items-center gap-1">
-                        <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", getDisplayStatusBadgeClass(s.display_status))}>
-                          {getStatusLabel(s.display_status, s.display_status_label)}
-                        </span>
-                        {s.is_moved_to_batch ? (
-                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                            Moved to batch
-                          </span>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(s.created_at)}
-                    </TableCell>
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      {(isManagerRole || user?.role === "super_admin") ? (
-                        !s.is_moved_to_batch ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.push(`/students/${s.id}`)}
-                          >
-                            Change Sales Batch/Course
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Locked (moved to mentor batch)</span>
-                        )
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
+                    <TableHead className="min-w-[140px]">Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {students.map((s) => (
+                    <TableRow
+                      key={s.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => router.push(`/students/${s.id}`)}
+                    >
+                      <TableCell className="font-medium">{s.student_name}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        <div className="flex flex-col gap-1">
+                          <span className="whitespace-nowrap">{formatCourseLabel(s.course)}</span>
+                          {s.sales_batch_name && (
+                            <span className="w-fit rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 border border-blue-100">
+                              {s.sales_batch_name}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
+                        {s.college_name || "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        <span className="flex items-center gap-1"><Phone className="h-3 w-3 shrink-0" /> {s.student_mobile}</span>
+                      </TableCell>
+                      {(canSeeAll || user?.role === "super_admin") && (
+                        <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                          <div className="flex flex-col gap-0.5">
+                            <span>{s.sales_person_name || s.uploaded_by_name || "—"}</span>
+                            <span className="text-xs">{formatDate(s.created_at)}</span>
+                          </div>
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", getDisplayStatusBadgeClass(s.display_status))}>
+                              {getStatusLabel(s.display_status, s.display_status_label)}
+                            </span>
+                            {s.is_moved_to_batch && (
+                              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                                Moved
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">{formatDate(s.created_at)}</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

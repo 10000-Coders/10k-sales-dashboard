@@ -406,8 +406,11 @@ export default function StudentDetailClient() {
               TPo: {[student.tpo_name, student.tpo_number, student.tpo_email].filter(Boolean).join(" · ")}
             </p>
           )}
+          {student.sales_batch_name && (
+            <p className="text-sm text-muted-foreground">Sales batch: {student.sales_batch_name}</p>
+          )}
           {student.target_batch_name && (
-            <p className="text-sm font-medium">Batch: {student.target_batch_name}</p>
+            <p className="text-sm font-medium">Mentor batch: {student.target_batch_name}</p>
           )}
         </CardContent>
       </Card>

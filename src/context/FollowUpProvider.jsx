@@ -25,14 +25,16 @@ export const FollowUpProvider = ({ children }) => {
   const leadsRef = useRef([]);
   const audioCtxRef = useRef(null);
 
-  // Base URL for non-sales APIs
-  const baseUrl = process.env.NEXT_PUBLIC_baseUrl || "";
+  // Base URL for non-sales APIs (e.g. https://poc.10kcoders.com/api/ — no trailing slash after replace)
+  const baseUrl = (process.env.NEXT_PUBLIC_baseUrl || "").replace(/\/$/, "");
+  // Avoid api/api: normalize so base ends with at most one /api
+  const apiRoot = baseUrl.replace(/\/api\/api\/?$/, "/api");
 
-  // 1. Sync Time
+  // 1. Sync Time — backend path is api/student/server-time/, so base (api root) + student/server-time/
   const syncTime = useCallback(async () => {
     try {
       const start = Date.now();
-      const endpoint = baseUrl ? `${baseUrl.replace(/\/$/, "")}/api/student/server-time/` : "/api/student/server-time/";
+      const endpoint = apiRoot ? `${apiRoot}/student/server-time/` : "/api/student/server-time/";
       const response = await baseAxios.get(endpoint);
       const serverTimeStr = response.data.datetime;
       const serverTime = new Date(serverTimeStr).getTime();
@@ -44,7 +46,7 @@ export const FollowUpProvider = ({ children }) => {
     } catch (error) {
       console.error("Failed to sync server time:", error);
     }
-  }, [baseUrl]);
+  }, [apiRoot]);
 
   // 2. Fetch Leads
   const fetchMyLeads = useCallback(async () => {

@@ -1,5 +1,7 @@
-# Cloudflare Pages: rewrite dynamic route segments to the single built page (static export).
-# Client-side router reads the real id from the URL (useParams). Build outputs students/0.html etc.
-/students/*  /students/0  200
-/leads/*     /leads/0  200
-/activities/*  /activities/0  200
+# Cloudflare Pages: rewrite dynamic [id] routes to the single built page; keep /students/new (enroll) as-is.
+# First matching rule wins – so list /students/new before the catch-all.
+/students/new   /students/new   200
+/students/new/  /students/new   200
+/students/*     /students/0     200
+/leads/*        /leads/0        200
+/activities/*   /activities/0   200

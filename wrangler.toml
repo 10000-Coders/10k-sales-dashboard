@@ -1,0 +1,6 @@
+name = "dev-salse-dashbord"
+# Must be .vercel/output/static so _worker.js is at deployment root (not inside a static/ folder).
+pages_build_output_dir = ".vercel/output/static"
+# Required for next-on-pages (Node APIs in the worker). Also set in Dashboard: Settings → Functions → Compatibility flags.
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
