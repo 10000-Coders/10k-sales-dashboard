@@ -82,13 +82,17 @@ export default function SideBar() {
   return (
     <>
       <aside className="fixed left-0 top-0 z-30 flex h-screen w-[250px] flex-shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white overflow-x-hidden">
-        <Image
-          className="mt-[11px] mb-[13px] flex-shrink-0 object-contain"
-          width={133}
-          height={64}
-          src="/10k_brand_icon.png"
-          alt="10k Coders"
-        />
+        <div className="flex flex-shrink-0 items-center justify-center px-4 py-4">
+          <div className="bg-white rounded-lg p-2">
+            <Image
+              className="object-contain"
+              width={133}
+              height={40}
+              src="/10k_brand_icon.png"
+              alt="10k Coders"
+            />
+          </div>
+        </div>
         <nav className="flex-1 overflow-y-auto overflow-x-hidden">
           <ul className="flex flex-col items-center gap-0">
             {visibleMenuItems.map((item, idx) => (

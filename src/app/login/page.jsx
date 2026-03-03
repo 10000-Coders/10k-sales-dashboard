@@ -38,22 +38,24 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen">
       {/* Left: Brand panel */}
-      <div className="hidden lg:flex lg:w-[48%] flex-col justify-between bg-[hsl(24,95%,53%)] p-10 text-white">
+      <div className="hidden lg:flex lg:w-[48%] flex-col justify-between bg-white border-r border-gray-100 p-10 text-gray-900">
         <div>
-          <div className="relative h-10 w-[133px]">
-            <Image
-              src="/10k_brand_icon.png"
-              alt="10k Coders"
-              fill
-              className="object-contain object-left"
-              priority
-            />
+          <div className="bg-white rounded-lg p-2 inline-block">
+            <div className="relative h-10 w-[133px]">
+              <Image
+                src="/10k_brand_icon.png"
+                alt="10k Coders"
+                fill
+                className="object-contain object-left"
+                priority
+              />
+            </div>
           </div>
         </div>
         <div className="space-y-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Sales Dashboard</h1>
-            <p className="mt-2 text-white/90 text-lg">Manage leads, track activities, and close more deals.</p>
+            <p className="mt-2 text-gray-600 text-lg">Manage leads, track activities, and close more deals.</p>
           </div>
           <ul className="space-y-4">
             {[
@@ -61,31 +63,33 @@ export default function LoginPage() {
               { icon: Users, text: "Assign and manage your sales team" },
               { icon: LayoutDashboard, text: "One place for all your sales operations" },
             ].map(({ icon: Icon, text }) => (
-              <li key={text} className="flex items-center gap-3 text-white/95">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/20">
-                  <Icon className="h-4 w-4" />
+              <li key={text} className="flex items-center gap-3 text-gray-700">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100">
+                  <Icon className="h-4 w-4 text-gray-600" />
                 </span>
                 <span>{text}</span>
               </li>
             ))}
           </ul>
         </div>
-        <p className="text-sm text-white/80">© 10k Coders · Sales team portal</p>
+        <p className="text-sm text-gray-500">© 10000 Coders · Sales team portal</p>
       </div>
 
       {/* Right: Login form */}
-      <div className="flex flex-1 flex-col items-center justify-center bg-[hsl(0,0%,98%)] px-4 py-12">
+      <div className="flex flex-1 flex-col items-center justify-center bg-white px-4 py-12">
         <div className="w-full max-w-[400px]">
           {/* Mobile logo */}
           <div className="mb-8 flex justify-center lg:hidden">
-            <div className="relative h-9 w-[120px]">
-              <Image
-                src="/10k_brand_icon.png"
-                alt="10k Coders"
-                fill
-                className="object-contain"
-                priority
-              />
+            <div className="bg-white rounded-lg p-2">
+              <div className="relative h-9 w-[120px]">
+                <Image
+                  src="/10k_brand_icon.png"
+                  alt="10k Coders"
+                  fill
+                  className="object-contain"
+                  priority
+                />
+              </div>
             </div>
           </div>
 
