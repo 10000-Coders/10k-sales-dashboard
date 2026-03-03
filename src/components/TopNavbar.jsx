@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import { useSelector } from "react-redux";
 import { FollowUpNotification } from "@/components/FollowUpNotification";
 import { cn } from "@/lib/utils";
@@ -35,7 +36,15 @@ export default function TopNavbar() {
 
   return (
     <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4 sm:px-6">
-      <div className="flex items-center">
+      <div className="flex items-center gap-2">
+        <div className="relative h-8 w-8 flex-shrink-0 sm:h-9 sm:w-9">
+          <Image
+            src="/10k_brand_icon.png"
+            alt="10k Coders"
+            fill
+            className="object-contain"
+          />
+        </div>
         <h1 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
           Sales Dashboard
         </h1>

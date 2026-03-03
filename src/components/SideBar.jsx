@@ -83,11 +83,11 @@ export default function SideBar() {
     <>
       <aside className="fixed left-0 top-0 z-30 flex h-screen w-[250px] flex-shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white overflow-x-hidden">
         <Image
-          className="mt-[11px] mb-[13px] flex-shrink-0"
+          className="mt-[11px] mb-[13px] flex-shrink-0 object-contain"
           width={133}
           height={64}
-          src="/sideBar_Images/logo.png"
-          alt="Logo"
+          src="/10k_brand_icon.png"
+          alt="10k Coders"
         />
         <nav className="flex-1 overflow-y-auto overflow-x-hidden">
           <ul className="flex flex-col items-center gap-0">

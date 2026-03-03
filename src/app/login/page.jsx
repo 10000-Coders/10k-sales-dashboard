@@ -42,7 +42,7 @@ export default function LoginPage() {
         <div>
           <div className="relative h-10 w-[133px]">
             <Image
-              src="/sideBar_Images/logo.png"
+              src="/10k_brand_icon.png"
               alt="10k Coders"
               fill
               className="object-contain object-left"
@@ -80,7 +80,7 @@ export default function LoginPage() {
           <div className="mb-8 flex justify-center lg:hidden">
             <div className="relative h-9 w-[120px]">
               <Image
-                src="/sideBar_Images/logo.png"
+                src="/10k_brand_icon.png"
                 alt="10k Coders"
                 fill
                 className="object-contain"
