@@ -1,17 +1,18 @@
 # Deploying to Cloudflare Pages
 
-This Next.js app is configured for **static export** so it can be deployed to Cloudflare Pages.
+This Next.js app uses **@cloudflare/next-on-pages** for Cloudflare Pages. The repo has a `wrangler.toml` that sets the build output directory.
 
-## Build configuration
+## Build configuration (required in Dashboard)
 
-- **Build command:** `yarn build` (or `npm run build`)
-- **Build output directory:** `out`
-- **Root directory:** (leave empty, or project root)
+In **Cloudflare Dashboard** → your Pages project → **Settings** → **Builds & deployments** → **Build configuration**, set:
 
-In Cloudflare Pages project settings, set:
+| Setting | Value |
+|--------|--------|
+| **Build command** | `yarn build:cf` or `npx @cloudflare/next-on-pages@1` |
+| **Build output directory** | `.vercel/output/static` |
+| **Root directory** | (leave empty) |
 
-- **Framework preset:** Next.js (Static HTML Export)
-- **Build output directory:** `out`
+If you use the default Next.js preset (`yarn build` / `out`), the build will not produce the output that `wrangler.toml` expects and the deployment will fail or serve the wrong files. You must use the build command above.
 
 ## Dynamic routes
 
@@ -24,7 +25,12 @@ So visiting `/students/123` serves the same static page as `/students/0`; the br
 
 ## Environment variables
 
-Configure in Cloudflare Pages **Settings → Environment variables** (e.g. `NEXT_PUBLIC_baseUrl` for your API base URL).
+In **Settings → Environment variables** add at least:
+
+- **`NEXT_PUBLIC_baseUrl`** – your API base URL (e.g. `https://your-api.com/api` or `https://your-api.com/api/`)
+- **`NEXT_PUBLIC_env_type`** (optional) – e.g. `production`
+
+Without these, the build may succeed but the app will not know where to call the backend. Set them for both Production and Preview if you use both.
 
 ## API
 

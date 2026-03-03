@@ -18,6 +18,7 @@
     "@headlessui/react": "^1.7.18",
     "@mui/material": "^5.15.5",
     "@mui/styled-engine-sc": "^6.0.0-alpha.12",
+    "@mui/system": "^5.15.5",
     "@mui/x-date-pickers": "^6.19.0",
     "@reduxjs/toolkit": "^2.0.1",
     "axios": "^1.6.5",
@@ -30,10 +31,12 @@
     "next": "14.2.18",
     "react": "^18",
     "react-dom": "^18",
+    "react-is": "^18.2.0",
     "react-redux": "^9.1.0",
     "react-select": "^5.8.0",
     "react-toastify": "^10.0.4",
     "recharts": "^3.7.0",
+    "redux": "^5.0.0",
     "redux-persist": "^6.0.0",
     "redux-thunk": "^3.1.0",
     "styled-components": "^6.1.8",
@@ -41,8 +44,12 @@
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.16",
+    "@types/react": "^18.2.0",
     "autoprefixer": "^10.0.1",
     "postcss": "^8",
-    "tailwindcss": "^3.3.0"
-  }
+    "tailwindcss": "^3.3.0",
+    "vercel": "^37.0.0",
+    "wrangler": "^3.28.0"
+  },
+  "packageManager": "yarn@4.5.0+sha512.837566d24eec14ec0f5f1411adb544e892b3454255e61fdef8fd05f3429480102806bac7446bc9daff3896b01ae4b62d00096c7e989f1596f2af10b927532f39"
 }
