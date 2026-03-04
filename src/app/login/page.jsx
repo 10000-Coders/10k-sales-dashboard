@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Mail, Lock, Eye, EyeOff, Loader2, LayoutDashboard, Users, Target } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { login } from "@/redux/features/user/userAuth";
+import { setLoginAt } from "@/lib/sessionExpiry";
 import useToast from "@/hooks/useToast";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ export default function LoginPage() {
     e.preventDefault();
     const res = await dispatch(login(formData));
     if (login.fulfilled.match(res)) {
+      setLoginAt(); // 48h session: re-login required after this
       showSuccessToast("Logged in successfully.", "top-right", "light");
       router.push("/");
     } else {
@@ -37,25 +39,23 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen">
-      {/* Left: Brand panel */}
-      <div className="hidden lg:flex lg:w-[48%] flex-col justify-between bg-white border-r border-gray-100 p-10 text-gray-900">
+      {/* Left: Brand panel (orange as usual) */}
+      <div className="hidden lg:flex lg:w-[48%] flex-col justify-between bg-[#FF8000] p-10 text-white">
         <div>
-          <div className="bg-white rounded-lg p-2 inline-block">
-            <div className="relative h-10 w-[133px]">
-              <Image
-                src="/10k_brand_icon.png"
-                alt="10k Coders"
-                fill
-                className="object-contain object-left"
-                priority
-              />
-            </div>
+          <div className="relative h-[70px]  w-[130px]">
+            <Image
+              src="/logo-2.png"
+              alt="10000 Coders"
+              fill
+              className="object-contain object-left bg-black/40"
+              priority
+            />
           </div>
         </div>
         <div className="space-y-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Sales Dashboard</h1>
-            <p className="mt-2 text-gray-600 text-lg">Manage leads, track activities, and close more deals.</p>
+            <p className="mt-2 text-white/90 text-lg">Manage leads, track activities, and close more deals.</p>
           </div>
           <ul className="space-y-4">
             {[
@@ -63,16 +63,16 @@ export default function LoginPage() {
               { icon: Users, text: "Assign and manage your sales team" },
               { icon: LayoutDashboard, text: "One place for all your sales operations" },
             ].map(({ icon: Icon, text }) => (
-              <li key={text} className="flex items-center gap-3 text-gray-700">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100">
-                  <Icon className="h-4 w-4 text-gray-600" />
+              <li key={text} className="flex items-center gap-3 text-white/95">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/20">
+                  <Icon className="h-4 w-4" />
                 </span>
                 <span>{text}</span>
               </li>
             ))}
           </ul>
         </div>
-        <p className="text-sm text-gray-500">© 10000 Coders · Sales team portal</p>
+        <p className="text-sm text-white/80">© 10000 Coders · Sales team portal</p>
       </div>
 
       {/* Right: Login form */}
@@ -80,16 +80,14 @@ export default function LoginPage() {
         <div className="w-full max-w-[400px]">
           {/* Mobile logo */}
           <div className="mb-8 flex justify-center lg:hidden">
-            <div className="bg-white rounded-lg p-2">
-              <div className="relative h-9 w-[120px]">
-                <Image
-                  src="/10k_brand_icon.png"
-                  alt="10k Coders"
-                  fill
-                  className="object-contain"
-                  priority
-                />
-              </div>
+            <div className="relative h-10 w-[140px]">
+              <Image
+                src="/logo-2.png"
+                alt="10000 Coders"
+                fill
+                className="object-contain"
+                priority
+              />
             </div>
           </div>
 

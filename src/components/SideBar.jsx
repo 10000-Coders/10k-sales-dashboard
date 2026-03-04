@@ -5,6 +5,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { LogOut, Loader2 } from "lucide-react";
 import { logout } from "@/redux/features/user/userAuth";
+import { clearLoginAt } from "@/lib/sessionExpiry";
 import { routeObject, MenuItems } from "@/shared/static/sidebarItems";
 import { cn } from "@/lib/utils";
 
@@ -73,7 +74,7 @@ export default function SideBar() {
 
   const handleLogout = async () => {
     setLoggingOut(true);
-    // Simulate a brief delay for smoother UX
+    clearLoginAt(); // clear 48h session timestamp
     await new Promise(resolve => setTimeout(resolve, 500));
     dispatch(logout());
     router.replace("/login");

@@ -29,8 +29,9 @@ import { cn } from "@/lib/utils";
 import { getRangeForPreset, todayStr } from "@/lib/dateUtils";
 import withPrivateAuth from "@/components/withPrivateAuth";
 
-function isManagerOrAdmin(role) {
-  return role === "manager" || role === "admin";
+/** True only for Manager (team table + all stats). Super Admin sees own stats only. */
+function isManager(role) {
+  return role === "manager";
 }
 
 const PRESETS = [
@@ -66,16 +67,15 @@ const ROLE_RESPONSIBILITIES = {
     "Review Activities by period and by person to keep the team on track.",
   ],
   super_admin: [
-    "Monitor team stats and lead/activity/payment performance across the org.",
-    "Verify or reject student payments; review payment summaries by batch.",
-    "Oversee leads, students, activities, and batches (Sales persons are managed by Manager).",
-    "Use Activities to review productivity by period and by person.",
+    "View your own leads, students, activities, and payment stats (same scope as counselor/admin).",
+    "Use Dashboard and Activities to track your productivity; use Payments to view your students’ payments.",
+    "Enroll students from your own leads only; Sales persons and Batches are managed by Manager.",
   ],
 };
 
 function HomePage() {
   const user = useSelector((state) => state.userAuth?.user);
-  const isManager = isManagerOrAdmin(user?.role);
+  const isManagerRole = isManager(user?.role);
   const [preset, setPreset] = useState("today");
   const [fromDate, setFromDate] = useState(todayStr());
   const [toDate, setToDate] = useState(todayStr());
@@ -114,7 +114,7 @@ function HomePage() {
   }, [user?.id, preset, fromDate, toDate, getHeaders]);
 
   const fetchTeamStats = useCallback(async () => {
-    if (!isManager) return;
+    if (!isManagerRole) return;
     try {
       if (SINGLE_DAY_PRESETS.has(preset)) {
         const date = preset === "today" ? todayStr() : getRangeForPreset("yesterday").from;
@@ -127,7 +127,7 @@ function HomePage() {
     } catch {
       setTeamStats(null);
     }
-  }, [isManager, preset, fromDate, toDate, getHeaders]);
+  }, [isManagerRole, preset, fromDate, toDate, getHeaders]);
 
   useEffect(() => {
     setLoading(true);
@@ -236,7 +236,7 @@ function HomePage() {
                     )}
                   </div>
 
-                  {isManager && (
+                  {isManagerRole && (
                     <div>
                       <h3 className="font-semibold flex items-center gap-2 mb-3">
                         <Users className="h-4 w-4" />

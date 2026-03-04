@@ -1,14 +1,17 @@
 "use client";
 
 import { useLayoutEffect } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { usePathname, useRouter } from "next/navigation";
 import { RBAC_CONFIG, LOGIN_ROUTE, DEFAULT_REDIRECT } from "@/shared/static/rbacConfig";
+import { logout } from "@/redux/features/user/userAuth";
+import { isSessionExpired, clearLoginAt } from "@/lib/sessionExpiry";
 
 export default function withPrivateAuth(Component) {
   return function ProtectedRoute(props) {
     const router = useRouter();
     const pathname = usePathname();
+    const dispatch = useDispatch();
     const { isLoggedIn, user } = useSelector((state) => state.userAuth);
 
     useLayoutEffect(() => {
@@ -18,7 +21,15 @@ export default function withPrivateAuth(Component) {
         return;
       }
 
-      // 2. Authorization Check (Role-based)
+      // 2. Session expiry: 48 hours — force re-login
+      if (isSessionExpired()) {
+        clearLoginAt();
+        dispatch(logout());
+        router.replace(LOGIN_ROUTE);
+        return;
+      }
+
+      // 3. Authorization Check (Role-based)
       const userRole = user.role;
       const allowedPaths = RBAC_CONFIG[userRole] || [];
 
@@ -32,7 +43,7 @@ export default function withPrivateAuth(Component) {
         console.warn(`Access denied for role: ${userRole} to path: ${pathname}`);
         router.push(DEFAULT_REDIRECT);
       }
-    }, [isLoggedIn, user, pathname, router]);
+    }, [isLoggedIn, user, pathname, router, dispatch]);
 
     // Show nothing while checking auth/loading
     if (!isLoggedIn || !user) {

@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 /** Manager and Super Admin see all students; Admin/Counselor see only their own. */
 import withPrivateAuth from "@/components/withPrivateAuth";
 
-/** Manager and Super Admin see all students; Admin/Counselor see only their own. */
+/** Manager and Super Admin see all students and can filter by person; Admin/Counselor see only their own. */
 function canSeeAllStudents(role) {
   return role === "manager" || role === "super_admin";
 }
@@ -248,7 +248,7 @@ function StudentsPage() {
                     <TableHead className="min-w-[140px]">Course & Batch</TableHead>
                     <TableHead className="hidden md:table-cell min-w-[120px]">College</TableHead>
                     <TableHead className="min-w-[120px]">Mobile</TableHead>
-                    {(canSeeAll || user?.role === "super_admin") && (
+                    {canSeeAll && (
                       <TableHead className="hidden lg:table-cell min-w-[100px]">Student of</TableHead>
                     )}
                     <TableHead className="min-w-[140px]">Status</TableHead>
@@ -278,7 +278,7 @@ function StudentsPage() {
                       <TableCell className="text-muted-foreground text-sm">
                         <span className="flex items-center gap-1"><Phone className="h-3 w-3 shrink-0" /> {s.student_mobile}</span>
                       </TableCell>
-                      {(canSeeAll || user?.role === "super_admin") && (
+                      {canSeeAll && (
                         <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
                           <div className="flex flex-col gap-0.5">
                             <span>{s.sales_person_name || s.uploaded_by_name || "—"}</span>

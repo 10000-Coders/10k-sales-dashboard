@@ -133,7 +133,7 @@ const validateForm = () => {
     <Dialog open={open} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" />
       <div className="fixed inset-0 flex w-screen items-center justify-center p-4">
-        <Dialog.Panel className="mx-auto w-full max-w-xl rounded-2xl border bg-white shadow-2xl overflow-hidden">
+        <Dialog.Panel className="mx-auto w-full max-w-xl rounded-2xl border bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
           {/* Decorative Header */}
           <div className="bg-primary/5 px-6 py-6 border-b flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -157,7 +157,7 @@ const validateForm = () => {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6">
+          <form onSubmit={handleSubmit} className="p-6 overflow-y-auto">
             {errors.submit && (
               <div className="mb-6 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center gap-3 text-destructive">
                 <AlertCircle className="h-5 w-5 shrink-0" />

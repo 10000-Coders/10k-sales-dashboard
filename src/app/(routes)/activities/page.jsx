@@ -28,11 +28,14 @@ import { cn } from "@/lib/utils";
 import { getRangeForPreset, todayStr } from "@/lib/dateUtils";
 
 function isManagerOrAdmin(role) {
-  return role === "manager" || role === "super_admin";
+  // Only Manager is treated as management for Activities (team view).
+  // Super Admin behaves like Admin/Counselor here: own stats only.
+  return role === "manager";
 }
 
+/** Only Manager can list sales persons and pick another person's activities. */
 function isManagerOnly(role) {
-  return role === "manager" || role === "super_admin";
+  return role === "manager";
 }
 
 const PRESETS = [
