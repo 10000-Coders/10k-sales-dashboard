@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import withPrivateAuth from "@/components/withPrivateAuth";
-
+import { useSalesPersons } from "@/hooks/useSalesData";
 import axios from "@/axios";
 import {
   Card,
@@ -49,16 +49,22 @@ const PRESETS = [
 
 const defaultRange = getRangeForPreset("this_month");
 
+/** Module-level dedup: prevent double stats/range fetch when React Strict Mode remounts */
+let statsRangeCache = { key: null, data: null, at: 0 };
+let statsRangeFetchPromise = null;
+let statsRangeFetchKey = null;
+const STATS_CACHE_MS = 5000;
+
 function ActivitiesPage() {
   const router = useRouter();
   const user = useSelector((state) => state.userAuth?.user);
   const isManager = isManagerOrAdmin(user?.role);
   const canFetchPersons = isManagerOnly(user?.role); // Only manager can list sales persons (API restricted)
+  const { persons } = useSalesPersons({ enabled: canFetchPersons });
   const [preset, setPreset] = useState("this_month");
   const [fromDate, setFromDate] = useState(defaultRange.from);
   const [toDate, setToDate] = useState(defaultRange.to);
   const [personId, setPersonId] = useState("");
-  const [persons, setPersons] = useState([]);
   const [rangeStats, setRangeStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -76,39 +82,51 @@ function ActivitiesPage() {
     return h;
   }, [user?.id, user?.role]);
 
-  const fetchPersons = useCallback(async () => {
-    if (!canFetchPersons) return;
-    try {
-      const { data } = await axios.get("/persons/", { headers: getHeaders() });
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
-      setPersons(list);
-    } catch {
-      setPersons([]);
-    }
-  }, [canFetchPersons, getHeaders]);
-
-  useEffect(() => {
-    fetchPersons();
-  }, [fetchPersons]);
-
   const fetchRangeStats = useCallback(async () => {
     const from = fromDate || todayStr();
     const to = toDate || todayStr();
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({ from, to });
-      if (canFetchPersons && personId) {
-        params.set("sales_person", personId);
-      } else if (!isManager && user?.id) {
-        params.set("sales_person", user.id);
-      }
-      const { data } = await axios.get(`/stats/range/?${params.toString()}`, { headers: getHeaders() });
-      setRangeStats(data);
-    } catch {
-      setRangeStats(null);
-    } finally {
-      setLoading(false);
+    const cacheKey = `${from}|${to}|${personId}|${user?.id}`;
+
+    if (statsRangeCache.key === cacheKey && Date.now() - statsRangeCache.at < STATS_CACHE_MS) {
+      setRangeStats(statsRangeCache.data);
+      return;
     }
+
+    if (statsRangeFetchPromise && statsRangeFetchKey === cacheKey) {
+      setLoading(true);
+      try {
+        await statsRangeFetchPromise;
+        if (statsRangeCache.key === cacheKey) setRangeStats(statsRangeCache.data);
+      } catch {
+        setRangeStats(null);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    statsRangeFetchKey = cacheKey;
+    statsRangeFetchPromise = (async () => {
+      try {
+        setLoading(true);
+        const params = new URLSearchParams({ from, to });
+        if (canFetchPersons && personId) {
+          params.set("sales_person", personId);
+        } else if (!isManager && user?.id) {
+          params.set("sales_person", user.id);
+        }
+        const { data } = await axios.get(`/stats/range/?${params.toString()}`, { headers: getHeaders() });
+        statsRangeCache = { key: cacheKey, data, at: Date.now() };
+        setRangeStats(data);
+      } catch {
+        setRangeStats(null);
+      } finally {
+        setLoading(false);
+        statsRangeFetchPromise = null;
+        statsRangeFetchKey = null;
+      }
+    })();
+    await statsRangeFetchPromise;
   }, [fromDate, toDate, personId, canFetchPersons, isManager, user?.id, getHeaders]);
 
   useEffect(() => {

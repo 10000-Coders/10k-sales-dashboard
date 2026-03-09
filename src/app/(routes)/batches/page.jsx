@@ -48,6 +48,32 @@ function canManageSalesBatches(role) {
   return role === "manager" || role === "super_admin";
 }
 
+/** Module-level cache + in-flight dedup for /sales-batches/ (avoids 2x call from Strict Mode) */
+const SALES_BATCHES_CACHE_MS = 2 * 60 * 1000; // 2 min
+const salesBatchesCache = { data: null, at: 0 };
+let salesBatchesFetchPromise = null;
+
+function clearSalesBatchesCache() {
+  salesBatchesCache.data = null;
+  salesBatchesCache.at = 0;
+  salesBatchesFetchPromise = null;
+}
+
+/** Module-level cache + in-flight dedup for /students/?sales_batch=<id> (avoids 2x call from Strict Mode) */
+const BATCH_STUDENTS_CACHE_MS = 2 * 60 * 1000; // 2 min
+const batchStudentsCache = new Map(); // salesBatchId -> { data, at }
+const batchStudentsFetchPromises = new Map(); // salesBatchId -> Promise
+
+function clearBatchStudentsCache(salesBatchId = null) {
+  if (salesBatchId != null) {
+    batchStudentsCache.delete(String(salesBatchId));
+    batchStudentsFetchPromises.delete(String(salesBatchId));
+  } else {
+    batchStudentsCache.clear();
+    batchStudentsFetchPromises.clear();
+  }
+}
+
 function BatchesPage() {
   const user = useSelector((state) => state.userAuth?.user);
   const canManage = canManageSalesBatches(user?.role);
@@ -88,11 +114,40 @@ function BatchesPage() {
   }, [user?.id, user?.role]);
 
   const fetchSalesBatches = useCallback(async () => {
+    if (salesBatchesCache.data != null && Date.now() - salesBatchesCache.at < SALES_BATCHES_CACHE_MS) {
+      setSalesBatches(salesBatchesCache.data);
+      setLoading(false);
+      return;
+    }
+    if (salesBatchesFetchPromise) {
+      try {
+        setLoading(true);
+        setError(null);
+        const list = await salesBatchesFetchPromise;
+        setSalesBatches(list);
+      } catch (err) {
+        setSalesBatches([]);
+        setError(err.response?.data?.detail || "Failed to load sales batches.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
-      const { data } = await axios.get("/sales-batches/", { headers: getHeaders() });
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
+      salesBatchesFetchPromise = (async () => {
+        try {
+          const { data } = await axios.get("/sales-batches/", { headers: getHeaders() });
+          const list = data?.results ?? (Array.isArray(data) ? data : []);
+          salesBatchesCache.data = list;
+          salesBatchesCache.at = Date.now();
+          return list;
+        } finally {
+          salesBatchesFetchPromise = null;
+        }
+      })();
+      const list = await salesBatchesFetchPromise;
       setSalesBatches(list);
     } catch (err) {
       setSalesBatches([]);
@@ -104,13 +159,32 @@ function BatchesPage() {
 
   const fetchBatchStudents = useCallback(async (salesBatchId) => {
     if (!salesBatchId) return;
+    const key = String(salesBatchId);
+    const cached = batchStudentsCache.get(key);
+    if (cached && Date.now() - cached.at < BATCH_STUDENTS_CACHE_MS) {
+      setBatchStudents(cached.data);
+      return;
+    }
+    let promise = batchStudentsFetchPromises.get(key);
+    if (!promise) {
+      promise = (async () => {
+        try {
+          const params = new URLSearchParams();
+          params.set("sales_batch", key);
+          const { data } = await axios.get(`/students/?${params.toString()}`, { headers: getHeaders() });
+          const list = data?.results ?? (Array.isArray(data) ? data : []);
+          batchStudentsCache.set(key, { data: list, at: Date.now() });
+          return list;
+        } finally {
+          batchStudentsFetchPromises.delete(key);
+        }
+      })();
+      batchStudentsFetchPromises.set(key, promise);
+    }
     try {
       setBatchStudentsLoading(true);
       setBatchStudentsError(null);
-      const params = new URLSearchParams();
-      params.set("sales_batch", String(salesBatchId));
-      const { data } = await axios.get(`/students/?${params.toString()}`, { headers: getHeaders() });
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
+      const list = await promise;
       setBatchStudents(list);
     } catch (err) {
       setBatchStudents([]);
@@ -120,37 +194,26 @@ function BatchesPage() {
     }
   }, [getHeaders]);
 
-  const fetchPaymentSummaries = useCallback(async (studentsList) => {
+  const fetchPaymentSummaries = useCallback((studentsList) => {
     if (!Array.isArray(studentsList) || studentsList.length === 0) {
       setPaymentSummaryByStudent({});
       return;
     }
     setPaymentSummaryLoading(true);
     try {
-      const entries = await Promise.all(
-        studentsList.map(async (s) => {
-          if (!s?.id) return [null, { verified: 0, pending: 0 }];
-          try {
-            const { data } = await axios.get(`/students/${s.id}/payments/`, { headers: getHeaders() });
-            const payments = Array.isArray(data) ? data : [];
-            const verified = payments
-              .filter((p) => p?.status === "verified")
-              .reduce((sum, p) => sum + Number(p?.amount || 0), 0);
-            const pending = payments
-              .filter((p) => p?.status === "pending")
-              .reduce((sum, p) => sum + Number(p?.amount || 0), 0);
-            return [s.id, { verified, pending }];
-          } catch {
-            return [s.id, { verified: 0, pending: 0 }];
-          }
-        })
-      );
-      const mapped = Object.fromEntries(entries.filter(([id]) => id != null));
+      const entries = studentsList
+        .filter((s) => s?.id != null)
+        .map((s) => {
+          const verified = Number(s.total_paid ?? 0);
+          const pending = Number(s.pending_amount ?? 0);
+          return [s.id, { verified, pending }];
+        });
+      const mapped = Object.fromEntries(entries);
       setPaymentSummaryByStudent(mapped);
     } finally {
       setPaymentSummaryLoading(false);
     }
-  }, [getHeaders]);
+  }, []);
 
   const fetchMentorBatches = useCallback(async () => {
     try {
@@ -248,6 +311,7 @@ function BatchesPage() {
         await axios.post("/sales-batches/", payload, { headers: getHeaders() });
       }
       closeModal();
+      clearSalesBatchesCache();
       fetchSalesBatches();
     } catch (err) {
       const data = err.response?.data;
@@ -264,6 +328,7 @@ function BatchesPage() {
     if (!confirm("Delete this sales batch?")) return;
     try {
       await axios.delete(`/sales-batches/${batchId}/`, { headers: getHeaders() });
+      clearSalesBatchesCache();
       fetchSalesBatches();
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to delete sales batch.");
@@ -288,14 +353,13 @@ function BatchesPage() {
     setSelectedStudentIds([]);
   };
 
-  const openBatchStudents = async (batchId) => {
+  const openBatchStudents = (batchId) => {
     if (!batchId) return;
-    const nextId = String(batchId);
-    setSelectedSalesBatchId(nextId);
+    setSelectedSalesBatchId(String(batchId));
     setMoveError(null);
     setTargetBatch("");
     setStudentsModalOpen(true);
-    await fetchBatchStudents(nextId);
+    // useEffect fetches students when selectedSalesBatchId changes
   };
 
   const handleMoveSelectedStudents = async (e) => {
@@ -315,6 +379,8 @@ function BatchesPage() {
       setMoveModalOpen(false);
       setTargetBatch("");
       setSelectedStudentIds([]);
+      clearSalesBatchesCache();
+      clearBatchStudentsCache(selectedSalesBatchId);
       await Promise.all([fetchBatchStudents(selectedSalesBatchId), fetchSalesBatches()]);
     } catch (err) {
       const data = err.response?.data;

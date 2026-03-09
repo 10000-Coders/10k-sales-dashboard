@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux";
 import axios from "@/axios";
+import { useSalesBatches } from "@/hooks/useSalesData";
 import {
   Card,
   CardContent,
@@ -165,9 +166,7 @@ export default function NewStudentPage() {
 
   const [loadingLead, setLoadingLead] = useState(!!leadIdParam);
   const [fieldErrors, setFieldErrors] = useState({});
-  const [salesBatches, setSalesBatches] = useState([]);
-  const [salesBatchesLoading, setSalesBatchesLoading] = useState(false);
-  const [salesBatchesError, setSalesBatchesError] = useState(null);
+  const { salesBatches, loading: salesBatchesLoading, error: salesBatchesError } = useSalesBatches();
 
   const [form, setForm] = useState({
     student_name: "",
@@ -257,24 +256,6 @@ export default function NewStudentPage() {
       .catch(() => {})
       .finally(() => setLoadingLead(false));
   }, [leadIdParam, getHeaders, router]);
-
-  useEffect(() => {
-    const fetchSalesBatches = async () => {
-      try {
-        setSalesBatchesLoading(true);
-        setSalesBatchesError(null);
-        const { data } = await axios.get("/sales-batches/", { headers: getHeaders() });
-        const list = data?.results ?? (Array.isArray(data) ? data : []);
-        setSalesBatches(list);
-      } catch (err) {
-        setSalesBatches([]);
-        setSalesBatchesError(err.response?.data?.detail || "Failed to load sales batches.");
-      } finally {
-        setSalesBatchesLoading(false);
-      }
-    };
-    fetchSalesBatches();
-  }, [getHeaders]);
 
   const fetchPaymentReceivers = useCallback(async () => {
     try {

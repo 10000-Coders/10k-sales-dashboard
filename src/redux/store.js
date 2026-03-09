@@ -8,8 +8,7 @@ import rootReducer from './reducers';
 const persistConfig = {
   key: 'sales-dashboard',
   storage,
-  // whitelist: ['navigation'], only navigation will be persisted
-  // blacklist: ['navigation'] navigation will not be persisted
+  whitelist: ['userAuth'], // Only persist auth; salesData cache is transient
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

@@ -1,9 +1,9 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import withPrivateAuth from "@/components/withPrivateAuth";
-
+import { useSalesPersons } from "@/hooks/useSalesData";
 import axios from "@/axios";
 import {
   Card,
@@ -28,14 +28,11 @@ import { Users, Loader2, UserPlus, Pencil, Phone } from "lucide-react";
 function SalesPersonsPage() {
   const router = useRouter();
   const user = useSelector((state) => state.userAuth?.user);
-  const [persons, setPersons] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingPerson, setEditingPerson] = useState(null);
-
   const userRole = (user?.role || "").toLowerCase();
   const isManager = userRole === "manager" || userRole === "super_admin";
+  const { persons, loading, error, refetch: refetchPersons } = useSalesPersons({ enabled: isManager });
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingPerson, setEditingPerson] = useState(null);
 
   const getHeaders = useCallback(() => {
     const h = {};
@@ -43,26 +40,6 @@ function SalesPersonsPage() {
     if (user?.role) h["X-Sales-Person-Role"] = user.role;
     return h;
   }, [user?.id, user?.role]);
-
-  const fetchPersons = useCallback(async () => {
-    if (!isManager) return;
-    try {
-      setLoading(true);
-      setError(null);
-      const { data } = await axios.get("/persons/", { headers: getHeaders() });
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
-      setPersons(list);
-    } catch (err) {
-      setError(err.response?.data?.detail || "Failed to load sales persons.");
-      setPersons([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [isManager, getHeaders]);
-
-  useEffect(() => {
-    fetchPersons();
-  }, [fetchPersons]);
 
   const openAdd = () => {
     setEditingPerson(null);
@@ -185,7 +162,7 @@ function SalesPersonsPage() {
         onClose={() => setDialogOpen(false)}
         person={editingPerson}
         persons={persons}
-        onSuccess={fetchPersons}
+        onSuccess={refetchPersons}
         getHeaders={getHeaders}
       />
     </div>

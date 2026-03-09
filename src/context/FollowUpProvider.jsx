@@ -1,9 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { useSelector } from "react-redux";
-import axios from "@/axios";
-import baseAxios from "axios";
+import baseAxios from "axios"; // For server-time only (non-sales API)
 import { toast } from "react-toastify";
 
 const FollowUpContext = createContext(null);
@@ -16,10 +14,42 @@ export const useFollowUp = () => {
   return context;
 };
 
+/** Filter leads that have a follow-up due and are not enrolled */
+function filterFollowUpLeads(leads) {
+  return (leads || []).filter((l) => l.next_follow_up_at && l.status !== "enrolled");
+}
+
+const SERVER_TIME_STORAGE_KEY = "sales_dashboard_server_time_offset";
+const SERVER_TIME_CACHE_MS = 60 * 60 * 1000; // 1 hour - offset doesn't change, device clocks drift slowly
+
+/** In-flight promise to dedupe concurrent/Strict Mode double calls */
+let serverTimeFetchPromise = null;
+
+function getStoredServerTimeOffset() {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = localStorage.getItem(SERVER_TIME_STORAGE_KEY);
+    if (!stored) return null;
+    const { offset, at } = JSON.parse(stored);
+    if (Date.now() - at < SERVER_TIME_CACHE_MS) return offset;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function setStoredServerTimeOffset(offset) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(SERVER_TIME_STORAGE_KEY, JSON.stringify({ offset, at: Date.now() }));
+  } catch {
+    /* ignore */
+  }
+}
+
 export const FollowUpProvider = ({ children }) => {
-  const user = useSelector((state) => state.userAuth?.user);
   const [upcomingFollowUps, setUpcomingFollowUps] = useState([]);
-  const [serverTimeOffset, setServerTimeOffset] = useState(0); // localTime - serverTime in ms
+  const [serverTimeOffset, setServerTimeOffset] = useState(() => getStoredServerTimeOffset() ?? 0);
   const [permission, setPermission] = useState("default");
 
   const leadsRef = useRef([]);
@@ -27,45 +57,59 @@ export const FollowUpProvider = ({ children }) => {
 
   // Base URL for non-sales APIs (e.g. https://poc.10kcoders.com/api/ — no trailing slash after replace)
   const baseUrl = (process.env.NEXT_PUBLIC_baseUrl || "").replace(/\/$/, "");
-  // Avoid api/api: normalize so base ends with at most one /api
   const apiRoot = baseUrl.replace(/\/api\/api\/?$/, "/api");
 
-  // 1. Sync Time — backend path is api/student/server-time/, so base (api root) + student/server-time/
+  // Sync server time: use cached offset from localStorage if fresh (< 1h), else fetch once and store.
+  // In-flight guard prevents duplicate API calls (React Strict Mode double-mount, concurrent calls).
   const syncTime = useCallback(async () => {
-    try {
-      const start = Date.now();
-      const endpoint = apiRoot ? `${apiRoot}/student/server-time/` : "/api/student/server-time/";
-      const response = await baseAxios.get(endpoint);
-      const serverTimeStr = response.data.datetime;
-      const serverTime = new Date(serverTimeStr).getTime();
-      const end = Date.now();
-      const latency = (end - start) / 2;
-      
-      // serverTimeOffset = localTime - (serverTime + latency)
-      setServerTimeOffset(Date.now() - (serverTime + latency));
-    } catch (error) {
-      console.error("Failed to sync server time:", error);
+    const cached = getStoredServerTimeOffset();
+    if (cached != null) {
+      setServerTimeOffset(cached);
+      return; // No API call - use stored offset
     }
+    if (serverTimeFetchPromise) {
+      return serverTimeFetchPromise; // Reuse in-flight request
+    }
+    const doFetch = async () => {
+      try {
+        const start = Date.now();
+        const endpoint = apiRoot ? `${apiRoot}/student/server-time/` : "/api/student/server-time/";
+        const response = await baseAxios.get(endpoint);
+        const serverTimeStr = response.data.datetime;
+        const serverTime = new Date(serverTimeStr).getTime();
+        const end = Date.now();
+        const latency = (end - start) / 2;
+        const offset = Date.now() - (serverTime + latency);
+        setServerTimeOffset(offset);
+        setStoredServerTimeOffset(offset);
+      } catch (error) {
+        console.error("Failed to sync server time:", error);
+      } finally {
+        serverTimeFetchPromise = null;
+      }
+    };
+    serverTimeFetchPromise = doFetch();
+    return serverTimeFetchPromise;
   }, [apiRoot]);
 
-  // 2. Fetch Leads
-  const fetchMyLeads = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const params = new URLSearchParams();
-      params.set("sales_person", user.id);
-      // We don't filter in backend because we want to show all leads in the provider's logic if needed
-      // but primarily we need next_follow_up_at
-      const { data } = await axios.get(`/leads/?${params.toString()}`);
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
-      
-      const filtered = list.filter(l => l.next_follow_up_at && l.status !== 'enrolled');
-      setUpcomingFollowUps(filtered);
+  /** Update notification list from leads state (called by Leads page when it fetches) */
+  const setUpcomingFollowUpsFromLeads = useCallback((leads) => {
+    const filtered = filterFollowUpLeads(leads);
+    setUpcomingFollowUps(filtered);
+    leadsRef.current = filtered;
+  }, []);
+
+  /** Optimistically update a lead in the list (e.g. after logging activity) */
+  const updateLeadInFollowUpList = useCallback((leadId, updates) => {
+    setUpcomingFollowUps((prev) => {
+      const next = prev.map((l) =>
+        l.id === leadId ? { ...l, ...updates } : l
+      );
+      const filtered = next.filter((l) => l.next_follow_up_at && l.status !== "enrolled");
       leadsRef.current = filtered;
-    } catch (error) {
-      console.error("Failed to fetch leads for follow-up:", error);
-    }
-  }, [user?.id]);
+      return filtered;
+    });
+  }, []);
 
   // 3. Notification Logic
   const checkNotifications = useCallback(() => {
@@ -147,20 +191,8 @@ export const FollowUpProvider = ({ children }) => {
         Notification.requestPermission().then(setPermission);
       }
     }
-    
-    syncTime();
-    const timeSyncInterval = setInterval(syncTime, 600000); // Sync time every 10m
-    
-    return () => clearInterval(timeSyncInterval);
+    syncTime(); // Sync once on mount; use local time for notifications if it fails
   }, [syncTime]);
-
-  useEffect(() => {
-    if (user?.id) {
-      fetchMyLeads();
-      const leadPollingInterval = setInterval(fetchMyLeads, 120000); // Poll leads every 2m
-      return () => clearInterval(leadPollingInterval);
-    }
-  }, [user?.id, fetchMyLeads]);
 
   useEffect(() => {
     const notificationCheckInterval = setInterval(checkNotifications, 10000); // Check every 10s
@@ -170,10 +202,11 @@ export const FollowUpProvider = ({ children }) => {
   const value = {
     upcomingFollowUps,
     serverTimeOffset,
-    fetchMyLeads,
+    setUpcomingFollowUpsFromLeads,
+    updateLeadInFollowUpList,
     syncTime,
     permission,
-    requestPermission: () => Notification.requestPermission().then(setPermission)
+    requestPermission: () => Notification.requestPermission().then(setPermission),
   };
 
   return <FollowUpContext.Provider value={value}>{children}</FollowUpContext.Provider>;

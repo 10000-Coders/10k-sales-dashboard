@@ -75,7 +75,7 @@ export default function LeadDetailClient() {
   const params = useParams();
   const router = useRouter();
   const user = useSelector((state) => state.userAuth?.user);
-  const { fetchMyLeads } = useFollowUp() || {};
+  const { updateLeadInFollowUpList } = useFollowUp() || {};
   const id = params?.id;
   const [lead, setLead] = useState(null);
   const [activities, setActivities] = useState([]);
@@ -173,7 +173,11 @@ export default function LeadDetailClient() {
       setActivityForm({ activity_type: "call", outcome: "", notes: "", next_follow_up_at: "" });
       fetchLead();
       fetchActivities();
-      if (fetchMyLeads) fetchMyLeads(); // refresh global follow-up list so badges/timers update immediately
+      if (updateLeadInFollowUpList && lead?.id) {
+        updateLeadInFollowUpList(lead.id, {
+          next_follow_up_at: activityForm.next_follow_up_at || null,
+        });
+      }
     } catch (err) {
       setActivityError(err.response?.data?.detail || "Failed to log activity.");
     } finally {

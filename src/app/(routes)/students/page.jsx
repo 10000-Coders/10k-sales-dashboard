@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import axios from "@/axios";
+import { useSalesPersons, useSalesBatches } from "@/hooks/useSalesData";
 import {
   Card,
   CardContent,
@@ -25,6 +26,12 @@ import { cn } from "@/lib/utils";
 
 /** Manager and Super Admin see all students; Admin/Counselor see only their own. */
 import withPrivateAuth from "@/components/withPrivateAuth";
+
+/** Module-level dedup: prevent double students fetch when React Strict Mode remounts */
+let studentsCache = { key: null, data: null, at: 0 };
+let studentsFetchPromise = null;
+let studentsFetchCacheKey = null;
+const STUDENTS_CACHE_MS = 5000;
 
 /** Manager and Super Admin see all students and can filter by person; Admin/Counselor see only their own. */
 function canSeeAllStudents(role) {
@@ -82,11 +89,10 @@ function StudentsPage() {
   const router = useRouter();
   const user = useSelector((state) => state.userAuth?.user);
   const canSeeAll = canSeeAllStudents(user?.role);
+  const { persons } = useSalesPersons({ enabled: canSeeAll });
+  const { salesBatches, loading: salesBatchesLoading } = useSalesBatches();
 
   const [students, setStudents] = useState([]);
-  const [persons, setPersons] = useState([]);
-  const [salesBatches, setSalesBatches] = useState([]);
-  const [salesBatchesLoading, setSalesBatchesLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -103,58 +109,59 @@ function StudentsPage() {
     return h;
   }, [user?.id, user?.role]);
 
-  const fetchStudents = useCallback(async () => {
-    try {
+  const fetchStudents = useCallback(async (forceRefresh = false) => {
+    const cacheKey = `${searchDebounce}|${filterPerson}|${filterDateFrom}|${filterDateTo}|${filterSalesBatch}|${user?.id}`;
+
+    if (!forceRefresh && studentsCache.key === cacheKey && Date.now() - studentsCache.at < STUDENTS_CACHE_MS) {
+      setStudents(studentsCache.data);
+      return;
+    }
+
+    if (!forceRefresh && studentsFetchPromise && studentsFetchCacheKey === cacheKey) {
       setLoading(true);
-      setError(null);
-      const params = new URLSearchParams();
-      if (searchDebounce.trim()) params.set("search", searchDebounce.trim());
-      if (canSeeAll && filterPerson) params.set("sales_person", filterPerson);
-      if (filterDateFrom) params.set("created_after", filterDateFrom);
-      if (filterDateTo) params.set("created_before", filterDateTo);
-      if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
-      const { data } = await axios.get(`/students/${params.toString() ? `?${params.toString()}` : ""}`, { headers: getHeaders() });
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
-      setStudents(list);
-    } catch (err) {
-      setError(err.response?.data?.detail || "Failed to load students.");
-      setStudents([]);
-    } finally {
-      setLoading(false);
+      try {
+        await studentsFetchPromise;
+        if (studentsCache.key === cacheKey) setStudents(studentsCache.data);
+      } catch {
+        setStudents([]);
+      } finally {
+        setLoading(false);
+      }
+      return;
     }
-  }, [getHeaders, searchDebounce, canSeeAll, filterPerson, filterDateFrom, filterDateTo, filterSalesBatch]);
 
-  const fetchPersons = useCallback(async () => {
-    if (!canSeeAll) return;
-    try {
-      const { data } = await axios.get("/persons/", { headers: getHeaders() });
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
-      setPersons(list);
-    } catch {
-      setPersons([]);
+    if (forceRefresh) {
+      studentsCache = { key: null, data: null, at: 0 };
+      studentsFetchPromise = null;
+      studentsFetchCacheKey = null;
     }
-  }, [canSeeAll, getHeaders]);
 
-  const fetchSalesBatches = useCallback(async () => {
-    try {
-      setSalesBatchesLoading(true);
-      const { data } = await axios.get("/sales-batches/", { headers: getHeaders() });
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
-      setSalesBatches(list);
-    } catch {
-      setSalesBatches([]);
-    } finally {
-      setSalesBatchesLoading(false);
-    }
-  }, [getHeaders]);
-
-  useEffect(() => {
-    fetchPersons();
-  }, [fetchPersons]);
-
-  useEffect(() => {
-    fetchSalesBatches();
-  }, [fetchSalesBatches]);
+    studentsFetchCacheKey = cacheKey;
+    studentsFetchPromise = (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const params = new URLSearchParams();
+        if (searchDebounce.trim()) params.set("search", searchDebounce.trim());
+        if (canSeeAll && filterPerson) params.set("sales_person", filterPerson);
+        if (filterDateFrom) params.set("created_after", filterDateFrom);
+        if (filterDateTo) params.set("created_before", filterDateTo);
+        if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
+        const { data } = await axios.get(`/students/${params.toString() ? `?${params.toString()}` : ""}`, { headers: getHeaders() });
+        const list = data?.results ?? (Array.isArray(data) ? data : []);
+        studentsCache = { key: cacheKey, data: list, at: Date.now() };
+        setStudents(list);
+      } catch (err) {
+        setError(err.response?.data?.detail || "Failed to load students.");
+        setStudents([]);
+      } finally {
+        setLoading(false);
+        studentsFetchPromise = null;
+        studentsFetchCacheKey = null;
+      }
+    })();
+    await studentsFetchPromise;
+  }, [getHeaders, searchDebounce, canSeeAll, filterPerson, filterDateFrom, filterDateTo, filterSalesBatch, user?.id]);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounce(searchQuery), 300);

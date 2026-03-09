@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import axios from "@/axios";
+import { useSalesPersons } from "@/hooks/useSalesData";
 import {
   Card,
   CardContent,
@@ -25,6 +26,7 @@ import { Loader2, UserPlus, Pencil, Phone, Calendar, Search, ChevronDown } from 
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
+import { useFollowUp } from "@/context/FollowUpProvider";
 
 /** Only Manager sees all leads; Admin and Counselor see only their own. */
 import withPrivateAuth from "@/components/withPrivateAuth";
@@ -33,6 +35,12 @@ import withPrivateAuth from "@/components/withPrivateAuth";
 function isManager(role) {
   return role === "manager" || role === "super_admin";
 }
+
+/** Module-level dedup: prevent double leads fetch when React Strict Mode remounts */
+let leadsCache = { key: null, data: null, at: 0 };
+let leadsFetchPromise = null;
+let leadsFetchCacheKey = null;
+const LEADS_CACHE_MS = 5000;
 
 const STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
@@ -61,8 +69,9 @@ function LeadsPage() {
   const router = useRouter();
   const user = useSelector((state) => state.userAuth?.user);
   const isManagerRole = isManager(user?.role);
+  const { persons, refetch: refetchPersons } = useSalesPersons({ enabled: isManagerRole });
+  const { setUpcomingFollowUpsFromLeads } = useFollowUp();
   const [leads, setLeads] = useState([]);
-  const [persons, setPersons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -96,33 +105,74 @@ function LeadsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const fetchLeads = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const params = new URLSearchParams();
-      if (filterStatus) params.set("status", filterStatus);
-      if (filterDateFrom) params.set("created_after", filterDateFrom);
-      if (filterDateTo) params.set("created_before", filterDateTo);
-      if (searchDebounce.trim()) params.set("search", searchDebounce.trim());
-      if (isManagerRole && filterPerson) {
-        params.set("sales_person", filterPerson);
-      } else if (!isManagerRole && user?.id) {
-        params.set("sales_person", user.id);
-      }
-      const headers = {};
-      if (user?.id != null) headers["X-Sales-Person-Id"] = String(user.id);
-      if (user?.role) headers["X-Sales-Person-Role"] = user.role;
-      const { data } = await axios.get(`/leads/?${params.toString()}`, { headers });
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
-      setLeads(list);
-    } catch (err) {
-      setError(err.response?.data?.detail || "Failed to load leads.");
-      setLeads([]);
-    } finally {
-      setLoading(false);
+  const fetchLeads = useCallback(async (forceRefresh = false) => {
+    const cacheKey = `${filterStatus}|${filterPerson}|${filterDateFrom}|${filterDateTo}|${searchDebounce}|${user?.id}`;
+
+    if (forceRefresh) {
+      leadsCache = { key: null, data: null, at: 0 };
+      leadsFetchPromise = null;
+      leadsFetchCacheKey = null;
     }
-  }, [filterStatus, filterPerson, filterDateFrom, filterDateTo, searchDebounce, isManagerRole, user?.id]);
+
+    if (!forceRefresh && leadsCache.key === cacheKey && Date.now() - leadsCache.at < LEADS_CACHE_MS) {
+      setLeads(leadsCache.data);
+      const myLeadsForNotification = leadsCache.data.filter((l) => String(l.sales_person) === String(user?.id));
+      setUpcomingFollowUpsFromLeads(myLeadsForNotification);
+      return;
+    }
+
+    if (!forceRefresh && leadsFetchPromise && leadsFetchCacheKey === cacheKey) {
+      setLoading(true);
+      try {
+        await leadsFetchPromise;
+        if (leadsCache.key === cacheKey) {
+          setLeads(leadsCache.data);
+          const myLeadsForNotification = leadsCache.data.filter((l) => String(l.sales_person) === String(user?.id));
+          setUpcomingFollowUpsFromLeads(myLeadsForNotification);
+        }
+      } catch {
+        /* first fetch will handle error state */
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    leadsFetchCacheKey = cacheKey;
+    leadsFetchPromise = (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const params = new URLSearchParams();
+        if (filterStatus) params.set("status", filterStatus);
+        if (filterDateFrom) params.set("created_after", filterDateFrom);
+        if (filterDateTo) params.set("created_before", filterDateTo);
+        if (searchDebounce.trim()) params.set("search", searchDebounce.trim());
+        if (isManagerRole && filterPerson) {
+          params.set("sales_person", filterPerson);
+        } else if (!isManagerRole && user?.id) {
+          params.set("sales_person", user.id);
+        }
+        const headers = {};
+        if (user?.id != null) headers["X-Sales-Person-Id"] = String(user.id);
+        if (user?.role) headers["X-Sales-Person-Role"] = user.role;
+        const { data } = await axios.get(`/leads/?${params.toString()}`, { headers });
+        const list = data?.results ?? (Array.isArray(data) ? data : []);
+        leadsCache = { key: cacheKey, data: list, at: Date.now() };
+        setLeads(list);
+        const myLeadsForNotification = list.filter((l) => String(l.sales_person) === String(user?.id));
+        setUpcomingFollowUpsFromLeads(myLeadsForNotification);
+      } catch (err) {
+        setError(err.response?.data?.detail || "Failed to load leads.");
+        setLeads([]);
+      } finally {
+        setLoading(false);
+        leadsFetchPromise = null;
+        leadsFetchCacheKey = null;
+      }
+    })();
+    await leadsFetchPromise;
+  }, [filterStatus, filterPerson, filterDateFrom, filterDateTo, searchDebounce, isManagerRole, user?.id, setUpcomingFollowUpsFromLeads]);
 
   const getHeaders = useCallback(() => {
     const h = {};
@@ -130,21 +180,6 @@ function LeadsPage() {
     if (user?.role) h["X-Sales-Person-Role"] = user.role;
     return h;
   }, [user?.id, user?.role]);
-
-  const fetchPersons = useCallback(async () => {
-    if (!isManagerRole) return;
-    try {
-      const { data } = await axios.get("/persons/", { headers: getHeaders() });
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
-      setPersons(list);
-    } catch {
-      setPersons([]);
-    }
-  }, [isManagerRole, getHeaders]);
-
-  useEffect(() => {
-    fetchPersons();
-  }, [fetchPersons]);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounce(searchQuery), 300);
@@ -366,7 +401,7 @@ function LeadsPage() {
         onClose={() => setDialogOpen(false)}
         lead={editingLead}
         currentUserId={user?.id}
-        onSuccess={() => { fetchLeads(); if (isManagerRole) fetchPersons(); }}
+        onSuccess={() => { fetchLeads(true); if (isManagerRole) refetchPersons(); }}
       />
     </div>
   );

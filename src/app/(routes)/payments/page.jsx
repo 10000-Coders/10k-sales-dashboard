@@ -64,6 +64,28 @@ const COURSE_LABELS = {
   devops: "DevOps",
 };
 
+/** Module-level cache + in-flight dedup to avoid duplicate payments/batch-summary/receivers API calls (e.g. Strict Mode) */
+const PAYMENTS_CACHE_MS = 2 * 60 * 1000; // 2 min
+const paymentsCache = new Map();
+const paymentsFetchPromises = new Map();
+let batchSummaryInFlightKey = null;
+let batchSummaryInFlightPromise = null;
+
+function paymentsCacheKey(prefix, params) {
+  return `${prefix}:${params?.toString() ?? ""}`;
+}
+
+function clearPaymentsListAndSummaryCache() {
+  for (const key of paymentsCache.keys()) {
+    if (key.startsWith("payments:") || key.startsWith("batch-summary")) {
+      paymentsCache.delete(key);
+      paymentsFetchPromises.delete(key);
+    }
+  }
+  batchSummaryInFlightKey = null;
+  batchSummaryInFlightPromise = null;
+}
+
 /**
  * @typedef {Object} PaymentItem
  * @property {string | null | undefined} reference_image
@@ -136,20 +158,39 @@ function PaymentsPage() {
       setError("Select a sales batch or mentor batch to view payments.");
       return;
     }
+    const params = new URLSearchParams();
+    if (filterStatus) params.set("status", filterStatus);
+    if (filterSalesPerson) params.set("sales_person", filterSalesPerson);
+    if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
+    if (filterMentorBatch) params.set("mentor_batch", filterMentorBatch);
+    if (filterDateRange) params.set("date_range", filterDateRange);
+    if (filterDateFrom) params.set("date_from", filterDateFrom);
+    if (filterDateTo) params.set("date_to", filterDateTo);
+    const key = paymentsCacheKey("payments", params);
+    const cached = paymentsCache.get(key);
+    if (cached && Date.now() - cached.at < PAYMENTS_CACHE_MS) {
+      setPayments(cached.data);
+      return;
+    }
+    let promise = paymentsFetchPromises.get(key);
+    if (!promise) {
+      promise = (async () => {
+        try {
+          const url = params.toString() ? `/payments/?${params.toString()}` : "/payments/";
+          const { data } = await axios.get(url, { headers: getHeaders() });
+          const list = data?.results ?? (Array.isArray(data) ? data : []);
+          paymentsCache.set(key, { data: list, at: Date.now() });
+          return list;
+        } finally {
+          paymentsFetchPromises.delete(key);
+        }
+      })();
+      paymentsFetchPromises.set(key, promise);
+    }
     try {
       setLoading(true);
       setError(null);
-      const params = new URLSearchParams();
-      if (filterStatus) params.set("status", filterStatus);
-      if (filterSalesPerson) params.set("sales_person", filterSalesPerson);
-      if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
-      if (filterMentorBatch) params.set("mentor_batch", filterMentorBatch);
-      if (filterDateRange) params.set("date_range", filterDateRange);
-      if (filterDateFrom) params.set("date_from", filterDateFrom);
-      if (filterDateTo) params.set("date_to", filterDateTo);
-      const url = params.toString() ? `/payments/?${params.toString()}` : "/payments/";
-      const { data } = await axios.get(url, { headers: getHeaders() });
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
+      const list = await promise;
       setPayments(list);
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to load payments.");
@@ -177,62 +218,63 @@ function PaymentsPage() {
       setSummaryError(null);
       return;
     }
+    const buildParams = () => {
+      const params = new URLSearchParams();
+      params.set("group_by", "sales_batch");
+      if (filterStatus) params.set("status", filterStatus);
+      if (filterSalesPerson) params.set("sales_person", filterSalesPerson);
+      if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
+      if (filterMentorBatch) params.set("mentor_batch", filterMentorBatch);
+      if (filterDateRange) params.set("date_range", filterDateRange);
+      if (filterDateFrom) params.set("date_from", filterDateFrom);
+      if (filterDateTo) params.set("date_to", filterDateTo);
+      return params.toString();
+    };
+    const summaryParams = buildParams();
+    const cacheKey = paymentsCacheKey("batch-summary", summaryParams);
+
+    const cached = paymentsCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < PAYMENTS_CACHE_MS) {
+      setSummaryRows(cached.data);
+      return;
+    }
+    if (batchSummaryInFlightKey === cacheKey && batchSummaryInFlightPromise) {
+      try {
+        setSummaryLoading(true);
+        setSummaryError(null);
+        const rows = await batchSummaryInFlightPromise;
+        setSummaryRows(rows);
+      } catch (err) {
+        setSummaryRows([]);
+        setSummaryError(err.response?.data?.detail || "Failed to load batch summary.");
+      } finally {
+        setSummaryLoading(false);
+      }
+      return;
+    }
+
+    const doFetch = async () => {
+      const url = `/payments/batch-summary/${summaryParams ? `?${summaryParams}` : ""}`;
+      const { data } = await axios.get(url, { headers: getHeaders() });
+      const rows = Array.isArray(data) ? data : data?.results ?? [];
+      paymentsCache.set(cacheKey, { data: rows, at: Date.now() });
+      return rows;
+    };
+
+    batchSummaryInFlightKey = cacheKey;
+    batchSummaryInFlightPromise = doFetch();
+
     try {
       setSummaryLoading(true);
       setSummaryError(null);
-      const buildParams = (statusOverride = null) => {
-        const params = new URLSearchParams();
-        params.set("group_by", "sales_batch");
-        if (statusOverride) params.set("status", statusOverride);
-        else if (filterStatus) params.set("status", filterStatus);
-        if (filterSalesPerson) params.set("sales_person", filterSalesPerson);
-        if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
-        if (filterMentorBatch) params.set("mentor_batch", filterMentorBatch);
-        if (filterDateRange) params.set("date_range", filterDateRange);
-        if (filterDateFrom) params.set("date_from", filterDateFrom);
-        if (filterDateTo) params.set("date_to", filterDateTo);
-        return params.toString() ? `?${params.toString()}` : "";
-      };
-
-      // 1) Full summary (all statuses) for counts
-      const summaryUrl = `/payments/batch-summary/${buildParams()}`;
-      const { data: summaryData } = await axios.get(summaryUrl, { headers: getHeaders() });
-      const baseRows = Array.isArray(summaryData) ? summaryData : summaryData?.results ?? [];
-
-      // 2) Verified-only summary to get verified totals
-      const verifiedUrl = `/payments/batch-summary/${buildParams("verified")}`;
-      const { data: verifiedData } = await axios.get(verifiedUrl, { headers: getHeaders() });
-      const verifiedRows = Array.isArray(verifiedData) ? verifiedData : verifiedData?.results ?? [];
-      const verifiedMap = new Map(
-        verifiedRows.map((r) => {
-          const key = r.batch_key ?? r.batch_name ?? "";
-          const amount =
-            r.verified_amount ??
-            r.total_verified_amount ??
-            r.verified_total_amount ??
-            r.total_amount_verified ??
-            r.total_amount ??
-            0;
-          return [String(key), Number(amount) || 0];
-        })
-      );
-
-      const merged = baseRows.map((row) => {
-        const key = row.batch_key ?? row.batch_name ?? "";
-        const verifiedAmountFromBase =
-          row.verified_amount ??
-          row.total_verified_amount ??
-          row.verified_total_amount ??
-          row.total_amount_verified;
-        const verifiedAmount = verifiedAmountFromBase != null ? Number(verifiedAmountFromBase) : verifiedMap.get(String(key)) ?? 0;
-        return { ...row, verified_amount: verifiedAmount };
-      });
-
-      setSummaryRows(merged);
+      const rows = await batchSummaryInFlightPromise;
+      setSummaryRows(rows);
     } catch (err) {
       setSummaryRows([]);
       setSummaryError(err.response?.data?.detail || "Failed to load batch summary.");
     } finally {
+      batchSummaryInFlightKey = null;
+      batchSummaryInFlightPromise = null;
       setSummaryLoading(false);
     }
   }, [
@@ -258,10 +300,29 @@ function PaymentsPage() {
 
   const fetchReceivers = useCallback(async () => {
     if (!canManageReceivers) return;
+    const key = paymentsCacheKey("receivers", "");
+    const cached = paymentsCache.get(key);
+    if (cached && Date.now() - cached.at < PAYMENTS_CACHE_MS) {
+      setReceivers(cached.data);
+      return;
+    }
+    let promise = paymentsFetchPromises.get(key);
+    if (!promise) {
+      promise = (async () => {
+        try {
+          const { data } = await axios.get("/payment-receivers/", { headers: getHeaders() });
+          const list = data?.results ?? (Array.isArray(data) ? data : []);
+          paymentsCache.set(key, { data: list, at: Date.now() });
+          return list;
+        } finally {
+          paymentsFetchPromises.delete(key);
+        }
+      })();
+      paymentsFetchPromises.set(key, promise);
+    }
     try {
       setReceiverLoading(true);
-      const { data } = await axios.get("/payment-receivers/", { headers: getHeaders() });
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
+      const list = await promise;
       setReceivers(list);
     } catch {
       setReceivers([]);
@@ -341,6 +402,8 @@ function PaymentsPage() {
       } else {
         await axios.post("/payment-receivers/", receiverForm, { headers: getHeaders() });
       }
+      paymentsCache.delete(paymentsCacheKey("receivers", ""));
+      paymentsFetchPromises.delete(paymentsCacheKey("receivers", ""));
       fetchReceivers();
       closeReceiverModal();
     } catch (err) {
@@ -398,9 +461,10 @@ function PaymentsPage() {
         );
       }
 
-      // Refresh batch summary counts
+      // Invalidate cache so batch summary refetches fresh counts
+      clearPaymentsListAndSummaryCache();
       fetchBatchSummary();
-      
+
       // Close the detail modal
       closeModal();
     } catch (err) {

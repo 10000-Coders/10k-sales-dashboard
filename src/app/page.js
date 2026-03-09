@@ -44,6 +44,53 @@ const PRESETS = [
 
 const SINGLE_DAY_PRESETS = new Set(["today", "yesterday"]);
 
+/** Module-level cache + in-flight dedup for stats API (prevents 4x calls from Strict Mode + manager dual-fetch) */
+const STATS_CACHE_MS = 6 * 60 * 60 * 1000; // 6 hours
+const statsCache = new Map(); // key -> { data, at }
+const statsFetchPromises = new Map(); // key -> Promise
+
+async function fetchStatsCached({ singleDay, date, fromDate, toDate, salesPersonId, getHeaders }) {
+  const cacheKey = singleDay
+    ? `stats:${date}:${salesPersonId ?? "team"}`
+    : `stats:range:${fromDate}:${toDate}:${salesPersonId ?? "team"}`;
+
+  const cached = statsCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < STATS_CACHE_MS) {
+    return cached.data;
+  }
+
+  const inFlight = statsFetchPromises.get(cacheKey);
+  if (inFlight) return inFlight;
+
+  const doFetch = async () => {
+    try {
+      const headers = getHeaders();
+      let data;
+      if (singleDay) {
+        const url = salesPersonId
+          ? `/stats/?date=${date}&sales_person=${salesPersonId}`
+          : `/stats/?date=${date}`;
+        const res = await axios.get(url, { headers });
+        data = res.data;
+      } else {
+        const url = salesPersonId
+          ? `/stats/range/?from=${fromDate}&to=${toDate}&sales_person=${salesPersonId}`
+          : `/stats/range/?from=${fromDate}&to=${toDate}`;
+        const res = await axios.get(url, { headers });
+        data = res.data;
+      }
+      statsCache.set(cacheKey, { data, at: Date.now() });
+      return data;
+    } finally {
+      statsFetchPromises.delete(cacheKey);
+    }
+  };
+
+  const promise = doFetch();
+  statsFetchPromises.set(cacheKey, promise);
+  return promise;
+}
+
 /** Step-by-step responsibilities by role (lead tracking, follow-up, enrollment, payments). */
 const ROLE_RESPONSIBILITIES = {
   counselor: [
@@ -100,14 +147,17 @@ function HomePage() {
   const fetchMyStats = useCallback(async () => {
     if (!user?.id) return;
     try {
-      if (SINGLE_DAY_PRESETS.has(preset)) {
-        const date = preset === "today" ? todayStr() : getRangeForPreset("yesterday").from;
-        const { data } = await axios.get(`/stats/?date=${date}&sales_person=${user.id}`, { headers: getHeaders() });
-        setMyStats(data);
-      } else {
-        const { data } = await axios.get(`/stats/range/?from=${fromDate}&to=${toDate}&sales_person=${user.id}`, { headers: getHeaders() });
-        setMyStats(data);
-      }
+      const singleDay = SINGLE_DAY_PRESETS.has(preset);
+      const date = singleDay ? (preset === "today" ? todayStr() : getRangeForPreset("yesterday").from) : null;
+      const data = await fetchStatsCached({
+        singleDay,
+        date: date ?? fromDate,
+        fromDate,
+        toDate,
+        salesPersonId: user.id,
+        getHeaders,
+      });
+      setMyStats(data);
     } catch {
       setMyStats(null);
     }
@@ -116,14 +166,17 @@ function HomePage() {
   const fetchTeamStats = useCallback(async () => {
     if (!isManagerRole) return;
     try {
-      if (SINGLE_DAY_PRESETS.has(preset)) {
-        const date = preset === "today" ? todayStr() : getRangeForPreset("yesterday").from;
-        const { data } = await axios.get(`/stats/?date=${date}`, { headers: getHeaders() });
-        setTeamStats(data);
-      } else {
-        const { data } = await axios.get(`/stats/range/?from=${fromDate}&to=${toDate}`, { headers: getHeaders() });
-        setTeamStats(data);
-      }
+      const singleDay = SINGLE_DAY_PRESETS.has(preset);
+      const date = singleDay ? (preset === "today" ? todayStr() : getRangeForPreset("yesterday").from) : null;
+      const data = await fetchStatsCached({
+        singleDay,
+        date: date ?? fromDate,
+        fromDate,
+        toDate,
+        salesPersonId: null,
+        getHeaders,
+      });
+      setTeamStats(data);
     } catch {
       setTeamStats(null);
     }
