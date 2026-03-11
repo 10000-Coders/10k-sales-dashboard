@@ -65,6 +65,8 @@ export default function SideBar() {
       router.push("/students");
     } else if (text === "Payments") {
       router.push("/payments");
+    } else if (text === "Account Summary") {
+      router.push("/reports/date-account-summary");
     } else {
       const slug = text.toLowerCase().replace(/\s+/g, "");
       router.push(`/${slug}`);
@@ -96,21 +98,24 @@ export default function SideBar() {
         </div>
         <nav className="flex-1 overflow-y-auto overflow-x-hidden">
           <ul className="flex flex-col items-center gap-0">
-            {visibleMenuItems.map((item, idx) => (
-              <li
-                key={idx}
-                className={cn(
-                  "relative flex w-[250px] cursor-pointer items-center justify-between rounded-r-full px-[30px] py-[12px] transition-all duration-200",
-                  activeItem === item.text 
-                    ? "bg-[#FF8000] text-white shadow-md" 
-                    : "text-gray-600 hover:bg-gray-100 hover:text-black"
-                )}
-                onClick={() => handleActiveItem(item.text)}
-              >
-                <span className="font-medium">{item.text}</span>
-                {activeItem === item.text ? item.imgWhite : item.imgBlack}
-              </li>
-            ))}
+            {visibleMenuItems.map((item, idx) => {
+              const IconComponent = item.icon;
+              return (
+                <li
+                  key={idx}
+                  className={cn(
+                    "relative flex w-[240px] cursor-pointer items-center gap-3 px-2 rounded-r-full py-[10px] transition-all duration-200",
+                    activeItem === item.text 
+                      ? "bg-[#FF8000] text-white shadow-md" 
+                      : "text-gray-600 hover:bg-gray-100 hover:text-black"
+                  )}
+                  onClick={() => handleActiveItem(item.text)}
+                >
+                  <IconComponent className="h-5 w-5 flex-shrink-0" />
+                  <span className="font-medium">{item.text}</span>
+                </li>
+              );
+            })}
           </ul>
         </nav>
 

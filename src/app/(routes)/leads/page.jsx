@@ -31,9 +31,9 @@ import { useFollowUp } from "@/context/FollowUpProvider";
 /** Only Manager sees all leads; Admin and Counselor see only their own. */
 import withPrivateAuth from "@/components/withPrivateAuth";
 
-/** Only Manager sees all leads; Admin and Counselor see only their own. */
+/** Only Manager sees all leads; Admin, Counselor and Super Admin see only their own. */
 function isManager(role) {
-  return role === "manager" || role === "super_admin";
+  return role === "manager";
 }
 
 /** Module-level dedup: prevent double leads fetch when React Strict Mode remounts */
@@ -118,6 +118,7 @@ function LeadsPage() {
       setLeads(leadsCache.data);
       const myLeadsForNotification = leadsCache.data.filter((l) => String(l.sales_person) === String(user?.id));
       setUpcomingFollowUpsFromLeads(myLeadsForNotification);
+      setLoading(false);
       return;
     }
 

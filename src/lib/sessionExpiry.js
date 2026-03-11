@@ -1,8 +1,8 @@
 /**
- * Session expiry: users must log in again after 48 hours.
+ * Session expiry: users must log in again after 24 hours.
  */
 
-const SESSION_DURATION_MS = 48 * 60 * 60 * 1000; // 48 hours
+const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 const LOGIN_AT_KEY = "sales_dashboard_login_at";
 
 export function setLoginAt() {
@@ -20,7 +20,7 @@ export function clearLoginAt() {
 }
 
 /**
- * Returns true if there is no stored login time or if 48 hours have passed since login.
+ * Returns true if there is no stored login time or if 24 hours have passed since login.
  */
 export function isSessionExpired() {
   if (typeof window === "undefined") return true;

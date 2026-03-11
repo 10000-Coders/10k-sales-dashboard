@@ -1,13 +1,17 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "@/axios";
 
+/**
+ * Login with email + OTP (password login removed).
+ * POST /login/otp/verify/ returns same shape as old password login (sales person object).
+ */
 export const login = createAsyncThunk(
   "userAuth/login",
   async (payload, { rejectWithValue }) => {
     try {
-      const response = await axios.post("/login/", {
+      const response = await axios.post("/login/otp/verify/", {
         email: payload.email?.trim()?.toLowerCase(),
-        password: payload.password,
+        otp: String(payload.otp || "").trim(),
       });
       return response.data;
     } catch (error) {

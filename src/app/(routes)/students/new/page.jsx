@@ -312,7 +312,11 @@ export default function NewStudentPage() {
     setEmailOtpError("");
     setEmailOtpLoading(true);
     try {
-      const result = await sendMentorOtp({ channel: "email", email });
+      const result = await sendMentorOtp({
+        channel: "email",
+        email,
+        filters: ["check_and_block_exists_in_sales_student"],
+      });
       if (result.success) {
         setEmailOtpSent(true);
         setEmailOtp("");
@@ -357,7 +361,11 @@ export default function NewStudentPage() {
     setMobileOtpError("");
     setMobileOtpLoading(true);
     try {
-      const result = await sendMentorOtp({ channel: "mobile", mobile });
+      const result = await sendMentorOtp({
+        channel: "mobile",
+        mobile,
+        filters: ["check_and_block_exists_in_sales_student"],
+      });
       if (result.success) {
         setMobileOtpSent(true);
         setMobileOtp("");
@@ -368,6 +376,24 @@ export default function NewStudentPage() {
     } finally {
       setMobileOtpLoading(false);
     }
+  };
+
+  /** Reset email OTP flow so user can edit email and send again (no 60s lock). */
+  const resetEmailOtpFlow = () => {
+    setEmailVerified(false);
+    setEmailOtpSent(false);
+    setEmailOtp("");
+    setEmailOtpError("");
+    setEmailResendAt(0);
+  };
+
+  /** Reset mobile OTP flow so user can edit number and send again. */
+  const resetMobileOtpFlow = () => {
+    setMobileVerified(false);
+    setMobileOtpSent(false);
+    setMobileOtp("");
+    setMobileOtpError("");
+    setMobileResendAt(0);
   };
 
   const handleVerifyMobileOtp = async () => {
@@ -643,21 +669,29 @@ export default function NewStudentPage() {
                   setEmailOtpSent(false);
                   setEmailOtp("");
                   setEmailOtpError("");
+                  setEmailResendAt(0); // allow Send again for new email without waiting
                 }}
                 placeholder="email@example.com"
-                className={fieldErrors.student_email ? "border-destructive" : ""}
-                disabled={emailVerified}
+                className={
+                  fieldErrors.student_email
+                    ? "border-destructive"
+                    : emailVerified || emailOtpSent
+                      ? "bg-muted cursor-not-allowed"
+                      : ""
+                }
+                disabled={emailVerified || emailOtpSent}
               />
               {!emailVerified && (
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={handleSendEmailOtp}
-                    disabled={emailOtpLoading || emailResendSeconds > 0}
+                    disabled={emailOtpLoading || (emailOtpSent && emailResendSeconds > 0)}
                   >
-                    {emailOtpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : emailResendSeconds > 0 ? `Resend in ${emailResendSeconds}s` : emailOtpSent ? "Resend OTP" : "Send OTP"}
+                    {emailOtpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : emailOtpSent && emailResendSeconds > 0 ? `Resend in ${emailResendSeconds}s` : emailOtpSent ? "Resend OTP" : "Send OTP"}
                   </Button>
                   {emailOtpSent && (
                     <>
@@ -678,9 +712,30 @@ export default function NewStudentPage() {
                       </Button>
                     </>
                   )}
+                  </div>
+                  {emailOtpSent && (
+                    <button
+                      type="button"
+                      className="text-left text-sm text-muted-foreground underline hover:text-foreground"
+                      onClick={resetEmailOtpFlow}
+                    >
+                      Change email
+                    </button>
+                  )}
                 </div>
               )}
-              {emailVerified && <p className="text-sm text-green-600 dark:text-green-400">Email verified</p>}
+              {emailVerified && (
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm text-green-600 dark:text-green-400">Email verified</p>
+                  <button
+                    type="button"
+                    className="text-left text-sm text-muted-foreground underline hover:text-foreground w-fit"
+                    onClick={resetEmailOtpFlow}
+                  >
+                    Change email
+                  </button>
+                </div>
+              )}
               {(fieldErrors.student_email || emailOtpError) && (
                 <p className="mt-1 text-sm text-destructive">{fieldErrors.student_email || emailOtpError}</p>
               )}
@@ -699,21 +754,29 @@ export default function NewStudentPage() {
                   setMobileOtpSent(false);
                   setMobileOtp("");
                   setMobileOtpError("");
+                  setMobileResendAt(0); // allow Send again for new number without waiting
                 }}
                 placeholder="10 digits only"
-                className={fieldErrors.student_mobile ? "border-destructive" : ""}
-                disabled={mobileVerified}
+                className={
+                  fieldErrors.student_mobile
+                    ? "border-destructive"
+                    : mobileVerified || mobileOtpSent
+                      ? "bg-muted cursor-not-allowed"
+                      : ""
+                }
+                disabled={mobileVerified || mobileOtpSent}
               />
               {!mobileVerified && (
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={handleSendMobileOtp}
-                    disabled={mobileOtpLoading || mobileResendSeconds > 0}
+                    disabled={mobileOtpLoading || (mobileOtpSent && mobileResendSeconds > 0)}
                   >
-                    {mobileOtpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : mobileResendSeconds > 0 ? `Resend in ${mobileResendSeconds}s` : mobileOtpSent ? "Resend OTP" : "Send OTP"}
+                    {mobileOtpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : mobileOtpSent && mobileResendSeconds > 0 ? `Resend in ${mobileResendSeconds}s` : mobileOtpSent ? "Resend OTP" : "Send OTP"}
                   </Button>
                   {mobileOtpSent && (
                     <>
@@ -734,9 +797,30 @@ export default function NewStudentPage() {
                       </Button>
                     </>
                   )}
+                  </div>
+                  {mobileOtpSent && (
+                    <button
+                      type="button"
+                      className="text-left text-sm text-muted-foreground underline hover:text-foreground"
+                      onClick={resetMobileOtpFlow}
+                    >
+                      Change number
+                    </button>
+                  )}
                 </div>
               )}
-              {mobileVerified && <p className="text-sm text-green-600 dark:text-green-400">Mobile verified</p>}
+              {mobileVerified && (
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm text-green-600 dark:text-green-400">Mobile verified</p>
+                  <button
+                    type="button"
+                    className="text-left text-sm text-muted-foreground underline hover:text-foreground w-fit"
+                    onClick={resetMobileOtpFlow}
+                  >
+                    Change number
+                  </button>
+                </div>
+              )}
               {(fieldErrors.student_mobile || mobileOtpError) && (
                 <p className="mt-1 text-sm text-destructive">{fieldErrors.student_mobile || mobileOtpError}</p>
               )}

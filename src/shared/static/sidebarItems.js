@@ -1,4 +1,13 @@
-import { GgList } from "../svgImages/sideBarImages";
+import {
+  LayoutDashboard,
+  Users,
+  UserPlus,
+  Activity,
+  GraduationCap,
+  CreditCard,
+  BarChart3,
+  Layers,
+} from "lucide-react";
 
 export const routeObject = {
   "/": "Dashboard",
@@ -8,14 +17,16 @@ export const routeObject = {
   "/students": "Students",
   "/payments": "Payments",
   "/batches": "Batches",
+  "/reports/date-account-summary": "Account Summary",
 };
 
 export const MenuItems = [
-  { text: "Dashboard", imgBlack: <GgList />, imgWhite: <GgList fill="white" /> },
-  { text: "Sales persons", imgBlack: <GgList />, imgWhite: <GgList fill="white" />, managerOnly: true },
-  { text: "Leads", imgBlack: <GgList />, imgWhite: <GgList fill="white" /> },
-  { text: "Activities", imgBlack: <GgList />, imgWhite: <GgList fill="white" /> },
-  { text: "Students", imgBlack: <GgList />, imgWhite: <GgList fill="white" /> },
-  { text: "Payments", imgBlack: <GgList />, imgWhite: <GgList fill="white" />, adminOrManagerOnly: true, allowCounselor: true },
-  { text: "Batches", imgBlack: <GgList />, imgWhite: <GgList fill="white" />, managerOnly: true },
+  { text: "Dashboard", icon: LayoutDashboard },
+  { text: "Leads", icon: UserPlus },
+  { text: "Students", icon: GraduationCap },
+  { text: "Payments", icon: CreditCard, adminOrManagerOnly: true, allowCounselor: true },
+  { text: "Batches", icon: Layers, managerOnly: true },
+  { text: "Account Summary", icon: BarChart3, managerOnly: true },
+  { text: "Sales persons", icon: Users, managerOnly: true },
+  { text: "Activities", icon: Activity },
 ];

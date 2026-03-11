@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import withPrivateAuth from "@/components/withPrivateAuth";
 
@@ -105,6 +105,7 @@ function BatchesPage() {
   const [moveError, setMoveError] = useState(null);
   const [paymentSummaryByStudent, setPaymentSummaryByStudent] = useState({});
   const [paymentSummaryLoading, setPaymentSummaryLoading] = useState(false);
+  const lastBatchStudentsFetchRef = useRef({ id: null, at: 0 });
 
   const getHeaders = useCallback(() => {
     const h = {};
@@ -245,6 +246,15 @@ function BatchesPage() {
       setStudentsModalOpen(false);
       return;
     }
+    // Extra guard: avoid duplicate fetches on rapid remount/effect re-run (dev Strict Mode)
+    const now = Date.now();
+    if (
+      lastBatchStudentsFetchRef.current.id === String(selectedSalesBatchId) &&
+      now - lastBatchStudentsFetchRef.current.at < 2000
+    ) {
+      return;
+    }
+    lastBatchStudentsFetchRef.current = { id: String(selectedSalesBatchId), at: now };
     fetchBatchStudents(selectedSalesBatchId);
     setSelectedStudentIds([]);
     setMoveError(null);

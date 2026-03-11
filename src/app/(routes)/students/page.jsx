@@ -114,6 +114,7 @@ function StudentsPage() {
 
     if (!forceRefresh && studentsCache.key === cacheKey && Date.now() - studentsCache.at < STUDENTS_CACHE_MS) {
       setStudents(studentsCache.data);
+      setLoading(false);
       return;
     }
 
