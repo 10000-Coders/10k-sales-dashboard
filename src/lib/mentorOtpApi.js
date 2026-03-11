@@ -22,24 +22,33 @@ function getOtpHeaders() {
 
 /**
  * Send OTP to email or mobile.
- * POST mentor/otp/send/ with body: { channel: "email"|"mobile", email?: string, mobile?: string }
- * @returns { Promise<{ success: boolean, error?: string }> }
+ * POST mentor/otp/send/ with body: { channel, email?, mobile?, filters?: string[] }
+ * filters: e.g. ["check_and_block_exists_in_sales_student"] to block when already in sales.
+ * @returns { Promise<{ success: boolean, error?: string, code?: string }> }
  */
-export async function sendMentorOtp({ channel, email, mobile }) {
+export async function sendMentorOtp({ channel, email, mobile, filters }) {
   const base = getMentorBaseUrl();
   if (!base) return { success: false, error: "Mentor API not configured." };
   try {
+    const body = {
+      channel,
+      ...(channel === "email" && email != null ? { email: String(email).trim().toLowerCase() } : {}),
+      ...(channel === "mobile" && mobile != null ? { mobile: String(mobile).replace(/\D/g, "").slice(0, 10) } : {}),
+    };
+    if (Array.isArray(filters) && filters.length) body.filters = filters;
     const res = await fetch(`${base}/otp/send/`, {
       method: "POST",
       headers: getOtpHeaders(),
-      body: JSON.stringify({
-        channel,
-        ...(channel === "email" && email != null ? { email: String(email).trim().toLowerCase() } : {}),
-        ...(channel === "mobile" && mobile != null ? { mobile: String(mobile).replace(/\D/g, "").slice(0, 10) } : {}),
-      }),
+      body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { success: false, error: data?.error || "Failed to send OTP." };
+    if (!res.ok) {
+      return {
+        success: false,
+        error: data?.error || "Failed to send OTP.",
+        code: data?.code,
+      };
+    }
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message || "Network error." };
