@@ -140,7 +140,7 @@ function ActivitiesPage() {
     : [];
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
+    <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -219,7 +219,7 @@ function ActivitiesPage() {
             <p className="py-8 text-center text-muted-foreground">No data for this period.</p>
           ) : (
             <>
-              <div className="rounded-md border overflow-x-auto">
+              <div className="w-full min-w-0 overflow-x-auto rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>

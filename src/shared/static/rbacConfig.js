@@ -1,8 +1,8 @@
 export const RBAC_CONFIG = {
-  manager: ["/", "/sales-persons", "/leads", "/activities", "/students", "/payments", "/batches", "/reports/date-account-summary"],
-  super_admin: ["/", "/leads", "/activities", "/students", "/payments", "/batches"],
-  admin: ["/", "/leads", "/activities", "/students", "/payments"],
-  counselor: ["/", "/leads", "/activities", "/students", "/payments"],
+  manager: ["/", "/sales-persons", "/leads", "/referrals", "/activities", "/students", "/payments", "/batches", "/reports/date-account-summary"],
+  super_admin: ["/", "/leads", "/referrals", "/activities", "/students", "/payments", "/batches"],
+  admin: ["/", "/leads", "/referrals", "/activities", "/students", "/payments"],
+  counselor: ["/", "/leads", "/referrals", "/activities", "/students", "/payments"],
 };
 
 export const DEFAULT_REDIRECT = "/";

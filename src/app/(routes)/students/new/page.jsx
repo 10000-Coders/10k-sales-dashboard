@@ -38,8 +38,10 @@ const PAYMENT_MODE_OPTIONS = [
   { value: "bank", label: "Bank Transfer" },
   { value: "cash", label: "Cash" },
   { value: "card", label: "Card" },
-  { value: "other", label: "Other" },
 ];
+
+/** Modes that must have a receiver (bank) account selected */
+const PAYMENT_MODES_NEED_RECEIVER = ["upi", "bank", "card"];
 
 const COURSE_OPTIONS = [
   { value: "", label: "Select course" },
@@ -162,9 +164,10 @@ export default function NewStudentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const leadIdParam = searchParams.get("lead");
+  const referralIdParam = searchParams.get("referral");
   const user = useSelector((state) => state.userAuth?.user);
 
-  const [loadingLead, setLoadingLead] = useState(!!leadIdParam);
+  const [loadingLead, setLoadingLead] = useState(!!leadIdParam || !!referralIdParam);
   const [fieldErrors, setFieldErrors] = useState({});
   const { salesBatches, loading: salesBatchesLoading, error: salesBatchesError } = useSalesBatches();
 
@@ -237,25 +240,46 @@ export default function NewStudentPage() {
   }, [user?.id, user?.role]);
 
   useEffect(() => {
-    if (!leadIdParam) {
+    if (!leadIdParam && !referralIdParam) {
       router.replace("/students");
       return;
     }
     const h = getHeaders();
-    axios
-      .get(`/leads/${leadIdParam}/`, { headers: h })
-      .then(({ data }) => {
-        const mobile = data.mobile ? normalizeMobile(String(data.mobile)) : "";
-        setForm((f) => ({
-          ...f,
-          student_name: (data.name || f.student_name).replace(/[0-9]/g, "").trim() || f.student_name,
-          student_email: data.email || f.student_email,
-          student_mobile: mobile || f.student_mobile,
-        }));
-      })
-      .catch(() => {})
-      .finally(() => setLoadingLead(false));
-  }, [leadIdParam, getHeaders, router]);
+    if (leadIdParam) {
+      axios
+        .get(`/leads/${leadIdParam}/`, { headers: h })
+        .then(({ data }) => {
+          const mobile = data.mobile ? normalizeMobile(String(data.mobile)) : "";
+          setForm((f) => ({
+            ...f,
+            student_name: (data.name || f.student_name).replace(/[0-9]/g, "").trim() || f.student_name,
+            student_email: data.email || f.student_email,
+            student_mobile: mobile || f.student_mobile,
+          }));
+        })
+        .catch(() => {})
+        .finally(() => setLoadingLead(false));
+      return;
+    }
+    if (referralIdParam) {
+      axios
+        .get(`/referrals/${referralIdParam}/`, { headers: h })
+        .then(({ data }) => {
+          const mobile = data.referred_mobile ? normalizeMobile(String(data.referred_mobile)) : "";
+          setForm((f) => ({
+            ...f,
+            student_name: (data.referred_name || f.student_name).replace(/[0-9]/g, "").trim() || f.student_name,
+            student_email: data.referred_email || f.student_email,
+            student_mobile: mobile || f.student_mobile,
+            college_name: data.referred_college || f.college_name,
+            year_of_passing: data.referred_year_of_passing != null ? String(data.referred_year_of_passing) : f.year_of_passing,
+            student_degree: data.referred_qualification || f.student_degree,
+          }));
+        })
+        .catch(() => {})
+        .finally(() => setLoadingLead(false));
+    }
+  }, [leadIdParam, referralIdParam, getHeaders, router]);
 
   const fetchPaymentReceivers = useCallback(async () => {
     try {
@@ -273,7 +297,7 @@ export default function NewStudentPage() {
   }, [getHeaders]);
 
   useEffect(() => {
-    if (initialPayment.payment_mode === "upi" || initialPayment.payment_mode === "bank") {
+    if (PAYMENT_MODES_NEED_RECEIVER.includes(initialPayment.payment_mode)) {
       fetchPaymentReceivers();
     }
   }, [initialPayment.payment_mode, fetchPaymentReceivers]);
@@ -420,7 +444,7 @@ export default function NewStudentPage() {
   };
 
   const validateBeforeSubmit = () => {
-    if (!leadIdParam) return;
+    if (!leadIdParam && !referralIdParam) return false;
     setError(null);
     setFieldErrors({});
     setPaymentFieldErrors({});
@@ -464,8 +488,8 @@ export default function NewStudentPage() {
     if (!initialPayment.payment_mode) {
       paymentErrors.payment_mode = "Initial payment mode is required.";
     }
-    if ((initialPayment.payment_mode === "upi" || initialPayment.payment_mode === "bank") && !initialPayment.receiver) {
-      paymentErrors.receiver = "Receiver account is required for UPI/Bank payments.";
+    if (PAYMENT_MODES_NEED_RECEIVER.includes(initialPayment.payment_mode) && !initialPayment.receiver) {
+      paymentErrors.receiver = "Receiver account is required for UPI, Bank Transfer, and Card payments.";
     }
     if (!initialPayment.reference_image) {
       paymentErrors.reference_image = "Proof Screenshot is required.";
@@ -504,15 +528,14 @@ export default function NewStudentPage() {
   };
 
   const submitEnrollment = async () => {
-    if (!leadIdParam) return;
+    if (!leadIdParam && !referralIdParam) return;
     setSaving(true);
     const headers = getHeaders();
 
     try {
-      const leadId = Number(leadIdParam);
-
       const studentPayload = {
-        lead: leadId,
+        ...(leadIdParam ? { lead: Number(leadIdParam) } : {}),
+        ...(referralIdParam ? { referral: Number(referralIdParam) } : {}),
         student_name: form.student_name.trim(),
         student_email: form.student_email.trim().toLowerCase(),
         student_mobile: normalizeMobile(form.student_mobile) || "",
@@ -588,12 +611,14 @@ export default function NewStudentPage() {
     }
   };
 
-  if (!leadIdParam) {
+  if (!leadIdParam && !referralIdParam) {
     return null;
   }
 
+  const fromReferral = !!referralIdParam && !leadIdParam;
+
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
+    <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" />
@@ -601,7 +626,9 @@ export default function NewStudentPage() {
         <div>
           <h1 className="text-2xl font-semibold">Enroll student</h1>
           <p className="text-muted-foreground">
-            Enter student details and first payment. Lead is pre-filled from the lead you selected.
+            {fromReferral
+              ? "Enter student details and first payment. Referral details are pre-filled."
+              : "Enter student details and first payment. Lead is pre-filled from the lead you selected."}
           </p>
         </div>
       </div>
@@ -614,7 +641,7 @@ export default function NewStudentPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">
-              Enrolling from lead. Fill student details below and add initial payment.
+              {fromReferral ? "Enrolling from referral." : "Enrolling from lead."} Fill student details below and add initial payment.
             </p>
           </CardContent>
         </Card>
@@ -1190,7 +1217,7 @@ export default function NewStudentPage() {
                 <p className="mt-1 text-sm text-destructive">{paymentFieldErrors.payment_mode}</p>
               )}
             </div>
-            {(initialPayment.payment_mode === "upi" || initialPayment.payment_mode === "bank") && (
+            {PAYMENT_MODES_NEED_RECEIVER.includes(initialPayment.payment_mode) && (
               <div>
                 <Label>Receiver account *</Label>
                 <select
@@ -1267,7 +1294,10 @@ export default function NewStudentPage() {
             <Button type="button" variant="outline" onClick={() => setCancelConfirmOpen(true)} disabled={saving || loadingLead}>
               Cancel
             </Button>
-            <Button type="submit" disabled={saving || loadingLead || !emailVerified || !mobileVerified}>
+            <Button
+              type="submit"
+              disabled={saving || loadingLead || !emailVerified || !mobileVerified}
+            >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Review & Submit"}
             </Button>
           </div>
