@@ -32,8 +32,9 @@ const PAYMENT_MODE_OPTIONS = [
   { value: "bank", label: "Bank Transfer" },
   { value: "cash", label: "Cash" },
   { value: "card", label: "Card" },
-  { value: "other", label: "Other" },
 ];
+
+const PAYMENT_MODES_NEED_RECEIVER = ["upi", "bank", "card"];
 
 const COURSE_LABELS = {
   python_fullstack: "Python Fullstack",
@@ -199,7 +200,7 @@ export default function StudentDetailClient() {
   }, [fetchSalesBatches]);
 
   useEffect(() => {
-    if (addPaymentOpen && (paymentForm.payment_mode === "upi" || paymentForm.payment_mode === "bank")) {
+    if (addPaymentOpen && PAYMENT_MODES_NEED_RECEIVER.includes(paymentForm.payment_mode)) {
       fetchPaymentReceivers();
     }
   }, [addPaymentOpen, paymentForm.payment_mode, fetchPaymentReceivers]);
@@ -242,8 +243,8 @@ export default function StudentDetailClient() {
       setPaymentError("Both Proof Screenshot and Receipt Image are required.");
       return;
     }
-    if ((paymentForm.payment_mode === "upi" || paymentForm.payment_mode === "bank") && !paymentForm.receiver) {
-      setPaymentError("Please select a receiver bank account for UPI / Bank Transfer payments.");
+    if (PAYMENT_MODES_NEED_RECEIVER.includes(paymentForm.payment_mode) && !paymentForm.receiver) {
+      setPaymentError("Please select a receiver bank account for UPI, Bank Transfer, or Card payments.");
       return;
     }
     const newAmount = Number(paymentForm.amount);
@@ -351,7 +352,7 @@ export default function StudentDetailClient() {
   const displayStatusBadge = getDisplayStatusBadgeClass(student.display_status);
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
+    <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <Button variant="ghost" className="w-fit" onClick={() => router.push("/students")}>
         <ArrowLeft className="h-4 w-4" /> Back to students
       </Button>
@@ -572,7 +573,7 @@ export default function StudentDetailClient() {
                   ))}
                 </select>
               </div>
-              {(paymentForm.payment_mode === "upi" || paymentForm.payment_mode === "bank") && (
+              {PAYMENT_MODES_NEED_RECEIVER.includes(paymentForm.payment_mode) && (
                 <div>
                   <Label>Receiver account *</Label>
                   <select

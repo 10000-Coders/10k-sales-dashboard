@@ -7,12 +7,14 @@ import {
   CreditCard,
   BarChart3,
   Layers,
+  Share2,
 } from "lucide-react";
 
 export const routeObject = {
   "/": "Dashboard",
   "/sales-persons": "Sales persons",
   "/leads": "Leads",
+  "/referrals": "Referrals",
   "/activities": "Activities",
   "/students": "Students",
   "/payments": "Payments",
@@ -23,6 +25,7 @@ export const routeObject = {
 export const MenuItems = [
   { text: "Dashboard", icon: LayoutDashboard },
   { text: "Leads", icon: UserPlus },
+  { text: "Referrals", textForCounselor: "Your referral leads", icon: Share2 },
   { text: "Students", icon: GraduationCap },
   { text: "Payments", icon: CreditCard, adminOrManagerOnly: true, allowCounselor: true },
   { text: "Batches", icon: Layers, managerOnly: true },

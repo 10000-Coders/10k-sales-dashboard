@@ -174,7 +174,7 @@ function StudentsPage() {
   }, [fetchStudents]);
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
+    <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <Card>
         <CardHeader>
           <div>
@@ -248,7 +248,7 @@ function StudentsPage() {
           ) : students.length === 0 ? (
             <p className="py-6 text-center text-muted-foreground">No students yet. Add one from a lead or as walk-in.</p>
           ) : (
-            <div className="overflow-x-auto -mx-2 sm:mx-0">
+            <div className="w-full min-w-0 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
