@@ -1,5 +1,6 @@
 "use client";
 
+import withPrivateAuth from "@/components/withPrivateAuth";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
@@ -26,7 +27,7 @@ function isManagerOrSuperAdmin(role) {
   return role === "manager" || role === "super_admin";
 }
 
-export default function ReferralDetailClient() {
+function ReferralDetailClient() {
   const params = useParams();
   const router = useRouter();
   const user = useSelector((state) => state.userAuth?.user);
@@ -200,3 +201,5 @@ export default function ReferralDetailClient() {
     </div>
   );
 }
+
+export default withPrivateAuth(ReferralDetailClient);

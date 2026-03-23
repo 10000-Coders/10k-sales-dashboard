@@ -1,10 +1,8 @@
-"use client";
-
 import ReferralDetailClient from "./ReferralDetailClient";
-import withPrivateAuth from "@/components/withPrivateAuth";
 
-function ReferralDetailPage() {
+/** Required for Cloudflare Pages (@cloudflare/next-on-pages) */
+export const runtime = "edge";
+
+export default function ReferralDetailPage() {
   return <ReferralDetailClient />;
 }
-
-export default withPrivateAuth(ReferralDetailPage);
