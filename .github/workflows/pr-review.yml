@@ -23,15 +23,32 @@ jobs:
 
       - name: Call Gemini API
         run: |
+          if [ -z "${GEMINI_API_KEY}" ]; then
+            echo "::error::GEMINI_API_KEY is not set. Add it under repo Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
           jq -Rs --arg instruction "Review this pull request diff. Suggest improvements and identify bugs and performance issues. Keep the response concise and structured with sections: Summary, Bugs/Risks, Performance, Improvements." \
             '{contents:[{parts:[{text:($instruction + "\n\nPR Diff:\n" + .)}]}]}' diff.txt > request.json
 
-          curl -sS -X POST \
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}" \
+          # Stable model id (see https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash)
+          http_code=$(curl -sS -o review.json -w "%{http_code}" -X POST \
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}" \
             -H "Content-Type: application/json" \
-            -d @request.json > review.json
+            -d @request.json)
 
-          jq -e 'has("error") | not' review.json > /dev/null
+          echo "Gemini HTTP status: ${http_code}"
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::Gemini request failed (HTTP ${http_code})"
+            cat review.json
+            exit 1
+          fi
+
+          if jq -e 'has("error")' review.json >/dev/null 2>&1; then
+            echo "::error::Gemini returned an error in the response body"
+            jq . review.json
+            exit 1
+          fi
 
       - name: Print Gemini review
         run: |
