@@ -45,40 +45,11 @@ jobs:
 
           provider=""
 
-          # 1) Claude (primary)
-          if [ -n "${CLAUDE_API_KEY}" ]; then
-            jq -n --arg diff "$(cat diff.txt)" --arg instruction "$(jq -r '.contents[0].parts[0].text' request.json)" \
-              '{
-                model: "claude-3-5-sonnet-latest",
-                max_tokens: 1200,
-                messages: [
-                  {role: "user", content: ($instruction + "\n\nPR Diff:\n" + $diff)}
-                ]
-              }' > claude_request.json
-
-            claude_http=$(curl -sS -o claude_response.json -w "%{http_code}" -X POST \
-              "https://api.anthropic.com/v1/messages" \
-              -H "content-type: application/json" \
-              -H "x-api-key: ${CLAUDE_API_KEY}" \
-              -H "anthropic-version: 2023-06-01" \
-              -d @claude_request.json)
-
-            echo "Claude HTTP status: ${claude_http}"
-            if [ "${claude_http}" = "200" ]; then
-              jq -r '[.content[]? | select(.type=="text") | .text] | join("\n")' claude_response.json > review.txt
-              if [ -s review.txt ]; then
-                provider="Claude"
-              fi
-            fi
-          else
-            echo "CLAUDE_API_KEY not set, skipping Claude."
-          fi
-
-          # 2) Gemini (fallback)
+          # 1) Gemini (primary)
           if [ -z "${provider}" ]; then
             if [ -n "${GEMINI_API_KEY}" ]; then
               gemini_http=$(curl -sS -o review.json -w "%{http_code}" -X POST \
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}" \
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${GEMINI_API_KEY}" \
                 -H "Content-Type: application/json" \
                 -d @request.json)
 
@@ -91,6 +62,37 @@ jobs:
               fi
             else
               echo "GEMINI_API_KEY not set, skipping Gemini."
+            fi
+          fi
+
+          # 2) Claude (fallback)
+          if [ -z "${provider}" ]; then
+            if [ -n "${CLAUDE_API_KEY}" ]; then
+              jq -n --arg diff "$(cat diff.txt)" --arg instruction "$(jq -r '.contents[0].parts[0].text' request.json)" \
+                '{
+                  model: "claude-3-5-sonnet-latest",
+                  max_tokens: 1200,
+                  messages: [
+                    {role: "user", content: ($instruction + "\n\nPR Diff:\n" + $diff)}
+                  ]
+                }' > claude_request.json
+
+              claude_http=$(curl -sS -o claude_response.json -w "%{http_code}" -X POST \
+                "https://api.anthropic.com/v1/messages" \
+                -H "content-type: application/json" \
+                -H "x-api-key: ${CLAUDE_API_KEY}" \
+                -H "anthropic-version: 2023-06-01" \
+                -d @claude_request.json)
+
+              echo "Claude HTTP status: ${claude_http}"
+              if [ "${claude_http}" = "200" ]; then
+                jq -r '[.content[]? | select(.type=="text") | .text] | join("\n")' claude_response.json > review.txt
+                if [ -s review.txt ]; then
+                  provider="Claude"
+                fi
+              fi
+            else
+              echo "CLAUDE_API_KEY not set, skipping Claude."
             fi
           fi
 
