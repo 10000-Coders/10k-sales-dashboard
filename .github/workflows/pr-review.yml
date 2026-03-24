@@ -24,14 +24,24 @@ jobs:
       - name: Call Gemini API
         run: |
           if [ -z "${GEMINI_API_KEY}" ]; then
-            echo "::error::GEMINI_API_KEY is not set. Add it under repo Settings → Secrets and variables → Actions."
+            echo "::error::GEMINI_API_KEY is not set. Add it under repo Settings > Secrets and variables > Actions."
             exit 1
           fi
 
-          jq -Rs --arg instruction "Review this pull request diff. Suggest improvements and identify bugs and performance issues. Keep the response concise and structured with sections: Summary, Bugs/Risks, Performance, Improvements." \
+          jq -Rs --arg instruction "You are reviewing a pull request diff before merge.
+Return ONLY plain text in this exact format:
+Overall Status: Pass or Needs Changes
+What Changed:
+- 2 to 4 short bullets
+Code Quality:
+- up to 4 short bullets
+Risks or Unknowns:
+- short bullets, or 'None'
+Next Actions:
+- up to 3 short bullets, or 'None'
+Keep output simple, clear, and non-technical where possible." \
             '{contents:[{parts:[{text:($instruction + "\n\nPR Diff:\n" + .)}]}]}' diff.txt > request.json
 
-          # Stable model id (see https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash)
           http_code=$(curl -sS -o review.json -w "%{http_code}" -X POST \
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}" \
             -H "Content-Type: application/json" \
@@ -50,10 +60,25 @@ jobs:
             exit 1
           fi
 
+          jq -r '.candidates[0].content.parts[0].text // empty' review.json > review.txt
+          if [ ! -s review.txt ]; then
+            printf '%s\n' \
+              "Overall Status: Needs Changes" \
+              "What Changed:" \
+              "- Unable to parse AI review output." \
+              "Code Quality:" \
+              "- AI response was empty or invalid." \
+              "Risks or Unknowns:" \
+              "- Review may be incomplete." \
+              "Next Actions:" \
+              "- Re-run workflow." \
+              "- Verify GEMINI_API_KEY and model access." > review.txt
+          fi
+
       - name: Print Gemini review
         run: |
-          echo "=== Gemini PR Review (formatted) ==="
-          jq -r '.candidates[0].content.parts[0].text // "No review text found in response."' review.json
+          echo "=== Gemini PR Review ==="
+          cat review.txt
           echo ""
-          echo "=== Full JSON response ==="
-          jq . review.json
+          echo "=== Workflow Summary ===" >> "$GITHUB_STEP_SUMMARY"
+          cat review.txt >> "$GITHUB_STEP_SUMMARY"
