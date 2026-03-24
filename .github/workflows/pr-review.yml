@@ -11,7 +11,7 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -27,9 +27,11 @@ jobs:
             '{contents:[{parts:[{text:($instruction + "\n\nPR Diff:\n" + .)}]}]}' diff.txt > request.json
 
           curl -sS -X POST \
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}" \
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}" \
             -H "Content-Type: application/json" \
             -d @request.json > review.json
+
+          jq -e 'has("error") | not' review.json > /dev/null
 
       - name: Print Gemini review
         run: |
