@@ -49,7 +49,7 @@ jobs:
           if [ -z "${provider}" ]; then
             if [ -n "${GEMINI_API_KEY}" ]; then
               gemini_http=$(curl -sS -o review.json -w "%{http_code}" -X POST \
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${GEMINI_API_KEY}" \
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}" \
                 -H "Content-Type: application/json" \
                 -d @request.json)
 
