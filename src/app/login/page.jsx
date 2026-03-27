@@ -75,6 +75,14 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!otpSent) {
+      await handleSendOtp();
+      return;
+    }
+    if (otp.length < 6) {
+      showErrorToast("Enter 6-digit OTP.", "top-right", "light");
+      return;
+    }
     const res = await dispatch(login({ email, otp }));
     if (login.fulfilled.match(res)) {
       setLoginAt(); // 24h session

@@ -70,6 +70,8 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
       router.push("/students");
     } else if (text === "Payments") {
       router.push("/payments");
+    } else if (text === "Demo Reviews") {
+      router.push("/demo-reviews");
     } else if (text === "Account Summary") {
       router.push("/reports/date-account-summary");
     } else {

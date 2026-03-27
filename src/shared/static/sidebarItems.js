@@ -8,6 +8,7 @@ import {
   BarChart3,
   Layers,
   Share2,
+  ClipboardList,
 } from "lucide-react";
 
 export const routeObject = {
@@ -18,6 +19,7 @@ export const routeObject = {
   "/activities": "Activities",
   "/students": "Students",
   "/payments": "Payments",
+  "/demo-reviews": "Demo Reviews",
   "/batches": "Batches",
   "/reports/date-account-summary": "Account Summary",
 };
@@ -28,6 +30,7 @@ export const MenuItems = [
   { text: "Referrals", textForCounselor: "Your referral leads", icon: Share2 },
   { text: "Students", icon: GraduationCap },
   { text: "Payments", icon: CreditCard, adminOrManagerOnly: true, allowCounselor: true },
+  { text: "Demo Reviews", icon: ClipboardList },
   { text: "Batches", icon: Layers, managerOnly: true },
   { text: "Account Summary", icon: BarChart3, managerOnly: true },
   { text: "Sales persons", icon: Users, managerOnly: true },
