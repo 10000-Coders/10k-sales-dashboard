@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Share2, UserPlus, BarChart3, X } from "lucide-react";
+import { Loader2, Search, Share2, UserPlus, BarChart3, X, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import withPrivateAuth from "@/components/withPrivateAuth";
 
@@ -63,6 +63,28 @@ function getDateGroupLabel(createdAt) {
 }
 
 /** Returns groups in order: Today, Yesterday, then others by date desc. */
+function ReferrerCell({ name, batchName }) {
+  const n = typeof name === "string" ? name.trim() : "";
+  const b = typeof batchName === "string" ? batchName.trim() : "";
+  if (!n) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  return (
+    <div className="flex min-w-0 max-w-[min(100%,14rem)] flex-col gap-1.5">
+      <span className="truncate font-medium leading-snug text-foreground">{n}</span>
+      {b ? (
+        <span
+          className="inline-flex w-fit max-w-full items-center gap-1 rounded-md border border-orange-200/80 bg-orange-50/90 px-2 py-1 text-[11px] font-medium leading-none text-orange-900/90"
+          title={`Batch: ${b}`}
+        >
+          <Layers className="h-3 w-3 shrink-0 text-orange-600/80" aria-hidden />
+          <span className="truncate tabular-nums">{b}</span>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function groupReferralsByDate(referrals) {
   const map = new Map();
   for (const r of referrals) {
@@ -464,7 +486,9 @@ function ReferralsPage() {
                             <span className="block">{r.referred_email ?? "—"}</span>
                             {r.referred_mobile ? <span className="block text-xs">{r.referred_mobile}</span> : null}
                           </TableCell>
-                          <TableCell className="text-sm">{r.referrer_name ?? "—"}</TableCell>
+                          <TableCell className="align-top text-sm">
+                            <ReferrerCell name={r.referrer_name} batchName={r.referrer_batch_name} />
+                          </TableCell>
                           <TableCell>
                             <span
                               className={cn(

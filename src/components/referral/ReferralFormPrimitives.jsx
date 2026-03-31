@@ -18,10 +18,14 @@ export function FormRow({
   maxLength,
   id,
   hint,
+  disabled = false,
   ...inputProps
 }) {
   const error = fieldErrors[name];
   const inputId = id || `referral-${name}`;
+  const inputClass = `${INPUT_BASE} ${error ? INPUT_ERROR : INPUT_OK} ${
+    disabled ? "cursor-not-allowed bg-slate-100 text-slate-700 opacity-90" : ""
+  }`;
   return (
     <div className="space-y-1.5">
       <label htmlFor={inputId} className="flex flex-wrap items-baseline gap-x-1 text-sm font-medium text-slate-700">
@@ -35,12 +39,13 @@ export function FormRow({
         name={name}
         value={form[name] ?? ""}
         onChange={(e) => onChange(name, e.target.value)}
-        className={`${INPUT_BASE} ${error ? INPUT_ERROR : INPUT_OK}`}
+        className={inputClass}
         aria-invalid={!!error}
         aria-required={required}
         aria-describedby={error ? `${inputId}-error` : undefined}
         maxLength={maxLength}
         {...inputProps}
+        disabled={disabled}
       />
       {error && (
         <p id={`${inputId}-error`} className="flex items-center gap-1.5 text-sm text-red-600" role="alert">
