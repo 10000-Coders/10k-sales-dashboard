@@ -46,6 +46,8 @@
 html {
   overflow-x: hidden;
   max-width: 100%;
+  /* Avoid layout shift when vertical scrollbar shows/hides between pages */
+  scrollbar-gutter: stable;
 }
 
 body {

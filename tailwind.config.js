@@ -40,6 +40,7 @@ module.exports = {
         vivid_orange: "#FF8000",
         Light_Cyan: "#DDF5FF",
         vivid_dark: "#D87138",
+        Vivid_Tangelo: "#FF8541",
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
@@ -47,5 +48,5 @@ module.exports = {
       },
     },
   },
-  plugins: [],
+  plugins: [require("@tailwindcss/typography")],
 };
