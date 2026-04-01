@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Loader2, User } from "lucide-react";
+import { Loader2, Layers, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const STATUS_OPTIONS = [
@@ -100,9 +100,25 @@ export default function ReferralAssignmentCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
+          <div className="min-w-0 space-y-2">
             <Label className="text-muted-foreground">Referrer</Label>
-            <p className="font-medium">{referral?.referrer_name ?? "—"}</p>
+            <div className="rounded-lg border bg-muted/30 p-3">
+              {referral?.referrer_name?.trim() ? (
+                <>
+                  <p className="font-semibold leading-snug">{referral.referrer_name.trim()}</p>
+                  {referral.referrer_batch_name?.trim() ? (
+                    <p className="mt-2">
+                      <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-orange-200/90 bg-orange-50 px-2.5 py-1.5 text-xs font-medium text-orange-950">
+                        <Layers className="h-3.5 w-3.5 shrink-0 text-orange-700/90" aria-hidden />
+                        <span className="min-w-0 truncate tabular-nums">{referral.referrer_batch_name.trim()}</span>
+                      </span>
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                <p className="text-muted-foreground">—</p>
+              )}
+            </div>
             {referral?.referrer_email ? (
               <p className="text-sm text-muted-foreground">{referral.referrer_email}</p>
             ) : null}

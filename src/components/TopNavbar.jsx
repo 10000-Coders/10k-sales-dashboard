@@ -34,7 +34,7 @@ export default function TopNavbar({ onMenuClick }) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 flex h-[3.25rem] shrink-0 items-center justify-between border-b border-border/80 bg-background/85 px-4 shadow-sm backdrop-blur-md sm:h-14 sm:px-6">
+    <header className="z-40 flex h-[3.25rem] shrink-0 items-center justify-between border-b border-border/80 bg-background/95 px-4 shadow-sm backdrop-blur-md sm:h-14 sm:px-6">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         {typeof onMenuClick === "function" ? (
           <button

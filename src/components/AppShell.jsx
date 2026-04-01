@@ -14,7 +14,7 @@ export default function AppShell({ children }) {
   const openMobile = useCallback(() => setMobileNavOpen(true), []);
 
   return (
-    <div className="flex min-h-screen w-full min-w-0 max-w-full overflow-x-hidden bg-[hsl(var(--background))]">
+    <div className="flex h-[100dvh] min-h-0 w-full min-w-0 max-w-full overflow-hidden bg-[hsl(var(--background))]">
       <SideBar mobileOpen={mobileNavOpen} onMobileClose={closeMobile} />
 
       {/* Mobile overlay: tap to close */}
@@ -27,9 +27,9 @@ export default function AppShell({ children }) {
         />
       ) : null}
 
-      <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-x-hidden lg:ml-[250px]">
+      <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden lg:ml-[250px]">
         <TopNavbar onMenuClick={openMobile} />
-        <main className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-x-hidden overflow-y-auto bg-gradient-to-b from-slate-50/90 via-slate-50/50 to-slate-100/30">
+        <main className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-gradient-to-b from-slate-50/90 via-slate-50/50 to-slate-100/30">
           {children}
         </main>
       </div>
