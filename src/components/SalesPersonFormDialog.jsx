@@ -338,7 +338,7 @@ export function SalesPersonFormDialog({
   return (
     <Dialog open={open} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" />
-      <div className="fixed inset-0 flex w-screen items-center justify-center p-4 md:p-6">
+      <div className="fixed inset-0 flex min-w-0 items-center justify-center overflow-x-hidden p-4 md:p-6">
         <Dialog.Panel className="mx-auto w-full max-w-5xl rounded-3xl border bg-white shadow-2xl overflow-hidden max-h-[90vh]">
           {/* Decorative Header */}
           <div className="bg-primary/5 px-6 py-6 border-b flex items-center justify-between md:px-8 sticky top-0 z-10">

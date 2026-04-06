@@ -6,10 +6,10 @@ import { useDispatch, useSelector } from "react-redux";
 import { LogOut, Loader2 } from "lucide-react";
 import { logout } from "@/redux/features/user/userAuth";
 import { clearLoginAt } from "@/lib/sessionExpiry";
-import { routeObject, MenuItems } from "@/shared/static/sidebarItems";
+import { routeObject, MenuItems, SCHOLARSHIP_TEST_NAV_LABEL } from "@/shared/static/sidebarItems";
 import { cn } from "@/lib/utils";
 
-export default function SideBar() {
+export default function SideBar({ mobileOpen = false, onMobileClose }) {
   const [activeItem, setActiveItem] = useState("");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -33,14 +33,19 @@ export default function SideBar() {
             isAdminOrManagerOrSuperAdmin ||
             (item.allowCounselor && user?.role === "counselor")
           );
+        if (item.adminManagerSuperAdminOnly) return isAdminOrManagerOrSuperAdmin;
         return true;
       }),
     [isManager, isAdminOrManagerOrSuperAdmin, user?.role]
   );
 
   useEffect(() => {
-    if (pathname?.startsWith("/leads")) {
+    if (pathname?.startsWith("/public-challenges")) {
+      setActiveItem(SCHOLARSHIP_TEST_NAV_LABEL);
+    } else if (pathname?.startsWith("/leads")) {
       setActiveItem("Leads");
+    } else if (pathname?.startsWith("/referrals")) {
+      setActiveItem("Referrals");
     } else if (pathname?.startsWith("/activities")) {
       setActiveItem("Activities");
     } else if (pathname?.startsWith("/students")) {
@@ -50,21 +55,28 @@ export default function SideBar() {
     } else {
       setActiveItem(routeObject[pathname] || "Dashboard");
     }
-  }, [pathname]);
+    onMobileClose?.();
+  }, [pathname, onMobileClose]);
 
   const handleActiveItem = (text) => {
     if (text === "Dashboard") {
       router.push("/");
+    } else if (text === SCHOLARSHIP_TEST_NAV_LABEL) {
+      router.push("/public-challenges");
     } else if (text === "Sales persons") {
       router.push("/sales-persons");
     } else if (text === "Leads") {
       router.push("/leads");
+    } else if (text === "Referrals") {
+      router.push("/referrals");
     } else if (text === "Activities") {
       router.push("/activities");
     } else if (text === "Students") {
       router.push("/students");
     } else if (text === "Payments") {
       router.push("/payments");
+    } else if (text === "Demo Reviews") {
+      router.push("/demo-reviews");
     } else if (text === "Account Summary") {
       router.push("/reports/date-account-summary");
     } else {
@@ -72,6 +84,7 @@ export default function SideBar() {
       router.push(`/${slug}`);
     }
     setActiveItem(text);
+    onMobileClose?.();
   };
 
   const handleLogout = async () => {
@@ -84,49 +97,65 @@ export default function SideBar() {
 
   return (
     <>
-      <aside className="fixed left-0 top-0 z-30 flex h-screen w-[250px] flex-shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white overflow-x-hidden">
-        <div className="flex flex-shrink-0 items-center justify-center px-4 py-4">
-          <div className="bg-white rounded-lg p-2">
+      <aside
+        className={cn(
+          "fixed left-0 top-0 z-30 flex h-[100dvh] max-h-[100dvh] w-[250px] flex-shrink-0 flex-col overflow-hidden border-r border-border/80 bg-card shadow-[4px_0_24px_-12px_rgba(0,0,0,0.08)]",
+          "transition-transform duration-200 ease-out",
+          "lg:translate-x-0",
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <div className="flex flex-shrink-0 items-center border-b border-border/60 px-4 py-5">
+          <div className="rounded-xl bg-muted/50 p-2 ring-1 ring-border/40">
             <Image
               className="object-contain"
-              width={133}
-              height={40}
+              width={128}
+              height={38}
               src="/10k_brand_icon.png"
               alt="10k Coders"
+              priority
             />
           </div>
         </div>
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden">
-          <ul className="flex flex-col items-center gap-0">
+        <nav className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2 py-3">
+          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Menu
+          </p>
+          <ul className="flex flex-col gap-0.5">
             {visibleMenuItems.map((item, idx) => {
               const IconComponent = item.icon;
+              const isCounselorOrAdmin = user?.role === "counselor" || user?.role === "admin";
+              const label = item.textForCounselor && isCounselorOrAdmin ? item.textForCounselor : item.text;
+              const active = activeItem === item.text;
               return (
-                <li
-                  key={idx}
-                  className={cn(
-                    "relative flex w-[240px] cursor-pointer items-center gap-3 px-2 rounded-r-full py-[10px] transition-all duration-200",
-                    activeItem === item.text 
-                      ? "bg-[#FF8000] text-white shadow-md" 
-                      : "text-gray-600 hover:bg-gray-100 hover:text-black"
-                  )}
-                  onClick={() => handleActiveItem(item.text)}
-                >
-                  <IconComponent className="h-5 w-5 flex-shrink-0" />
-                  <span className="font-medium">{item.text}</span>
+                <li key={idx}>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all duration-150",
+                      active
+                        ? "bg-primary font-semibold text-primary-foreground shadow-md shadow-primary/25"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                    onClick={() => handleActiveItem(item.text)}
+                  >
+                    <IconComponent className={cn("h-[18px] w-[18px] shrink-0", active && "opacity-100")} />
+                    <span className="leading-snug">{label}</span>
+                  </button>
                 </li>
               );
             })}
           </ul>
         </nav>
 
-        {/* Logout Button at Bottom */}
-        <div className="mt-auto border-t border-gray-100 p-4">
+        <div className="mt-auto border-t border-border/60 bg-muted/20 p-3">
           <button
+            type="button"
             onClick={() => setShowLogoutConfirm(true)}
-            className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
           >
-            <LogOut className="h-5 w-5" />
-            <span>Logout</span>
+            <LogOut className="h-4 w-4" />
+            <span>Sign out</span>
           </button>
         </div>
       </aside>

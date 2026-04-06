@@ -55,7 +55,7 @@ function SalesPersonsPage() {
 
 
   return (
-    <div className="flex flex-1 flex-col gap-8 p-8 max-w-7xl mx-auto w-full">
+    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:gap-8 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Team Management</h1>
         <p className="text-muted-foreground font-medium">Configure roles, permissions, and oversight for your sales personnel.</p>
