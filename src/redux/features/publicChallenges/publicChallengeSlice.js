@@ -22,6 +22,8 @@ export const fetchPublicChallenges = createAsyncThunk(
       const pageSize = Math.min(100, Math.max(1, Number(query.page_size) || 20));
       params.set('page', String(page));
       params.set('page_size', String(pageSize));
+      const challengeType = (query.challenge_type || '').trim();
+      if (challengeType) params.set('challenge_type', challengeType);
 
       const response = await axios.get(
         `public-challenges/admin/challenges/?${params.toString()}`
@@ -365,6 +367,8 @@ const initialState = {
     search: '',
     start_date: '',
     end_date: '',
+    /** Scholarship test UI only manages college-student challenges. */
+    challenge_type: 'COLLEGE_STUDENTS',
   },
   challengesListMeta: {
     count: 0,
