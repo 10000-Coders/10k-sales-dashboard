@@ -38,7 +38,7 @@ const PublicChallengeModal = ({ isOpen, onClose, challenge = null }) => {
     slug: '',
     description: '',
     instructions: '',
-    challenge_type: 'PUBLIC',
+    challenge_type: 'COLLEGE_STUDENTS',
     problem_selection_mode: 'MANUAL',
     auto_problem_count: 3,
     registration_start_at: '',
@@ -81,7 +81,7 @@ const PublicChallengeModal = ({ isOpen, onClose, challenge = null }) => {
           slug: generateSlugFromTitle(challenge.title || '') || challenge.slug || '',
           description: challenge.description || '',
           instructions: challenge.instructions || '',
-          challenge_type: challenge.challenge_type || 'PUBLIC',
+          challenge_type: challenge.challenge_type || 'COLLEGE_STUDENTS',
           problem_selection_mode: challenge.problem_selection_mode || 'MANUAL',
           auto_problem_count: challenge.auto_problem_count ?? 3,
           registration_start_at: formatDateForInput(challenge.registration_start_at),
@@ -102,7 +102,7 @@ const PublicChallengeModal = ({ isOpen, onClose, challenge = null }) => {
           slug: '',
           description: '',
           instructions: '',
-          challenge_type: 'PUBLIC',
+          challenge_type: 'COLLEGE_STUDENTS',
           problem_selection_mode: 'MANUAL',
           auto_problem_count: 3,
           registration_start_at: '',
@@ -212,7 +212,7 @@ const PublicChallengeModal = ({ isOpen, onClose, challenge = null }) => {
       const submitData = {
         ...formData,
         slug,
-        challenge_type: formData.challenge_type || 'PUBLIC',
+        challenge_type: formData.challenge_type || 'COLLEGE_STUDENTS',
         problem_selection_mode: formData.problem_selection_mode || 'MANUAL',
         auto_problem_count: isAuto ? (formData.auto_problem_count || 3) : 0,
         registration_start_at: registrationStart.toISOString(),
@@ -284,7 +284,7 @@ const PublicChallengeModal = ({ isOpen, onClose, challenge = null }) => {
                     />
                     {validationErrors.title && <p className="text-xs text-red-500 mt-1">{validationErrors.title}</p>}
                     <p className="text-xs text-gray-500 mt-1.5">
-                      Registration link slug is generated from the title automatically.
+                      URL slug is generated from the title automatically.
                     </p>
                   </div>
                   <div className="mt-4">
