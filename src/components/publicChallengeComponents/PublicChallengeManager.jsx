@@ -39,6 +39,8 @@ import { cn } from "@/lib/utils";
 import { SCHOLARSHIP_TEST_NAV_LABEL } from "@/shared/static/sidebarItems";
 
 const PAGE_SIZE = 20;
+/** Share-to-scholarship-app is only valid for this challenge type. */
+const SCHOLARSHIP_SHARE_TYPE = "COLLEGE_STUDENTS";
 
 const PublicChallengeManager = () => {
   const dispatch = useDispatch();
@@ -88,6 +90,7 @@ const PublicChallengeManager = () => {
         end_date: dateTo,
         page,
         page_size: PAGE_SIZE,
+        challenge_type: SCHOLARSHIP_SHARE_TYPE,
       })
     );
   }, [dispatch, debouncedSearch, dateFrom, dateTo, page]);
@@ -193,6 +196,12 @@ const PublicChallengeManager = () => {
   };
 
   const handleCopyLink = (challenge) => {
+    if (challenge?.challenge_type !== SCHOLARSHIP_SHARE_TYPE) {
+      showErrorToast(
+        "Scholarship share links are only available for college-student tests."
+      );
+      return;
+    }
     setCopyLinkChallenge(challenge);
     setShowCopyLinkModal(true);
   };
@@ -221,7 +230,7 @@ const PublicChallengeManager = () => {
   };
 
   const typeBadge = (type) =>
-    type === "COLLEGE_STUDENTS"
+    type === SCHOLARSHIP_SHARE_TYPE
       ? "border-purple-200 bg-purple-50 text-purple-900"
       : "border-border bg-muted/60 text-foreground";
 
@@ -392,7 +401,7 @@ const PublicChallengeManager = () => {
                                 typeBadge(challenge.challenge_type || "PUBLIC")
                               )}
                             >
-                              {challenge.challenge_type === "COLLEGE_STUDENTS"
+                              {challenge.challenge_type === SCHOLARSHIP_SHARE_TYPE
                                 ? "College"
                                 : "Public"}
                             </span>
@@ -406,12 +415,13 @@ const PublicChallengeManager = () => {
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
-                          {isActive && (
+                          {isActive &&
+                            challenge.challenge_type === SCHOLARSHIP_SHARE_TYPE && (
                             <Button
                               type="button"
                               variant="outline"
                               size="icon"
-                              title="Copy link"
+                              title="Copy scholarship test link"
                               onClick={() => handleCopyLink(challenge)}
                               className="shrink-0"
                             >
