@@ -1,6 +1,13 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "@/axios";
 
+const DEV_BYPASS_USER = {
+  id: 1,
+  name: "Sales User",
+  email: "sales.user@10000coders.in",
+  role: "manager",
+};
+
 /**
  * Login with email + OTP (password login removed).
  * POST /login/otp/verify/ returns same shape as old password login (sales person object).
@@ -25,12 +32,20 @@ export const logout = createAsyncThunk("userAuth/logout", async () => ({}));
 const userAuthSlice = createSlice({
   name: "userAuth",
   initialState: {
-    user: null,
-    isLoggedIn: false,
+    user: DEV_BYPASS_USER,
+    isLoggedIn: true,
     loginLoading: false,
     loginError: null,
   },
-  reducers: {},
+  reducers: {
+    ensureDevSession: (state) => {
+      if (!state.user) {
+        state.user = DEV_BYPASS_USER;
+      }
+      state.isLoggedIn = true;
+      state.loginError = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(login.pending, (state) => {
@@ -50,11 +65,12 @@ const userAuthSlice = createSlice({
         state.loginError = action.payload?.detail || action.payload?.message || "Login failed.";
       })
       .addCase(logout.fulfilled, (state) => {
-        state.user = null;
-        state.isLoggedIn = false;
+        state.user = DEV_BYPASS_USER;
+        state.isLoggedIn = true;
         state.loginError = null;
       });
   },
 });
 
+export const { ensureDevSession } = userAuthSlice.actions;
 export default userAuthSlice.reducer;

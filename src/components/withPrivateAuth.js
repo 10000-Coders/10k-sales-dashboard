@@ -3,8 +3,8 @@
 import { useLayoutEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { usePathname, useRouter } from "next/navigation";
-import { RBAC_CONFIG, LOGIN_ROUTE, DEFAULT_REDIRECT } from "@/shared/static/rbacConfig";
-import { logout } from "@/redux/features/user/userAuth";
+import { RBAC_CONFIG, DEFAULT_REDIRECT } from "@/shared/static/rbacConfig";
+import { logout, ensureDevSession } from "@/redux/features/user/userAuth";
 import { isSessionExpired, clearLoginAt } from "@/lib/sessionExpiry";
 
 export default function withPrivateAuth(Component) {
@@ -15,9 +15,9 @@ export default function withPrivateAuth(Component) {
     const { isLoggedIn, user } = useSelector((state) => state.userAuth);
 
     useLayoutEffect(() => {
-      // 1. Authentication Check
+      // 1. Development bypass session
       if (!isLoggedIn || !user) {
-        router.push(LOGIN_ROUTE);
+        dispatch(ensureDevSession());
         return;
       }
 
@@ -25,7 +25,7 @@ export default function withPrivateAuth(Component) {
       if (isSessionExpired()) {
         clearLoginAt();
         dispatch(logout());
-        router.replace(LOGIN_ROUTE);
+        dispatch(ensureDevSession());
         return;
       }
 
