@@ -8,7 +8,7 @@ In **Cloudflare Dashboard** → your Pages project → **Settings** → **Builds
 
 | Setting | Value |
 |--------|--------|
-| **Build command** | `yarn build:cf` or `npx @cloudflare/next-on-pages@1` |
+| **Build command** | `npm run build:prod` |
 | **Build output directory** | `.vercel/output/static` |
 | **Root directory** | (leave empty) |
 
