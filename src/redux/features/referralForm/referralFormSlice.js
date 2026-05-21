@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "@/axios";
+import { getAllStudents } from '@/utils/referrialApis';
 
 export const REFERRAL_FORM_STATUS = {
   IDLE: "idle",
@@ -140,6 +141,34 @@ export function validateReferralForm(form) {
   return errors;
 }
 
+/** Validation for sales-dashboard student referral modal (subset of fields). */
+export function validateSalesReferralForm(form) {
+  const full = validateReferralForm({
+    ...INITIAL_REFERRAL_FORM,
+    referred_state: "Not specified",
+    referred_address: "Not specified via sales dashboard",
+    referred_present_status: "Not specified",
+    ...form,
+  });
+
+  const keys = [
+    "referred_name",
+    "referred_email",
+    "referred_mobile",
+    "referred_college",
+    "referred_year_of_passing",
+    "referred_branch",
+    "referred_qualification",
+    "referred_interested_in",
+  ];
+
+  const errors = {};
+  for (const key of keys) {
+    if (full[key]) errors[key] = full[key];
+  }
+  return errors;
+}
+
 function normalizePayload(form) {
   const trim = (v) => (typeof v === "string" ? v.trim() : v);
   return {
@@ -214,6 +243,20 @@ export const submitReferral = createAsyncThunk(
     }
   }
 );
+export const getAllStudentsFromBackend = createAsyncThunk(
+  'batch/getAllStudentsFromBackend',
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      return await getAllStudents(params);
+    } catch (error) {
+      return rejectWithValue(
+        error?.response?.data || {
+          message: error?.message || 'Failed to fetch students',
+        }
+      );
+    }
+  }
+);
 
 function getInitialState() {
   return {
@@ -221,8 +264,22 @@ function getInitialState() {
     status: REFERRAL_FORM_STATUS.IDLE,
     error: null,
     fieldErrors: {},
+    all_students_backend: [],
+    all_students_backend_count: 0,
+    all_students_backend_total_pages: 1,
+    all_students_backend_current_page: 1,
+    all_students_backend_page_size: 25,
+    all_students_backend_loading: false,
+    all_students_backend_error: null,
+
+    filter_options_backend: {
+      available_branches: [],
+      available_batches: [],
+      available_colleges: [],
+    },
   };
 }
+
 
 const referralFormSlice = createSlice({
   name: "referralForm",
@@ -235,7 +292,12 @@ const referralFormSlice = createSlice({
         state.error = null;
       }
     },
-    resetReferralForm: () => getInitialState(),
+    resetReferralForm: (state) => {
+      state.form = { ...INITIAL_REFERRAL_FORM };
+      state.status = REFERRAL_FORM_STATUS.IDLE;
+      state.error = null;
+      state.fieldErrors = {};
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -255,6 +317,67 @@ const referralFormSlice = createSlice({
         state.status = REFERRAL_FORM_STATUS.ERROR;
         state.error = payload.message ?? action.error?.message ?? "Request failed.";
         state.fieldErrors = payload.fieldErrors ?? {};
+      })
+      .addCase(getAllStudentsFromBackend.pending, (state) => {
+        state.all_students_backend_loading = true;
+        state.all_students_backend_error = null;
+      })
+
+      .addCase(getAllStudentsFromBackend.fulfilled, (state, action) => {
+        state.all_students_backend_loading = false;
+        state.all_students_backend_error = null;
+
+        const payload = action.payload || {};
+        const data = payload.data || payload;
+        const filters = payload.filters || data.filters || {};
+
+        state.all_students_backend = data.results || [];
+        state.all_students_backend_count = data.count || 0;
+
+        state.all_students_backend_page_size =
+          data.page_size || data.pageSize || 25;
+
+        state.all_students_backend_current_page =
+          data.current_page || data.page || 1;
+
+        state.all_students_backend_total_pages =
+          data.total_pages ||
+          Math.ceil(
+            (data.count || 0) / (data.page_size || data.pageSize || 25)
+          ) ||
+          1;
+
+        state.filter_options_backend = {
+          available_branches: filters.available_branches || [],
+          available_batches: filters.available_batches || [],
+          available_colleges: filters.available_colleges || [],
+        };
+      })
+
+      .addCase(getAllStudentsFromBackend.rejected, (state, action) => {
+        state.all_students_backend_loading = false;
+        state.all_students_backend = [];
+        state.all_students_backend_count = 0;
+        state.all_students_backend_total_pages = 1;
+        state.all_students_backend_current_page = 1;
+
+        const payload = action.payload;
+        let errorMessage = 'Failed to fetch students';
+        if (typeof payload === 'string') {
+          errorMessage = payload;
+        } else if (payload && typeof payload === 'object') {
+          errorMessage =
+            payload.message ||
+            payload.detail ||
+            (Array.isArray(payload.non_field_errors)
+              ? payload.non_field_errors[0]
+              : null) ||
+            errorMessage;
+        } else if (action.error?.message) {
+          errorMessage = action.error.message;
+        }
+
+        state.all_students_backend_error = errorMessage;
       });
   },
 });
@@ -272,4 +395,31 @@ export const selectIsSubmitting = (state) =>
 export const selectIsSuccess = (state) =>
   state.referralForm?.status === REFERRAL_FORM_STATUS.SUCCESS;
 
+export const selectAllStudentsFromBackend = (state) =>
+  state.referralForm?.all_students_backend ?? [];
+
+export const selectAllStudentsFromBackendCount = (state) =>
+  state.referralForm?.all_students_backend_count ?? 0;
+
+export const selectAllStudentsFromBackendTotalPages = (state) =>
+  state.referralForm?.all_students_backend_total_pages ?? 1;
+
+export const selectAllStudentsFromBackendCurrentPage = (state) =>
+  state.referralForm?.all_students_backend_current_page ?? 1;
+
+export const selectAllStudentsFromBackendPageSize = (state) =>
+  state.referralForm?.all_students_backend_page_size ?? 25;
+
+export const selectGetAllStudentsFromBackendLoading = (state) =>
+  state.referralForm?.all_students_backend_loading ?? false;
+
+export const selectGetAllStudentsFromBackendError = (state) =>
+  state.referralForm?.all_students_backend_error ?? null;
+
+export const selectFilterOptionsBackend = (state) =>
+  state.referralForm?.filter_options_backend ?? {
+    available_branches: [],
+    available_batches: [],
+    available_colleges: [],
+  };
 export default referralFormSlice.reducer;
