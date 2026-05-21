@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import axios from "@/axios";
 import { useSalesPersons } from "@/hooks/useSalesData";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -267,6 +268,15 @@ function ReferralsPage() {
                 <BarChart3 className="h-4 w-4 mr-2" />
                 Distribution stats
               </Button>
+
+            )}
+            {isManagerOrSuper && (
+              <Link href="/referrals/addreferial">
+                <Button variant="outline" className="shrink-0">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add referral
+                </Button>
+              </Link>
             )}
           </div>
 
@@ -410,105 +420,105 @@ function ReferralsPage() {
                     {group.label} ({group.count})
                   </h3>
                   <div className="w-full min-w-0 overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {isManagerRole && (
-                          <TableHead className="w-10">
-                            {group.items.some((r) => r.assigned_to == null || r.assigned_to === "") ? (
-                              <input
-                                type="checkbox"
-                                checked={
-                                  group.items
-                                    .filter((r) => r.assigned_to == null || r.assigned_to === "")
-                                    .every((r) => selectedIds.has(r.id))
-                                }
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  const unassignedInGroup = group.items.filter(
-                                    (r) => r.assigned_to == null || r.assigned_to === ""
-                                  );
-                                  if (e.target.checked) {
-                                    setSelectedIds((prev) => {
-                                      const next = new Set(prev);
-                                      unassignedInGroup.forEach((r) => next.add(r.id));
-                                      return next;
-                                    });
-                                  } else {
-                                    setSelectedIds((prev) => {
-                                      const next = new Set(prev);
-                                      unassignedInGroup.forEach((r) => next.delete(r.id));
-                                      return next;
-                                    });
-                                  }
-                                }}
-                                aria-label={`Select all unassigned in ${group.label}`}
-                                className="h-4 w-4"
-                              />
-                            ) : null}
-                          </TableHead>
-                        )}
-                        <TableHead>Referred name</TableHead>
-                        <TableHead>Email / Mobile</TableHead>
-                        <TableHead>Referrer</TableHead>
-                        <TableHead>Status</TableHead>
-                        {isManagerRole && <TableHead>Assigned to</TableHead>}
-                        <TableHead>Created</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {group.items.map((r) => (
-                        <TableRow
-                          key={r.id}
-                          className={cn(
-                            "cursor-pointer hover:bg-muted/50",
-                            selectedIds.has(r.id) && "bg-muted/50"
-                          )}
-                          onClick={() => goToDetail(r)}
-                        >
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
                           {isManagerRole && (
-                            <TableCell onClick={(e) => e.stopPropagation()} className="w-10">
-                              {(r.assigned_to == null || r.assigned_to === "") ? (
+                            <TableHead className="w-10">
+                              {group.items.some((r) => r.assigned_to == null || r.assigned_to === "") ? (
                                 <input
                                   type="checkbox"
-                                  checked={selectedIds.has(r.id)}
-                                  onChange={(e) => toggleSelect(r.id, e)}
-                                  aria-label={`Select ${r.referred_name}`}
+                                  checked={
+                                    group.items
+                                      .filter((r) => r.assigned_to == null || r.assigned_to === "")
+                                      .every((r) => selectedIds.has(r.id))
+                                  }
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    const unassignedInGroup = group.items.filter(
+                                      (r) => r.assigned_to == null || r.assigned_to === ""
+                                    );
+                                    if (e.target.checked) {
+                                      setSelectedIds((prev) => {
+                                        const next = new Set(prev);
+                                        unassignedInGroup.forEach((r) => next.add(r.id));
+                                        return next;
+                                      });
+                                    } else {
+                                      setSelectedIds((prev) => {
+                                        const next = new Set(prev);
+                                        unassignedInGroup.forEach((r) => next.delete(r.id));
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  aria-label={`Select all unassigned in ${group.label}`}
                                   className="h-4 w-4"
                                 />
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
+                              ) : null}
+                            </TableHead>
                           )}
-                          <TableCell className="font-medium">{r.referred_name ?? "—"}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            <span className="block">{r.referred_email ?? "—"}</span>
-                            {r.referred_mobile ? <span className="block text-xs">{r.referred_mobile}</span> : null}
-                          </TableCell>
-                          <TableCell className="align-top text-sm">
-                            <ReferrerCell name={r.referrer_name} batchName={r.referrer_batch_name} />
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={cn(
-                                "rounded-full px-2 py-0.5 text-xs font-medium",
-                                r.status === "reward_processed" && "bg-green-100 text-green-800",
-                                r.status === "full_payment_done" && "bg-emerald-100 text-emerald-800",
-                                r.status === "enrolled" && "bg-blue-100 text-blue-800",
-                                r.status === "contacted" && "bg-sky-100 text-sky-800",
-                                r.status === "pending" && "bg-amber-100 text-amber-800"
-                              )}
-                            >
-                              {r.status?.replace(/_/g, " ") ?? "—"}
-                            </span>
-                          </TableCell>
-                          {isManagerRole && <TableCell className="text-sm">{r.assigned_to_name ?? "Unassigned"}</TableCell>}
-                          <TableCell className="text-muted-foreground text-sm">{formatDate(r.created_at)}</TableCell>
+                          <TableHead>Referred name</TableHead>
+                          <TableHead>Email / Mobile</TableHead>
+                          <TableHead>Referrer</TableHead>
+                          <TableHead>Status</TableHead>
+                          {isManagerRole && <TableHead>Assigned to</TableHead>}
+                          <TableHead>Created</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {group.items.map((r) => (
+                          <TableRow
+                            key={r.id}
+                            className={cn(
+                              "cursor-pointer hover:bg-muted/50",
+                              selectedIds.has(r.id) && "bg-muted/50"
+                            )}
+                            onClick={() => goToDetail(r)}
+                          >
+                            {isManagerRole && (
+                              <TableCell onClick={(e) => e.stopPropagation()} className="w-10">
+                                {(r.assigned_to == null || r.assigned_to === "") ? (
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedIds.has(r.id)}
+                                    onChange={(e) => toggleSelect(r.id, e)}
+                                    aria-label={`Select ${r.referred_name}`}
+                                    className="h-4 w-4"
+                                  />
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                            )}
+                            <TableCell className="font-medium">{r.referred_name ?? "—"}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              <span className="block">{r.referred_email ?? "—"}</span>
+                              {r.referred_mobile ? <span className="block text-xs">{r.referred_mobile}</span> : null}
+                            </TableCell>
+                            <TableCell className="align-top text-sm">
+                              <ReferrerCell name={r.referrer_name} batchName={r.referrer_batch_name} />
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={cn(
+                                  "rounded-full px-2 py-0.5 text-xs font-medium",
+                                  r.status === "reward_processed" && "bg-green-100 text-green-800",
+                                  r.status === "full_payment_done" && "bg-emerald-100 text-emerald-800",
+                                  r.status === "enrolled" && "bg-blue-100 text-blue-800",
+                                  r.status === "contacted" && "bg-sky-100 text-sky-800",
+                                  r.status === "pending" && "bg-amber-100 text-amber-800"
+                                )}
+                              >
+                                {r.status?.replace(/_/g, " ") ?? "—"}
+                              </span>
+                            </TableCell>
+                            {isManagerRole && <TableCell className="text-sm">{r.assigned_to_name ?? "Unassigned"}</TableCell>}
+                            <TableCell className="text-muted-foreground text-sm">{formatDate(r.created_at)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 </div>
               ))}
