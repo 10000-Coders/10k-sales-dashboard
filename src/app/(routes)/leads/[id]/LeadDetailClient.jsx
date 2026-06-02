@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import axios from "@/axios";
@@ -18,6 +19,7 @@ import { Loader2, ArrowLeft, Phone, Mail, User, Calendar, Activity, MessageCircl
 import { cn } from "@/lib/utils";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
 import { useFollowUp } from "@/context/FollowUpProvider";
+import { getInquirySourceLabel } from "@/constants/leadInquirySource";
 
 function getActivityIcon(type) {
   switch (type) {
@@ -256,7 +258,11 @@ export default function LeadDetailClient() {
               </div>
               {lead.status !== "enrolled" && (
                 <Button
-                  onClick={() => router.push(`/students/new?lead=${lead.id}`)}
+                  onClick={() =>
+                    router.push(
+                      `/students/new?lead=${lead.id}${lead.referral ? `&referral=${lead.referral}` : ""}`
+                    )
+                  }
                 >
                   <UserPlus className="h-4 w-4" />
                   Enroll student
@@ -278,7 +284,18 @@ export default function LeadDetailClient() {
               </div>
             ) : null}
             {lead.source ? (
-              <span className="text-sm text-muted-foreground">Source: {lead.source}</span>
+              <span className="text-sm text-muted-foreground">Source: {getInquirySourceLabel(lead.source)}</span>
+            ) : null}
+            {(lead.referrer_name || lead.referred_by_name) ? (
+              <span className="text-sm text-muted-foreground">
+                Referred by: {lead.referrer_name || lead.referred_by_name}
+                {(lead.referrer_batch_name || lead.referred_by_batch) ? ` (${lead.referrer_batch_name || lead.referred_by_batch})` : ""}
+              </span>
+            ) : null}
+            {lead.referral ? (
+              <Link href={`/referrals/${lead.referral}`} className="text-sm text-primary underline underline-offset-2">
+                View referral
+              </Link>
             ) : null}
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">

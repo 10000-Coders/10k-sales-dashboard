@@ -2,15 +2,15 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useFollowUp } from "@/context/FollowUpProvider";
-import { Bell, Calendar, ChevronRight } from "lucide-react";
+import { Bell, Calendar, ChevronRight, BellRing } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
 import { FollowUpTimer } from "./FollowUpTimer";
+import { toast } from "react-toastify";
 
 export const FollowUpNotification = () => {
   const router = useRouter();
-  const { upcomingFollowUps, serverTimeOffset } = useFollowUp();
+  const { upcomingFollowUps, serverTimeOffset, permission, requestPermission } = useFollowUp();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -30,6 +30,20 @@ export const FollowUpNotification = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleEnableAlerts = async (e) => {
+    e.stopPropagation();
+    const result = await requestPermission();
+    if (result === "granted") {
+      toast.success(
+        "Desktop alerts enabled. Keep one dashboard tab open; reminders appear even on WhatsApp or other sites."
+      );
+    } else if (result === "denied") {
+      toast.warn(
+        "Notifications are blocked. Allow them in your browser site settings for this dashboard."
+      );
+    }
+  };
+
   return (
     <div className="relative" ref={dropdownRef}>
       <Button
@@ -37,8 +51,16 @@ export const FollowUpNotification = () => {
         size="icon"
         className="relative"
         onClick={() => setIsOpen(!isOpen)}
+        title={
+          permission !== "granted"
+            ? "Enable desktop alerts for follow-up reminders"
+            : "Follow-up reminders"
+        }
       >
         <Bell className="h-5 w-5" />
+        {permission !== "granted" ? (
+          <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-background" />
+        ) : null}
         {activeFollowUps.length > 0 && (
           <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">
             {activeFollowUps.length}
@@ -48,6 +70,23 @@ export const FollowUpNotification = () => {
 
       {isOpen && (
         <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-lg border bg-white shadow-xl dark:bg-slate-900">
+          {permission !== "granted" && (
+            <div className="border-b bg-amber-50 px-4 py-3 dark:bg-amber-950/40">
+              <p className="text-xs text-amber-950 dark:text-amber-100">
+                Click below and allow notifications in your browser. Keep one dashboard tab
+                open (can be in the background). Sound plays when you are on the dashboard tab.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                className="mt-2 w-full gap-2"
+                onClick={handleEnableAlerts}
+              >
+                <BellRing className="h-4 w-4" />
+                Enable desktop alerts
+              </Button>
+            </div>
+          )}
           <div className="flex items-center justify-between border-b px-4 py-3">
             <h3 className="text-sm font-semibold">Upcoming Follow-ups</h3>
             <span className="text-xs text-muted-foreground">{activeFollowUps.length} active</span>

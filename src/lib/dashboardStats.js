@@ -1,6 +1,19 @@
 import { getRangeForPreset, todayStr } from "@/lib/dateUtils";
 import { SINGLE_DAY_PRESETS } from "@/lib/dashboardConstants";
 
+/** Human-readable period for team table header (en-IN). */
+export function formatStatsPeriodLabel(fromIso, toIso) {
+  const fmt = (iso) => {
+    if (!iso) return "";
+    const d = new Date(`${iso}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  };
+  const from = fmt(fromIso);
+  const to = fmt(toIso ?? fromIso);
+  if (!from) return "";
+  return from === to ? from : `${from} – ${to}`;
+}
 /**
  * Params for stats API: single-day vs range and the date(s).
  * @returns {{ singleDay: boolean, date: string, fromDate: string, toDate: string }}
@@ -30,6 +43,9 @@ function normalizePerson(p) {
     whatsapp: p.whatsapp_today ?? p.whatsapp ?? 0,
     verifiedPaymentAmount: p.verified_payment_amount ?? 0,
     pendingPaymentAmount: p.pending_payment_amount ?? 0,
+    overdueLeads: p.overdue_leads ?? 0,
+    interestedLeadsCount: p.interested_leads_count ?? 0,
+    interestedLeadsDue: p.interested_leads_due ?? 0,
   };
 }
 
@@ -40,6 +56,8 @@ function normalizePerson(p) {
  */
 export function normalizeStats(raw) {
   if (!raw) return null;
+  const periodFrom = raw.from_date ?? raw.date ?? null;
+  const periodTo = raw.to_date ?? raw.date ?? periodFrom;
   const normalized = {
     leadsTotal: raw.leads_total ?? raw.leads_created ?? 0,
     activitiesTotal: raw.activities_today ?? raw.activities_total ?? 0,
@@ -49,6 +67,12 @@ export function normalizeStats(raw) {
     verifiedPaymentAmount: raw.verified_payment_amount ?? 0,
     pendingPaymentCount: raw.pending_payment_count ?? 0,
     pendingPaymentAmount: raw.pending_payment_amount ?? 0,
+    overdueLeads: raw.overdue_leads ?? 0,
+    interestedLeadsCount: raw.interested_leads_count ?? 0,
+    interestedLeadsDue: raw.interested_leads_due ?? 0,
+    periodFrom,
+    periodTo,
+    periodLabel: formatStatsPeriodLabel(periodFrom, periodTo),
   };
   if (Array.isArray(raw.by_person)) {
     normalized.by_person = raw.by_person.map(normalizePerson).filter(Boolean);

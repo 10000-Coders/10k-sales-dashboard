@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Loader2, Phone, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FollowUpTimer } from "@/components/FollowUpTimer";
 
 /** Manager and Super Admin see all students; Admin/Counselor see only their own. */
 import withPrivateAuth from "@/components/withPrivateAuth";
@@ -259,6 +260,8 @@ function StudentsPage() {
                     {canSeeAll && (
                       <TableHead className="hidden lg:table-cell min-w-[100px]">Student of</TableHead>
                     )}
+                    <TableHead className="min-w-[130px]">Next payment follow-up</TableHead>
+                    <TableHead className="min-w-[120px]">Activities</TableHead>
                     <TableHead className="min-w-[140px]">Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -294,6 +297,19 @@ function StudentsPage() {
                           </div>
                         </TableCell>
                       )}
+                      <TableCell className="text-sm text-muted-foreground">
+                        {s.next_payment_follow_up_at ? (
+                          <FollowUpTimer followUpAt={s.next_payment_follow_up_at} className="text-[11px]" />
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        <div className="flex flex-col gap-0.5">
+                          <span>Lead: {s.lead_activities_count ?? 0}</span>
+                          <span>Student: {s.student_activities_count ?? 0}</span>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-0.5">
                           <div className="flex flex-wrap items-center gap-1">
