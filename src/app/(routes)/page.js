@@ -3,7 +3,8 @@
 import { useCallback, useState } from "react";
 import { useSelector } from "react-redux";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LayoutDashboard, TrendingUp, Users } from "lucide-react";
+import { LayoutDashboard, RefreshCw, TrendingUp, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { getRangeForPreset, todayStr } from "@/lib/dateUtils";
 import withPrivateAuth from "@/components/withPrivateAuth";
 import { isManager } from "@/lib/dashboardConstants";
@@ -20,19 +21,12 @@ function HomePage() {
   const [fromDate, setFromDate] = useState(todayStr());
   const [toDate, setToDate] = useState(todayStr());
 
-  const {
-    myStats,
-    teamStats,
-    loading,
-    errorMy,
-    errorTeam,
-    refetchMy,
-    refetchTeam,
-  } = useDashboardStats({
+  const { myStats, teamStats, loading, refreshing, errorMy, errorTeam, refreshStats } = useDashboardStats({
     preset,
     fromDate,
     toDate,
     userId: user?.id,
+    userRole: user?.role,
     isManager: isManagerRole,
   });
 
@@ -69,6 +63,20 @@ function HomePage() {
                 </CardDescription>
               </div>
             </div>
+            {user && (
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                onClick={refreshStats}
+                disabled={refreshing || loading}
+                className="h-12 shrink-0 gap-2.5 self-start px-6 text-base font-semibold sm:self-center"
+                aria-label="Refresh latest stats"
+              >
+                <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} aria-hidden />
+                Refresh latest data
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-8 pt-8">
@@ -92,12 +100,7 @@ function HomePage() {
                   </span>
                   My performance
                 </h3>
-                <StatsCards
-                  stats={myStats}
-                  loading={loading && !myStats}
-                  error={errorMy}
-                  onRetry={refetchMy}
-                />
+                <StatsCards stats={myStats} loading={loading && !myStats} error={errorMy} />
               </section>
 
               {isManagerRole && (
@@ -112,7 +115,6 @@ function HomePage() {
                     teamStats={teamStats}
                     loading={loading && !teamStats?.by_person?.length}
                     error={errorTeam}
-                    onRetry={refetchTeam}
                   />
                 </section>
               )}

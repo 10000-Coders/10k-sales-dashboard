@@ -449,15 +449,15 @@ function PaymentsPage() {
         { headers: getHeaders() }
       );
       
-      // Update main payments list
+      // Update main payments list (include recalculated student_due_amount from API)
       setPayments((prev) =>
-        prev.map((p) => (p.id === paymentId ? { ...p, status: updated.status, notes: updated.notes } : p))
+        prev.map((p) => (p.id === paymentId ? { ...p, ...updated } : p))
       );
 
       // Update batch payments list if it's open
       if (batchPaymentsModalOpen) {
         setBatchPayments((prev) =>
-          prev.map((p) => (p.id === paymentId ? { ...p, status: updated.status, notes: updated.notes } : p))
+          prev.map((p) => (p.id === paymentId ? { ...p, ...updated } : p))
         );
       }
 
@@ -499,6 +499,7 @@ function PaymentsPage() {
       if (filterDateFrom) params.set("date_from", filterDateFrom);
       if (filterDateTo) params.set("date_to", filterDateTo);
       params.set("sales_batch", String(row.batch_key || row.batch_name || ""));
+      clearPaymentsListAndSummaryCache();
       const url = `/payments/${params.toString() ? `?${params.toString()}` : ""}`;
       const { data } = await axios.get(url, { headers: getHeaders() });
       const list = data?.results ?? (Array.isArray(data) ? data : []);
@@ -534,6 +535,17 @@ function PaymentsPage() {
     }
     // Fallback to total_amount if backend hasn't added a verified-only field yet
     return Number(row.total_amount || 0) || 0;
+  };
+
+  const getTotalDueAmount = (row) => Number(row.total_due_amount ?? 0) || 0;
+
+  const getStudentDueAmount = (payment) => {
+    if (payment?.student_due_amount != null && payment.student_due_amount !== "") {
+      return Number(payment.student_due_amount) || 0;
+    }
+    const offered = payment?.student_payment_offered;
+    if (offered == null || offered === "") return null;
+    return 0;
   };
 
   // ... withPrivateAuth handles the initial !user and !canView checks for page access ...
@@ -647,6 +659,7 @@ function PaymentsPage() {
                 <TableHead>Batch</TableHead>
                 <TableHead>Total Payments</TableHead>
                 <TableHead>Verified Amount</TableHead>
+                <TableHead>Total Due</TableHead>
                 <TableHead>Pending</TableHead>
                 <TableHead>Verified</TableHead>
                 <TableHead>Rejected</TableHead>
@@ -662,6 +675,9 @@ function PaymentsPage() {
                       <TableCell className="font-medium">{row.batch_name || "Unassigned"}</TableCell>
                       <TableCell>{row.total_payments ?? 0}</TableCell>
                       <TableCell>₹ {getVerifiedAmount(row).toLocaleString()}</TableCell>
+                      <TableCell className="font-medium text-orange-700 dark:text-orange-400">
+                        ₹ {getTotalDueAmount(row).toLocaleString()}
+                      </TableCell>
                       <TableCell>{row.pending_count ?? 0}</TableCell>
                       <TableCell>{row.verified_count ?? 0}</TableCell>
                       <TableCell>{row.rejected_count ?? 0}</TableCell>
@@ -720,6 +736,7 @@ function PaymentsPage() {
                       <TableHead>Sales Person</TableHead>
                       <TableHead>Sales Batch</TableHead>
                       <TableHead>Amount</TableHead>
+                      <TableHead>Due</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Mode</TableHead>
                       <TableHead>Status</TableHead>
@@ -741,6 +758,11 @@ function PaymentsPage() {
                         <TableCell>{p.sales_person_name || "Unassigned"}</TableCell>
                         <TableCell>{p.sales_batch_name || "Unassigned"}</TableCell>
                         <TableCell className="font-medium">₹ {Number(p.amount).toLocaleString()}</TableCell>
+                        <TableCell className="font-medium text-orange-700 dark:text-orange-400">
+                          {getStudentDueAmount(p) != null
+                            ? `₹ ${getStudentDueAmount(p).toLocaleString()}`
+                            : "—"}
+                        </TableCell>
                         <TableCell>{formatDate(p.payment_date)}</TableCell>
                         <TableCell>{PAYMENT_MODE_LABELS[p.payment_mode] ?? p.payment_mode}</TableCell>
                         <TableCell>
@@ -857,6 +879,14 @@ function PaymentsPage() {
                         <dd className="font-semibold">
                           {selectedPayment.student_payment_offered != null
                             ? `₹ ${Number(selectedPayment.student_payment_offered).toLocaleString()}`
+                            : "—"}
+                        </dd>
+                      </div>
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <dt className="text-muted-foreground">Amount due</dt>
+                        <dd className="font-semibold text-orange-700 dark:text-orange-400">
+                          {getStudentDueAmount(selectedPayment) != null
+                            ? `₹ ${getStudentDueAmount(selectedPayment).toLocaleString()}`
                             : "—"}
                         </dd>
                       </div>
