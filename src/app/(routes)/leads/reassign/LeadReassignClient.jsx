@@ -39,19 +39,10 @@ import {
   selectReassignLeadsError,
   selectReassignLeadsLoading,
 } from "@/redux/features/leads/leadsSlice";
+import { LEAD_STATUS_STYLES } from "@/constants/leadStatus";
 
 const LEAD_TABLE_HEAD = "whitespace-nowrap align-middle py-1.5 text-[11px] font-medium text-muted-foreground";
 const LEAD_TABLE_CELL = "align-middle py-1.5 text-[11px]";
-
-const LEAD_STATUS_STYLES = {
-  enrolled: "bg-green-100 text-green-800",
-  interested: "bg-blue-100 text-blue-800",
-  not_interested: "bg-gray-100 text-gray-700",
-  wrong_number: "bg-gray-100 text-gray-700",
-  new: "bg-amber-100 text-amber-800",
-  callback: "bg-purple-100 text-purple-800",
-  contacted: "bg-sky-100 text-sky-800",
-};
 
 function formatDateTime(d) {
   if (!d) return "—";

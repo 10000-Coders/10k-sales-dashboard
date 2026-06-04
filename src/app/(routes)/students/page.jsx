@@ -21,7 +21,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Loader2, Phone, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight, Loader2, Phone, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
 
@@ -29,10 +30,11 @@ import { FollowUpTimer } from "@/components/FollowUpTimer";
 import withPrivateAuth from "@/components/withPrivateAuth";
 
 /** Module-level dedup: prevent double students fetch when React Strict Mode remounts */
-let studentsCache = { key: null, data: null, at: 0 };
+let studentsCache = { key: null, data: null, pagination: null, at: 0 };
 let studentsFetchPromise = null;
 let studentsFetchCacheKey = null;
 const STUDENTS_CACHE_MS = 5000;
+const STUDENTS_PAGE_SIZE = 100;
 
 /** Manager and Super Admin see all students and can filter by person; Admin/Counselor see only their own. */
 function canSeeAllStudents(role) {
@@ -102,6 +104,13 @@ function StudentsPage() {
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
   const [filterSalesBatch, setFilterSalesBatch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    count: 0,
+    page: 1,
+    page_size: STUDENTS_PAGE_SIZE,
+    total_pages: 0,
+  });
 
   const getHeaders = useCallback(() => {
     const h = {};
@@ -110,11 +119,13 @@ function StudentsPage() {
     return h;
   }, [user?.id, user?.role]);
 
-  const fetchStudents = useCallback(async (forceRefresh = false) => {
-    const cacheKey = `${searchDebounce}|${filterPerson}|${filterDateFrom}|${filterDateTo}|${filterSalesBatch}|${user?.id}`;
+  const fetchStudents = useCallback(async (forceRefresh = false, pageOverride) => {
+    const effectivePage = pageOverride ?? page;
+    const cacheKey = `${searchDebounce}|${filterPerson}|${filterDateFrom}|${filterDateTo}|${filterSalesBatch}|${effectivePage}|${user?.id}`;
 
     if (!forceRefresh && studentsCache.key === cacheKey && Date.now() - studentsCache.at < STUDENTS_CACHE_MS) {
       setStudents(studentsCache.data);
+      setPagination(studentsCache.pagination);
       setLoading(false);
       return;
     }
@@ -123,7 +134,10 @@ function StudentsPage() {
       setLoading(true);
       try {
         await studentsFetchPromise;
-        if (studentsCache.key === cacheKey) setStudents(studentsCache.data);
+        if (studentsCache.key === cacheKey) {
+          setStudents(studentsCache.data);
+          setPagination(studentsCache.pagination);
+        }
       } catch {
         setStudents([]);
       } finally {
@@ -133,7 +147,7 @@ function StudentsPage() {
     }
 
     if (forceRefresh) {
-      studentsCache = { key: null, data: null, at: 0 };
+      studentsCache = { key: null, data: null, pagination: null, at: 0 };
       studentsFetchPromise = null;
       studentsFetchCacheKey = null;
     }
@@ -149,13 +163,21 @@ function StudentsPage() {
         if (filterDateFrom) params.set("created_after", filterDateFrom);
         if (filterDateTo) params.set("created_before", filterDateTo);
         if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
-        const { data } = await axios.get(`/students/${params.toString() ? `?${params.toString()}` : ""}`, { headers: getHeaders() });
+        const { data } = await axios.get(`/students/?${params.toString()}`, { headers: getHeaders() });
         const list = data?.results ?? (Array.isArray(data) ? data : []);
-        studentsCache = { key: cacheKey, data: list, at: Date.now() };
+        const meta = {
+          count: data?.count ?? list.length,
+          page: data?.page ?? effectivePage,
+          page_size: data?.page_size ?? STUDENTS_PAGE_SIZE,
+          total_pages: data?.total_pages ?? (list.length ? 1 : 0),
+        };
+        studentsCache = { key: cacheKey, data: list, pagination: meta, at: Date.now() };
         setStudents(list);
+        setPagination(meta);
       } catch (err) {
         setError(err.response?.data?.detail || "Failed to load students.");
         setStudents([]);
+        setPagination({ count: 0, page: 1, page_size: STUDENTS_PAGE_SIZE, total_pages: 0 });
       } finally {
         setLoading(false);
         studentsFetchPromise = null;
@@ -163,7 +185,7 @@ function StudentsPage() {
       }
     })();
     await studentsFetchPromise;
-  }, [getHeaders, searchDebounce, canSeeAll, filterPerson, filterDateFrom, filterDateTo, filterSalesBatch, user?.id]);
+  }, [getHeaders, searchDebounce, canSeeAll, filterPerson, filterDateFrom, filterDateTo, filterSalesBatch, page, user?.id]);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounce(searchQuery), 300);
@@ -171,8 +193,18 @@ function StudentsPage() {
   }, [searchQuery]);
 
   useEffect(() => {
+    setPage(1);
+  }, [searchDebounce, filterPerson, filterDateFrom, filterDateTo, filterSalesBatch]);
+
+  useEffect(() => {
     fetchStudents();
   }, [fetchStudents]);
+
+  const totalPages = Math.max(1, pagination.total_pages || 1);
+  const totalCount = pagination.count ?? 0;
+  const currentPage = pagination.page ?? page;
+  const rangeFrom = totalCount === 0 ? 0 : (currentPage - 1) * STUDENTS_PAGE_SIZE + 1;
+  const rangeTo = Math.min(currentPage * STUDENTS_PAGE_SIZE, totalCount);
 
   return (
     <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
@@ -329,6 +361,40 @@ function StudentsPage() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          )}
+          {!loading && !error && totalCount > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
+              <p className="text-sm text-muted-foreground">
+                Showing {rangeFrom}–{rangeTo} of {totalCount}
+                {totalPages > 1 ? ` · Page ${currentPage} of ${totalPages}` : ""}
+              </p>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="gap-1"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                    className="gap-1"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

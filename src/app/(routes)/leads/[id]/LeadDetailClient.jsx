@@ -20,6 +20,11 @@ import { cn } from "@/lib/utils";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
 import { useFollowUp } from "@/context/FollowUpProvider";
 import { getInquirySourceLabel } from "@/constants/leadInquirySource";
+import {
+  LEAD_STATUS_OPTIONS,
+  LEAD_CALL_OUTCOME_OPTIONS,
+  getLeadStatusSelectClass,
+} from "@/constants/leadStatus";
 
 function getActivityIcon(type) {
   switch (type) {
@@ -39,29 +44,14 @@ function formatActivityDate(d) {
 }
 
 // Enrolled is not in dropdown – use "Enroll student" button to enroll; status is set when student is created
-const STATUS_OPTIONS = [
-  { value: "new", label: "New" },
-  { value: "contacted", label: "Contacted" },
-  { value: "interested", label: "Interested" },
-  { value: "not_interested", label: "Not Interested" },
-  { value: "callback", label: "Callback" },
-  { value: "wrong_number", label: "Wrong Number" },
-];
+const STATUS_OPTIONS = LEAD_STATUS_OPTIONS;
 
 const ACTIVITY_TYPES = [
   { value: "call", label: "Call" },
   { value: "whatsapp", label: "WhatsApp" },
 ];
 
-const OUTCOMES = [
-  { value: "not_answered", label: "Not Answered" },
-  { value: "interested", label: "Interested" },
-  { value: "not_interested", label: "Not Interested" },
-  { value: "callback", label: "Callback" },
-  { value: "wrong_number", label: "Wrong Number" },
-  { value: "enrolled", label: "Enrolled" },
-  { value: "other", label: "Other" },
-];
+const OUTCOMES = LEAD_CALL_OUTCOME_OPTIONS;
 
 function formatDateTime(d) {
   const dt = d ? new Date(d) : new Date();
@@ -242,11 +232,7 @@ export default function LeadDetailClient() {
                     disabled={statusSaving}
                     className={cn(
                       "rounded-md border border-input bg-background px-3 py-2 text-sm font-medium",
-                      lead.status === "interested" && "bg-blue-100 text-blue-800 border-blue-200",
-                      (lead.status === "not_interested" || lead.status === "wrong_number") && "bg-gray-100 text-gray-700 border-gray-200",
-                      lead.status === "new" && "bg-amber-100 text-amber-800 border-amber-200",
-                      lead.status === "callback" && "bg-purple-100 text-purple-800 border-purple-200",
-                      lead.status === "contacted" && "bg-sky-100 text-sky-800 border-sky-200"
+                      getLeadStatusSelectClass(lead.status)
                     )}
                   >
                     {STATUS_OPTIONS.map((o) => (

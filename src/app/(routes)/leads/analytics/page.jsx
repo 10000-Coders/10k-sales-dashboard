@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { LEAD_STATUS_PREFERRED_ORDER } from "@/constants/leadStatus";
 
 function formatStatusLabel(value) {
   return String(value || "")
@@ -62,15 +63,7 @@ function LeadSourceAnalyticsPage() {
   }, [resolvedSalesPerson, isManager, user?.name, persons]);
 
   const statusColumns = useMemo(() => {
-    const preferredOrder = [
-      "new",
-      "contacted",
-      "interested",
-      "not_interested",
-      "callback",
-      "enrolled",
-      "wrong_number",
-    ];
+    const preferredOrder = LEAD_STATUS_PREFERRED_ORDER;
 
     const statusSet = new Set();
     (analytics?.source_wise || []).forEach((item) => {

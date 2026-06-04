@@ -6,7 +6,6 @@ import leadsReducer from "./features/leads/leadsSlice";
 import referralFormReducer from "./features/referralForm/referralFormSlice";
 import publicChallengeReducer from "./features/publicChallenges/publicChallengeSlice";
 import mcqQuestionReducer from "./features/mcqQuestions/mcqQuestionSlice";
-import { dashboardApi } from "./features/dashboard/dashboardApi";
 
 const rootReducer = combineReducers({
   userAuth: userAuthReducer,
@@ -15,7 +14,6 @@ const rootReducer = combineReducers({
   referralForm: referralFormReducer,
   publicChallenges: publicChallengeReducer,
   mcqQuestions: mcqQuestionReducer,
-  [dashboardApi.reducerPath]: dashboardApi.reducer,
 });
 
 export default rootReducer;

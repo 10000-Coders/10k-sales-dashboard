@@ -27,6 +27,7 @@ import { ImageDropzone } from "@/components/ImageDropzone";
 import { cn } from "@/lib/utils";
 import { toast } from "react-toastify";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
+import { isProofScreenshotRequired } from "@/lib/paymentValidation";
 
 const PAYMENT_MODE_OPTIONS = [
   { value: "upi", label: "UPI" },
@@ -175,7 +176,7 @@ function toApiDateTime(value) {
   return value;
 }
 
-/** Payment that drives student.next_payment_follow_up_at (matches backend sync target). */
+/** Latest payment — follow-up is stored on the most recent payment (matches backend). */
 function getPrimaryPaymentForFollowUp(payments) {
   if (!payments?.length) return null;
   const sorted = [...payments].sort((a, b) => {
@@ -184,7 +185,7 @@ function getPrimaryPaymentForFollowUp(payments) {
     if (db !== da) return db - da;
     return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
   });
-  return sorted.find((p) => p.next_payment_follow_up_at) || sorted[0];
+  return sorted[0];
 }
 
 function canVerifyPayments(role) {
@@ -225,7 +226,7 @@ export default function StudentDetailClient() {
   const [paymentForm, setPaymentForm] = useState({
     amount: "",
     payment_date: new Date().toISOString().slice(0, 10),
-    next_payment_follow_up_at: new Date().toISOString().slice(0, 10),
+    next_payment_follow_up_at: "",
     payment_mode: "upi",
     receiver: "",
     reference: "",
@@ -431,8 +432,13 @@ export default function StudentDetailClient() {
   }, [student?.next_payment_follow_up_at]);
 
   const handleUpdatePaymentFollowUp = async (paymentId, rawValue, onSuccess) => {
-    const apiValue = toApiDateTime(rawValue);
-    if (!paymentId || !apiValue) {
+    if (!paymentId) {
+      setFollowUpError("No payment found to update.");
+      return;
+    }
+    const trimmed = (rawValue || "").trim();
+    const apiValue = trimmed ? toApiDateTime(trimmed) : null;
+    if (trimmed && !apiValue) {
       setFollowUpError("Choose a valid follow-up date and time.");
       return;
     }
@@ -445,12 +451,13 @@ export default function StudentDetailClient() {
         { headers: getHeaders() }
       );
       invalidateStudentDetailCache();
-      await Promise.all([fetchPayments(), fetchStudent()]);
+      await Promise.all([fetchPayments(), fetchStudent(), fetchActivityHistory()]);
+      setHeaderFollowUpValue(toDatetimeLocalValue(data.next_payment_follow_up_at));
       if (selectedPayment?.id === paymentId) {
         setSelectedPayment(data);
         setFollowUpEditValue(toDatetimeLocalValue(data.next_payment_follow_up_at));
       }
-      toast.success("Payment follow-up date updated.");
+      toast.success(apiValue ? "Payment follow-up saved." : "Payment follow-up cleared.");
       if (onSuccess) onSuccess();
     } catch (err) {
       const msg =
@@ -521,9 +528,14 @@ export default function StudentDetailClient() {
         outcome: activityForm.outcome,
         notes: trimmedNotes,
       };
-      const followUpApi = toApiDateTime(activityForm.next_follow_up_at);
+      const followUpTrimmed = (activityForm.next_follow_up_at || "").trim();
+      const followUpApi = followUpTrimmed ? toApiDateTime(followUpTrimmed) : null;
       if (followUpApi) {
         payload.next_follow_up_at = followUpApi;
+      } else if (followUpTrimmed) {
+        setActivityError("Enter a valid follow-up date and time.");
+        setActivitySubmitting(false);
+        return;
       }
       await axios.post(`/students/${id}/activities/`, payload, { headers: getHeaders() });
       setActivityForm({
@@ -535,7 +547,9 @@ export default function StudentDetailClient() {
       invalidateStudentDetailCache();
       await Promise.all([fetchActivityHistory(), fetchPayments(), fetchStudent()]);
       toast.success(
-        followUpApi ? "Activity logged. Payment follow-up date updated." : "Activity logged."
+        followUpApi
+          ? "Activity logged. Payment follow-up updated."
+          : "Activity logged."
       );
     } catch (err) {
       setActivityError(err.response?.data?.detail || "Failed to log activity.");
@@ -547,8 +561,12 @@ export default function StudentDetailClient() {
   const handleAddPayment = async (e) => {
     e.preventDefault();
     if (!id || !paymentForm.amount || Number(paymentForm.amount) <= 0) return;
-    if (!paymentForm.reference_image || !paymentForm.receipt_image) {
-      setPaymentError("Both Proof Screenshot and Receipt Image are required.");
+    if (!paymentForm.receipt_image) {
+      setPaymentError("Receipt Image is required.");
+      return;
+    }
+    if (isProofScreenshotRequired(paymentForm.payment_mode) && !paymentForm.reference_image) {
+      setPaymentError("Proof Screenshot is required for this payment mode.");
       return;
     }
     if (PAYMENT_MODES_NEED_RECEIVER.includes(paymentForm.payment_mode) && !paymentForm.receiver) {
@@ -570,20 +588,23 @@ export default function StudentDetailClient() {
       formData.append("amount", Number(paymentForm.amount));
       const dateStr = paymentForm.payment_date || new Date().toISOString().slice(0, 10);
       formData.append("payment_date", `${dateStr}T00:00:00`);
-      const followUpStr =
-        paymentForm.next_payment_follow_up_at || new Date().toISOString().slice(0, 10);
-      formData.append("next_payment_follow_up_at", `${followUpStr}T00:00:00`);
+      const followUpStr = (paymentForm.next_payment_follow_up_at || "").trim();
+      if (followUpStr) {
+        formData.append("next_payment_follow_up_at", `${followUpStr}T00:00:00`);
+      }
       formData.append("payment_mode", paymentForm.payment_mode || "upi");
       if (paymentForm.receiver) formData.append("receiver", paymentForm.receiver);
       formData.append("reference", paymentForm.reference || "");
       formData.append("notes", paymentForm.notes || "");
-      formData.append("reference_image", paymentForm.reference_image);
+      if (paymentForm.reference_image) {
+        formData.append("reference_image", paymentForm.reference_image);
+      }
       formData.append("receipt_image", paymentForm.receipt_image);
       await axios.post(`/students/${id}/payments/`, formData, { headers });
       setPaymentForm({
         amount: "",
         payment_date: new Date().toISOString().slice(0, 10),
-        next_payment_follow_up_at: new Date().toISOString().slice(0, 10),
+        next_payment_follow_up_at: "",
         payment_mode: "upi",
         receiver: "",
         reference: "",
@@ -724,30 +745,44 @@ export default function StudentDetailClient() {
             </p>
           )}
           {primaryFollowUpPayment && (
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="grid gap-1">
-                <Label className="text-xs text-muted-foreground">Next payment follow-up</Label>
-                <Input
-                  type="datetime-local"
-                  className="h-9 w-auto min-w-[220px] text-sm"
-                  value={headerFollowUpValue}
-                  onChange={(e) => setHeaderFollowUpValue(e.target.value)}
-                />
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="grid gap-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Next payment follow-up (optional — clear field and save to remove)
+                  </Label>
+                  <Input
+                    type="datetime-local"
+                    className="h-9 w-auto min-w-[220px] text-sm"
+                    value={headerFollowUpValue}
+                    onChange={(e) => {
+                      setHeaderFollowUpValue(e.target.value);
+                      setFollowUpError(null);
+                    }}
+                  />
+                </div>
+                {student.next_payment_follow_up_at && (
+                  <FollowUpTimer followUpAt={student.next_payment_follow_up_at} className="text-sm pb-2" />
+                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={followUpSaving}
+                  onClick={() =>
+                    handleUpdatePaymentFollowUp(primaryFollowUpPayment.id, headerFollowUpValue)
+                  }
+                >
+                  {followUpSaving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : headerFollowUpValue ? (
+                    "Save follow-up"
+                  ) : (
+                    "Clear follow-up"
+                  )}
+                </Button>
               </div>
-              {student.next_payment_follow_up_at && (
-                <FollowUpTimer followUpAt={student.next_payment_follow_up_at} className="text-sm pb-2" />
-              )}
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                disabled={followUpSaving || !headerFollowUpValue}
-                onClick={() =>
-                  handleUpdatePaymentFollowUp(primaryFollowUpPayment.id, headerFollowUpValue)
-                }
-              >
-                {followUpSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save follow-up"}
-              </Button>
+              {followUpError && <p className="text-xs text-destructive">{followUpError}</p>}
             </div>
           )}
           {student.college_name && (
@@ -927,7 +962,7 @@ export default function StudentDetailClient() {
                 />
               </div>
               <div>
-                <Label>Next payment follow-up at</Label>
+                <Label>Next payment follow-up at (optional)</Label>
                 <Input
                   type="date"
                   min={paymentForm.payment_date || undefined}
@@ -976,7 +1011,11 @@ export default function StudentDetailClient() {
               <div className="sm:col-span-2">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <ImageDropzone
-                    label="Proof Screenshot *"
+                    label={
+                      isProofScreenshotRequired(paymentForm.payment_mode)
+                        ? "Proof Screenshot *"
+                        : "Proof Screenshot (optional)"
+                    }
                     value={paymentForm.reference_image}
                     onChange={(file) => setPaymentForm((p) => ({ ...p, reference_image: file }))}
                   />
@@ -1355,15 +1394,17 @@ export default function StudentDetailClient() {
                             type="button"
                             size="sm"
                             variant="secondary"
-                            disabled={followUpSaving || !followUpEditValue}
+                            disabled={followUpSaving}
                             onClick={() =>
                               handleUpdatePaymentFollowUp(selectedPayment.id, followUpEditValue)
                             }
                           >
                             {followUpSaving ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
+                            ) : followUpEditValue ? (
                               "Save follow-up date"
+                            ) : (
+                              "Clear follow-up"
                             )}
                           </Button>
                         </dd>

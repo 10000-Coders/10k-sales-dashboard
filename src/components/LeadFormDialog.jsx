@@ -1,25 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Dialog } from "@headlessui/react";
+import Select from "react-select";
 import axios from "@/axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { formSelectStyles, formSelectMenuPortalTarget } from "@/lib/reactSelectStyles";
 import { Loader2, User, Phone, Mail, Share2, Calendar, Activity, X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { inquirySourceOptionsForValue } from "@/constants/leadInquirySource";
+import { LEAD_STATUS_FORM_OPTIONS } from "@/constants/leadStatus";
 import { getAllStudents } from "@/utils/referrialApis";
 
-const STATUS_OPTIONS = [
-  { value: "", label: "Select status" },
-  { value: "new", label: "New" },
-  { value: "contacted", label: "Contacted" },
-  { value: "interested", label: "Interested" },
-  { value: "not_interested", label: "Not Interested" },
-  { value: "callback", label: "Callback" },
-  { value: "wrong_number", label: "Wrong Number" },
-];
+const STATUS_OPTIONS = LEAD_STATUS_FORM_OPTIONS;
 
 function normalizeMobile(value) {
   const digits = String(value || "").replace(/\D/g, "");
@@ -50,7 +45,33 @@ export function LeadFormDialog({ open, onClose, lead = null, currentUserId, onSu
   const [batchOptions, setBatchOptions] = useState([]);
   const [studentOptions, setStudentOptions] = useState([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
+  const [studentSearch, setStudentSearch] = useState("");
+  const studentSearchDebounceRef = useRef(null);
   const isFriendSource = (form.source || "").trim().toLowerCase() === "friend";
+
+  const batchSelectOptions = useMemo(
+    () => batchOptions.map((name) => ({ value: name, label: name })),
+    [batchOptions]
+  );
+
+  const selectedBatchOption = useMemo(
+    () => batchSelectOptions.find((o) => o.value === form.referred_by_batch) || null,
+    [batchSelectOptions, form.referred_by_batch]
+  );
+
+  const studentSelectOptions = useMemo(
+    () =>
+      studentOptions.map((student) => ({
+        value: String(student.id),
+        label: `${student.student_name}${student.batch_name ? ` - ${student.batch_name}` : ""}`,
+      })),
+    [studentOptions]
+  );
+
+  const selectedStudentOption = useMemo(
+    () => studentSelectOptions.find((o) => o.value === String(form.referrer)) || null,
+    [studentSelectOptions, form.referrer]
+  );
 
   useEffect(() => {
     if (open) {
@@ -70,6 +91,7 @@ export function LeadFormDialog({ open, onClose, lead = null, currentUserId, onSu
         setForm(initialForm);
       }
       setErrors({});
+      setStudentSearch("");
     }
   }, [open, lead]);
 
@@ -97,41 +119,69 @@ export function LeadFormDialog({ open, onClose, lead = null, currentUserId, onSu
     const selectedBatch = (form.referred_by_batch || "").trim();
     if (!selectedBatch) {
       setStudentOptions([]);
+      setStudentSearch("");
       return;
     }
+
+    if (studentSearchDebounceRef.current) {
+      clearTimeout(studentSearchDebounceRef.current);
+    }
+
     let cancelled = false;
-    setStudentsLoading(true);
-    (async () => {
-      try {
-        const response = await getAllStudents({
-          page: 1,
-          page_size: 100,
-          mode: "All",
-          batches: [selectedBatch],
-          sort_by: "student_name",
-          sort_order: "asc",
-        });
-        const payload = response || {};
-        const rows = Array.isArray(payload?.data?.results) ? payload.data.results : [];
-        const mapped = rows.map((student) => ({
-          id: student.id,
-          student_name: student.student_name || "",
-          batch_name: student.batch_name || selectedBatch,
-        }));
-        if (!cancelled) setStudentOptions(mapped);
-      } catch {
-        if (!cancelled) setStudentOptions([]);
-      } finally {
-        if (!cancelled) setStudentsLoading(false);
-      }
-    })();
+    studentSearchDebounceRef.current = setTimeout(() => {
+      setStudentsLoading(true);
+      (async () => {
+        try {
+          const response = await getAllStudents({
+            page: 1,
+            page_size: 100,
+            mode: "All",
+            batches: [selectedBatch],
+            search: studentSearch.trim(),
+            sort_by: "student_name",
+            sort_order: "asc",
+          });
+          const payload = response || {};
+          const rows = Array.isArray(payload?.data?.results) ? payload.data.results : [];
+          const mapped = rows.map((student) => ({
+            id: student.id,
+            student_name: student.student_name || "",
+            batch_name: student.batch_name || selectedBatch,
+          }));
+          if (!cancelled) {
+            if (
+              isEdit &&
+              lead?.referrer &&
+              lead?.referred_by_name &&
+              !mapped.some((s) => String(s.id) === String(lead.referrer))
+            ) {
+              mapped.unshift({
+                id: lead.referrer,
+                student_name: lead.referred_by_name,
+                batch_name: lead.referred_by_batch || selectedBatch,
+              });
+            }
+            setStudentOptions(mapped);
+          }
+        } catch {
+          if (!cancelled) setStudentOptions([]);
+        } finally {
+          if (!cancelled) setStudentsLoading(false);
+        }
+      })();
+    }, 300);
+
     return () => {
       cancelled = true;
+      if (studentSearchDebounceRef.current) {
+        clearTimeout(studentSearchDebounceRef.current);
+      }
     };
-  }, [open, isFriendSource, form.referred_by_batch]);
+  }, [open, isFriendSource, form.referred_by_batch, studentSearch, isEdit, lead]);
 
   const handleChange = (field, value) => {
     if (field === "source" && String(value || "").trim().toLowerCase() !== "friend") {
+      setStudentSearch("");
       setForm((prev) => ({
         ...prev,
         source: value,
@@ -338,46 +388,46 @@ const validateForm = () => {
                 <>
                   <div className="grid gap-2">
                     <Label htmlFor="referred_by_batch" className="text-xs font-semibold text-gray-700 uppercase">Referred By Batch *</Label>
-                    <select
-                      id="referred_by_batch"
-                      value={form.referred_by_batch}
-                      onChange={(e) => {
-                        const value = e.target.value;
+                    <Select
+                      inputId="referred_by_batch"
+                      options={batchSelectOptions}
+                      value={selectedBatchOption}
+                      onChange={(option) => {
+                        const value = option?.value || "";
                         setForm((prev) => ({
                           ...prev,
                           referred_by_batch: value,
                           referrer: "",
                           referred_by_name: "",
                         }));
+                        setStudentSearch("");
                         setErrors((prev) => ({
                           ...prev,
                           referred_by_batch: undefined,
                           referrer: undefined,
                         }));
                       }}
-                      className={cn(
-                        "flex h-11 w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                        errors.referred_by_batch ? "border-destructive" : "border-input"
-                      )}
-                    >
-                      <option value="">Select batch</option>
-                      {batchOptions.map((batchName) => (
-                        <option key={batchName} value={batchName}>
-                          {batchName}
-                        </option>
-                      ))}
-                    </select>
+                      styles={formSelectStyles}
+                      error={!!errors.referred_by_batch}
+                      isSearchable
+                      isClearable
+                      openMenuOnFocus
+                      placeholder="select batch"
+                      menuPortalTarget={formSelectMenuPortalTarget}
+                      menuPosition="fixed"
+                      noOptionsMessage={() => "No batch found"}
+                    />
                     {errors.referred_by_batch && <p className="text-[10px] font-bold text-destructive uppercase">{errors.referred_by_batch}</p>}
                   </div>
 
                   <div className="grid gap-2">
                     <Label htmlFor="referrer" className="text-xs font-semibold text-gray-700 uppercase">Referred By Name *</Label>
-                    <select
-                      id="referrer"
-                      value={form.referrer}
-                      disabled={!form.referred_by_batch || studentsLoading}
-                      onChange={(e) => {
-                        const value = e.target.value;
+                    <Select
+                      inputId="referrer"
+                      options={studentSelectOptions}
+                      value={selectedStudentOption}
+                      onChange={(option) => {
+                        const value = option?.value || "";
                         const selected = studentOptions.find((s) => String(s.id) === String(value));
                         setForm((prev) => ({
                           ...prev,
@@ -385,20 +435,36 @@ const validateForm = () => {
                           referred_by_name: selected?.student_name || "",
                           referred_by_batch: selected?.batch_name || prev.referred_by_batch,
                         }));
+                        setStudentSearch("");
                         setErrors((prev) => ({ ...prev, referrer: undefined }));
                       }}
-                      className={cn(
-                        "flex h-11 w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                        errors.referrer ? "border-destructive" : "border-input"
-                      )}
-                    >
-                      <option value="">{studentsLoading ? "Loading students..." : "Select student"}</option>
-                      {studentOptions.map((student) => (
-                        <option key={student.id} value={student.id}>
-                          {student.student_name} - {student.batch_name}
-                        </option>
-                      ))}
-                    </select>
+                      onInputChange={(inputValue, { action }) => {
+                        if (action === "input-change") {
+                          setStudentSearch(inputValue);
+                        } else if (action === "menu-close" || action === "set-value") {
+                          setStudentSearch("");
+                        }
+                        return inputValue;
+                      }}
+                      filterOption={() => true}
+                      styles={formSelectStyles}
+                      error={!!errors.referrer}
+                      isSearchable
+                      isClearable
+                      isDisabled={!form.referred_by_batch}
+                      isLoading={studentsLoading}
+                      openMenuOnFocus
+                      placeholder={
+                        !form.referred_by_batch
+                          ? "Select a batch first"
+                          : "select student"
+                      }
+                      menuPortalTarget={formSelectMenuPortalTarget}
+                      menuPosition="fixed"
+                      noOptionsMessage={() =>
+                        studentsLoading ? "Loading..." : "No students in this batch"
+                      }
+                    />
                     {errors.referrer && <p className="text-[10px] font-bold text-destructive uppercase">{errors.referrer}</p>}
                   </div>
                 </>

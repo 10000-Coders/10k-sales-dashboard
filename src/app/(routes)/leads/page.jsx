@@ -27,6 +27,7 @@ import { Loader2, UserPlus, Pencil, Phone, Mail, Search, ChevronDown, ChevronLef
 import * as XLSX from "xlsx";
 import { parseLeadsWorkbook, mapLeadsExcelToBulkPayload } from "@/utils/parseLeadsExcel";
 import { formatApiError } from "@/utils/formatApiError";
+import { LEAD_STATUS_FILTER_OPTIONS, LEAD_STATUS_STYLES } from "@/constants/leadStatus";
 import {
   bulkCreateLeads,
   MAX_BULK_LEAD_IMPORT,
@@ -53,16 +54,7 @@ let leadsFetchCacheKey = null;
 const LEADS_CACHE_MS = 5000;
 const LEADS_PAGE_SIZE = 100;
 
-const STATUS_OPTIONS = [
-  { value: "", label: "All statuses" },
-  { value: "new", label: "New" },
-  { value: "contacted", label: "Contacted" },
-  { value: "interested", label: "Interested" },
-  { value: "not_interested", label: "Not Interested" },
-  { value: "callback", label: "Callback" },
-  { value: "enrolled", label: "Enrolled" },
-  { value: "wrong_number", label: "Wrong Number" },
-];
+const STATUS_OPTIONS = LEAD_STATUS_FILTER_OPTIONS;
 
 function formatDate(d) {
   const dt = d ? new Date(d) : new Date();
@@ -76,16 +68,6 @@ function formatDateTime(d) {
   if (isNaN(dt.getTime())) return "—";
   return dt.toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
-
-const LEAD_STATUS_STYLES = {
-  enrolled: "bg-green-100 text-green-800",
-  interested: "bg-blue-100 text-blue-800",
-  not_interested: "bg-gray-100 text-gray-700",
-  wrong_number: "bg-gray-100 text-gray-700",
-  new: "bg-amber-100 text-amber-800",
-  callback: "bg-purple-100 text-purple-800",
-  contacted: "bg-sky-100 text-sky-800",
-};
 
 const LEAD_TABLE_HEAD = "whitespace-nowrap align-middle py-1.5 text-[11px] font-medium text-muted-foreground";
 const LEAD_TABLE_CELL = "align-middle py-1.5 text-[11px]";

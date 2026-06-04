@@ -23,6 +23,7 @@ import { INITIAL_ENROLLMENT_FORM, COURSE_OPTIONS } from "@/lib/enrollmentFormCon
 import StudentEnrollmentFields from "@/components/enrollment/StudentEnrollmentFields";
 import EnrollmentQrModal from "@/components/enrollment/EnrollmentQrModal";
 import { useEnrollmentOtp } from "@/hooks/useEnrollmentOtp";
+import { isProofScreenshotRequired } from "@/lib/paymentValidation";
 import { QrCode } from "lucide-react";
 
 const PAYMENT_MODE_OPTIONS = [
@@ -51,7 +52,7 @@ export default function NewStudentPage() {
   const [initialPayment, setInitialPayment] = useState({
     amount: "",
     payment_date: new Date().toISOString().slice(0, 10),
-    next_payment_follow_up_at: new Date().toISOString().slice(0, 10),
+    next_payment_follow_up_at: "",
     payment_mode: "upi",
     receiver: "",
     reference: "",
@@ -229,9 +230,8 @@ export default function NewStudentPage() {
     if (!initialPayment.payment_date) {
       paymentErrors.payment_date = "Initial payment date is required.";
     }
-    if (!initialPayment.next_payment_follow_up_at) {
-      paymentErrors.next_payment_follow_up_at = "Next payment follow-up date is required.";
-    } else if (
+    if (
+      initialPayment.next_payment_follow_up_at &&
       initialPayment.payment_date &&
       initialPayment.next_payment_follow_up_at < initialPayment.payment_date
     ) {
@@ -244,7 +244,7 @@ export default function NewStudentPage() {
     if (PAYMENT_MODES_NEED_RECEIVER.includes(initialPayment.payment_mode) && !initialPayment.receiver) {
       paymentErrors.receiver = "Receiver account is required for UPI, Bank Transfer, and Card payments.";
     }
-    if (!initialPayment.reference_image) {
+    if (isProofScreenshotRequired(initialPayment.payment_mode) && !initialPayment.reference_image) {
       paymentErrors.reference_image = "Proof Screenshot is required.";
     }
     if (!initialPayment.receipt_image) {
@@ -321,15 +321,17 @@ export default function NewStudentPage() {
         const formData = new FormData();
         formData.append("amount", Number(initialPayment.amount));
         formData.append("payment_date", initialPayment.payment_date || new Date().toISOString().slice(0, 10));
-        formData.append(
-          "next_payment_follow_up_at",
-          initialPayment.next_payment_follow_up_at || new Date().toISOString().slice(0, 10)
-        );
+        const followUpDate = (initialPayment.next_payment_follow_up_at || "").trim();
+        if (followUpDate) {
+          formData.append("next_payment_follow_up_at", `${followUpDate}T00:00:00`);
+        }
         formData.append("payment_mode", initialPayment.payment_mode || "upi");
         if (initialPayment.receiver) formData.append("receiver", initialPayment.receiver);
         formData.append("reference", initialPayment.reference || "");
         formData.append("notes", initialPayment.notes || "");
-        formData.append("reference_image", initialPayment.reference_image);
+        if (initialPayment.reference_image) {
+          formData.append("reference_image", initialPayment.reference_image);
+        }
         formData.append("receipt_image", initialPayment.receipt_image);
         await axios.post(`/students/${studentId}/payments/`, formData, { headers });
       }
@@ -493,7 +495,7 @@ export default function NewStudentPage() {
             </div>
             <div>
               <Label htmlFor="payment-field-next-follow-up">
-                Next payment follow-up at <span className="text-destructive">*</span>
+                Next payment follow-up at (optional)
               </Label>
               <Input
                 type="date"
@@ -563,7 +565,11 @@ export default function NewStudentPage() {
             <div className="sm:col-span-2">
               <div className="grid items-start gap-4 sm:grid-cols-2">
                 <ImageDropzone
-                  label="Proof Screenshot *"
+                  label={
+                    isProofScreenshotRequired(initialPayment.payment_mode)
+                      ? "Proof Screenshot *"
+                      : "Proof Screenshot (optional)"
+                  }
                   value={initialPayment.reference_image}
                   id="payment-field-reference-image"
                   onChange={(file) => setInitialPayment((p) => ({ ...p, reference_image: file }))}
