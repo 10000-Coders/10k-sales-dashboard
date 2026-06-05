@@ -26,6 +26,8 @@ import { toast } from "react-toastify";
 import {
   ArrowLeft,
   ArrowRightLeft,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
   Phone,
   Mail,
@@ -34,10 +36,12 @@ import {
   bulkReassignLeads,
   clearReassignState,
   fetchLeadsForReassign,
+  REASSIGN_PAGE_SIZE,
   selectBulkReassignLoading,
   selectReassignLeads,
   selectReassignLeadsError,
   selectReassignLeadsLoading,
+  selectReassignPagination,
 } from "@/redux/features/leads/leadsSlice";
 import { LEAD_STATUS_STYLES } from "@/constants/leadStatus";
 
@@ -77,11 +81,13 @@ export default function LeadReassignClient() {
   const leadsLoading = useSelector(selectReassignLeadsLoading);
   const leadsError = useSelector(selectReassignLeadsError);
   const transferLoading = useSelector(selectBulkReassignLoading);
+  const pagination = useSelector(selectReassignPagination);
 
   const [fromPersonId, setFromPersonId] = useState("");
   const [toPersonId, setToPersonId] = useState("");
   const [transferCountInput, setTransferCountInput] = useState("");
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [page, setPage] = useState(1);
 
   const targetPersons = useMemo(
     () => persons.filter((p) => String(p.id) !== fromPersonId),
@@ -106,6 +112,7 @@ export default function LeadReassignClient() {
   }, [dispatch]);
 
   useEffect(() => {
+    setPage(1);
     setTransferCountInput("");
     setSelectedIds(new Set());
     setToPersonId("");
@@ -116,13 +123,13 @@ export default function LeadReassignClient() {
       toast.warn("Select a counselor to load leads from.");
       return;
     }
-    dispatch(fetchLeadsForReassign({ salesPersonId: fromPersonId }));
-  }, [dispatch, fromPersonId]);
+    dispatch(fetchLeadsForReassign({ salesPersonId: fromPersonId, page }));
+  }, [dispatch, fromPersonId, page]);
 
   useEffect(() => {
     if (!fromPersonId || !isManager) return;
-    dispatch(fetchLeadsForReassign({ salesPersonId: fromPersonId }));
-  }, [dispatch, fromPersonId, isManager]);
+    dispatch(fetchLeadsForReassign({ salesPersonId: fromPersonId, page }));
+  }, [dispatch, fromPersonId, isManager, page]);
 
   const transferCount = useMemo(() => {
     const parsed = Number.parseInt(transferCountInput, 10);
@@ -141,9 +148,24 @@ export default function LeadReassignClient() {
 
   const clearSelection = () => setSelectedIds(new Set());
 
-  const selectAll = () => {
-    setSelectedIds(new Set(reassignLeads.map((l) => l.id)));
+  const selectAllOnPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      reassignLeads.forEach((l) => next.add(l.id));
+      return next;
+    });
   };
+
+  const clearSelectionOnPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      reassignLeads.forEach((l) => next.delete(l.id));
+      return next;
+    });
+  };
+
+  const isAllOnPageSelected =
+    reassignLeads.length > 0 && reassignLeads.every((l) => selectedIds.has(l.id));
 
   useEffect(() => {
     if (!transferCountInput) return;
@@ -184,7 +206,7 @@ export default function LeadReassignClient() {
 
       setTransferCountInput("");
       setSelectedIds(new Set());
-      dispatch(fetchLeadsForReassign({ salesPersonId: fromPersonId }));
+      dispatch(fetchLeadsForReassign({ salesPersonId: fromPersonId, page }));
     } catch (err) {
       const detail =
         err?.detail ||
@@ -211,6 +233,12 @@ export default function LeadReassignClient() {
   const leadsErrorText =
     leadsError?.detail ||
     (typeof leadsError === "string" ? leadsError : null);
+
+  const totalPages = Math.max(1, pagination.total_pages || 1);
+  const totalCount = pagination.count ?? 0;
+  const currentPage = pagination.page ?? page;
+  const rangeFrom = totalCount === 0 ? 0 : (currentPage - 1) * REASSIGN_PAGE_SIZE + 1;
+  const rangeTo = Math.min(currentPage * REASSIGN_PAGE_SIZE, totalCount);
 
   return (
     <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
@@ -268,11 +296,11 @@ export default function LeadReassignClient() {
             </Button>
           </div>
 
-          {reassignLeads.length > 0 && (
+          {totalCount > 0 && (
             <div className="flex flex-wrap items-center gap-3 border-t pt-3">
               <div className="flex min-w-[200px] flex-col gap-1">
                 <label htmlFor="transfer-count" className="text-xs font-medium text-muted-foreground">
-                  Select first N leads
+                  Select first N on this page
                 </label>
                 <input
                   id="transfer-count"
@@ -285,8 +313,8 @@ export default function LeadReassignClient() {
                   placeholder={`Max ${reassignLeads.length}`}
                 />
               </div>
-              <Button type="button" variant="outline" size="sm" className="h-9" onClick={selectAll}>
-                Select all
+              <Button type="button" variant="outline" size="sm" className="h-9" onClick={selectAllOnPage}>
+                Select page
               </Button>
               <Button type="button" variant="ghost" size="sm" className="h-9" onClick={clearSelection}>
                 Clear selection
@@ -338,7 +366,7 @@ export default function LeadReassignClient() {
             <p className="py-6 text-center text-muted-foreground">
               Select the counselor who currently owns the leads (usually a counselor, not your manager login).
             </p>
-          ) : reassignLeads.length === 0 ? (
+          ) : totalCount === 0 ? (
             <div className="py-6 text-center text-muted-foreground">
               <p>No leads assigned to {fromPersonName || "this counselor"}.</p>
               <p className="mt-2 text-xs">
@@ -348,8 +376,9 @@ export default function LeadReassignClient() {
           ) : (
             <div className="w-full min-w-0 overflow-x-auto">
               <p className="mb-3 text-sm text-muted-foreground">
-                {reassignLeads.length} lead{reassignLeads.length === 1 ? "" : "s"} for{" "}
+                {totalCount} lead{totalCount === 1 ? "" : "s"} for{" "}
                 <span className="font-medium text-foreground">{fromPersonName}</span>
+                {totalPages > 1 ? ` · Page ${currentPage} of ${totalPages}` : ""}
               </p>
               <Table className="min-w-[900px] text-[11px]">
                 <TableHeader>
@@ -357,12 +386,9 @@ export default function LeadReassignClient() {
                     <TableHead className={cn("w-10", LEAD_TABLE_HEAD)}>
                       <input
                         type="checkbox"
-                        checked={
-                          reassignLeads.length > 0 &&
-                          reassignLeads.every((l) => selectedIds.has(l.id))
-                        }
-                        onChange={(e) => (e.target.checked ? selectAll() : clearSelection())}
-                        aria-label="Select all leads"
+                        checked={isAllOnPageSelected}
+                        onChange={(e) => (e.target.checked ? selectAllOnPage() : clearSelectionOnPage())}
+                        aria-label="Select all leads on this page"
                       />
                     </TableHead>
                     <TableHead className={cn("min-w-[120px]", LEAD_TABLE_HEAD)}>Name</TableHead>
@@ -458,6 +484,39 @@ export default function LeadReassignClient() {
                   ))}
                 </TableBody>
               </Table>
+              {totalCount > 0 && (
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {rangeFrom}–{rangeTo} of {totalCount}
+                  </p>
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={currentPage <= 1 || leadsLoading}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        className="gap-1"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={currentPage >= totalPages || leadsLoading}
+                        onClick={() => setPage((p) => p + 1)}
+                        className="gap-1"
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </CardContent>

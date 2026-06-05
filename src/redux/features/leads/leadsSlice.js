@@ -2,7 +2,7 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "@/axios";
 import { logout } from "@/redux/features/user/userAuth";
 
-const REASSIGN_PAGE_SIZE = 200;
+export const REASSIGN_PAGE_SIZE = 50;
 /** Must match backend sales.bulk_lead_utils.MAX_BULK_LEAD_COUNT */
 export const MAX_BULK_LEAD_IMPORT = 200;
 
@@ -50,42 +50,34 @@ export const bulkCreateLeads = createAsyncThunk(
   }
 );
 
-/** Fetch all leads owned by a counselor (manager reassign UI). */
+/** Fetch one page of leads owned by a counselor (manager reassign UI). */
 export const fetchLeadsForReassign = createAsyncThunk(
   "leads/fetchLeadsForReassign",
-  async ({ salesPersonId }, { getState, rejectWithValue }) => {
+  async ({ salesPersonId, page = 1, pageSize = REASSIGN_PAGE_SIZE }, { getState, rejectWithValue }) => {
     if (!salesPersonId) {
       return rejectWithValue({ detail: "Select a counselor to load leads." });
     }
     const headers = getHeadersFromState(getState());
-    const all = [];
-    let page = 1;
-    let hasMore = true;
 
     try {
-      while (hasMore) {
-        const params = new URLSearchParams({
-          sales_person: String(salesPersonId),
-          page: String(page),
-          page_size: String(REASSIGN_PAGE_SIZE),
-        });
-        const { data } = await axios.get(`/leads/?${params.toString()}`, { headers });
-        const list = data?.results ?? (Array.isArray(data) ? data : []);
-        all.push(...list);
-        const totalPages = data?.total_pages ?? 0;
-        const pageSize = data?.page_size ?? REASSIGN_PAGE_SIZE;
-        const count = data?.count;
-        if (totalPages > 0) {
-          hasMore = page < totalPages;
-        } else if (count != null) {
-          hasMore = all.length < count;
-        } else {
-          hasMore = list.length >= pageSize;
-        }
-        page += 1;
-      }
+      const params = new URLSearchParams({
+        sales_person: String(salesPersonId),
+        page: String(page),
+        page_size: String(pageSize),
+      });
+      const { data } = await axios.get(`/leads/?${params.toString()}`, { headers });
+      const list = data?.results ?? (Array.isArray(data) ? data : []);
 
-      return { leads: all, salesPersonId };
+      return {
+        leads: list,
+        salesPersonId,
+        pagination: {
+          count: data?.count ?? list.length,
+          page: data?.page ?? page,
+          page_size: data?.page_size ?? pageSize,
+          total_pages: data?.total_pages ?? (list.length ? 1 : 0),
+        },
+      };
     } catch (err) {
       const payload = err.response?.data;
       return rejectWithValue(
@@ -168,6 +160,12 @@ const leadsSlice = createSlice({
     reassignLeadsLoading: false,
     reassignLeadsError: null,
     reassignSourcePersonId: null,
+    reassignPagination: {
+      count: 0,
+      page: 1,
+      page_size: REASSIGN_PAGE_SIZE,
+      total_pages: 0,
+    },
     bulkReassignLoading: false,
     bulkReassignError: null,
     bulkReassignResult: null,
@@ -185,6 +183,12 @@ const leadsSlice = createSlice({
       state.reassignLeadsLoading = false;
       state.reassignLeadsError = null;
       state.reassignSourcePersonId = null;
+      state.reassignPagination = {
+        count: 0,
+        page: 1,
+        page_size: REASSIGN_PAGE_SIZE,
+        total_pages: 0,
+      };
       state.bulkReassignLoading = false;
       state.bulkReassignError = null;
       state.bulkReassignResult = null;
@@ -217,11 +221,18 @@ const leadsSlice = createSlice({
         state.reassignLeadsLoading = false;
         state.reassignLeads = action.payload.leads ?? [];
         state.reassignSourcePersonId = action.payload.salesPersonId;
+        state.reassignPagination = action.payload.pagination ?? state.reassignPagination;
         state.reassignLeadsError = null;
       })
       .addCase(fetchLeadsForReassign.rejected, (state, action) => {
         state.reassignLeadsLoading = false;
         state.reassignLeads = [];
+        state.reassignPagination = {
+          count: 0,
+          page: 1,
+          page_size: REASSIGN_PAGE_SIZE,
+          total_pages: 0,
+        };
         state.reassignLeadsError = action.payload;
       })
       .addCase(bulkReassignLeads.pending, (state) => {
@@ -260,6 +271,12 @@ const leadsSlice = createSlice({
         state.reassignLeadsLoading = false;
         state.reassignLeadsError = null;
         state.reassignSourcePersonId = null;
+        state.reassignPagination = {
+          count: 0,
+          page: 1,
+          page_size: REASSIGN_PAGE_SIZE,
+          total_pages: 0,
+        };
         state.bulkReassignLoading = false;
         state.bulkReassignError = null;
         state.bulkReassignResult = null;
@@ -280,6 +297,13 @@ export const selectLeadsBulkCreateResult = (state) => state.leads?.bulkCreateRes
 export const selectReassignLeads = (state) => state.leads?.reassignLeads ?? [];
 export const selectReassignLeadsLoading = (state) => state.leads?.reassignLeadsLoading ?? false;
 export const selectReassignLeadsError = (state) => state.leads?.reassignLeadsError ?? null;
+export const selectReassignPagination = (state) =>
+  state.leads?.reassignPagination ?? {
+    count: 0,
+    page: 1,
+    page_size: REASSIGN_PAGE_SIZE,
+    total_pages: 0,
+  };
 export const selectBulkReassignLoading = (state) => state.leads?.bulkReassignLoading ?? false;
 export const selectLeadSourceAnalytics = (state) => state.leads?.sourceAnalytics ?? null;
 export const selectLeadSourceAnalyticsLoading = (state) => state.leads?.sourceAnalyticsLoading ?? false;
