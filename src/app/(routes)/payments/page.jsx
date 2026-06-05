@@ -101,7 +101,8 @@ function PaymentsPage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterSalesPerson, setFilterSalesPerson] = useState(""); // sales_person id
   const [filterSalesBatch, setFilterSalesBatch] = useState("");
-  const [filterMentorBatch, setFilterMentorBatch] = useState("");
+  const [mentorBatchQuery, setMentorBatchQuery] = useState("");
+  const [mentorBatchDebounce, setMentorBatchDebounce] = useState("");
   const [filterDateRange, setFilterDateRange] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
@@ -141,7 +142,7 @@ function PaymentsPage() {
   const canVerify = userRole === "manager";
   const canManageReceivers = userRole === "manager";
   const superAdminNeedsBatch =
-    userRole === "super_admin" && !filterSalesBatch && !filterMentorBatch;
+    userRole === "super_admin" && !filterSalesBatch && !mentorBatchDebounce;
 
   const getHeaders = useCallback(() => {
     const h = {};
@@ -162,7 +163,7 @@ function PaymentsPage() {
     if (filterStatus) params.set("status", filterStatus);
     if (filterSalesPerson) params.set("sales_person", filterSalesPerson);
     if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
-    if (filterMentorBatch) params.set("mentor_batch", filterMentorBatch);
+    if (mentorBatchDebounce) params.set("mentor_batch", mentorBatchDebounce);
     if (filterDateRange) params.set("date_range", filterDateRange);
     if (filterDateFrom) params.set("date_from", filterDateFrom);
     if (filterDateTo) params.set("date_to", filterDateTo);
@@ -204,7 +205,7 @@ function PaymentsPage() {
     filterStatus,
     filterSalesPerson,
     filterSalesBatch,
-    filterMentorBatch,
+    mentorBatchDebounce,
     filterDateRange,
     filterDateFrom,
     filterDateTo,
@@ -224,7 +225,7 @@ function PaymentsPage() {
       if (filterStatus) params.set("status", filterStatus);
       if (filterSalesPerson) params.set("sales_person", filterSalesPerson);
       if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
-      if (filterMentorBatch) params.set("mentor_batch", filterMentorBatch);
+      if (mentorBatchDebounce) params.set("mentor_batch", mentorBatchDebounce);
       if (filterDateRange) params.set("date_range", filterDateRange);
       if (filterDateFrom) params.set("date_from", filterDateFrom);
       if (filterDateTo) params.set("date_to", filterDateTo);
@@ -283,12 +284,17 @@ function PaymentsPage() {
     filterStatus,
     filterSalesPerson,
     filterSalesBatch,
-    filterMentorBatch,
+    mentorBatchDebounce,
     filterDateRange,
     filterDateFrom,
     filterDateTo,
     getHeaders,
   ]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setMentorBatchDebounce(mentorBatchQuery), 2000);
+    return () => clearTimeout(t);
+  }, [mentorBatchQuery]);
 
   useEffect(() => {
     fetchPayments();
@@ -494,7 +500,7 @@ function PaymentsPage() {
       if (filterStatus) params.set("status", filterStatus);
       if (filterSalesPerson) params.set("sales_person", filterSalesPerson);
       if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
-      if (filterMentorBatch) params.set("mentor_batch", filterMentorBatch);
+      if (mentorBatchDebounce) params.set("mentor_batch", mentorBatchDebounce);
       if (filterDateRange) params.set("date_range", filterDateRange);
       if (filterDateFrom) params.set("date_from", filterDateFrom);
       if (filterDateTo) params.set("date_to", filterDateTo);
@@ -597,8 +603,8 @@ function PaymentsPage() {
               </select>
               <input
                 type="text"
-                value={filterMentorBatch}
-                onChange={(e) => setFilterMentorBatch(e.target.value)}
+                value={mentorBatchQuery}
+                onChange={(e) => setMentorBatchQuery(e.target.value)}
                 placeholder="Mentor batch (id or name)"
                 className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
               />

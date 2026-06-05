@@ -164,7 +164,7 @@ function ReferralsPage() {
   }, [filterStatus, filterDateFrom, filterDateTo, searchDebounce, filterAssignedTo, isManagerRole, getHeaders]);
 
   useEffect(() => {
-    const t = setTimeout(() => setSearchDebounce(searchQuery), 300);
+    const t = setTimeout(() => setSearchDebounce(searchQuery), 3000);
     return () => clearTimeout(t);
   }, [searchQuery]);
 

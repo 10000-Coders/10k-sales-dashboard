@@ -625,8 +625,38 @@ export default function StudentDetailClient() {
     }
   };
 
+  const validateCourseAndBatch = () => {
+    const fieldErrs = {};
+    if (!editCourse.trim()) {
+      fieldErrs.course = "Course is required.";
+    }
+    if (!editSalesBatch.trim()) {
+      fieldErrs.sales_batch = "Sales batch is required.";
+    }
+    return fieldErrs;
+  };
+
+  const handleSaveCourseBatchClick = () => {
+    setEditError(null);
+    const fieldErrs = validateCourseAndBatch();
+    if (Object.keys(fieldErrs).length > 0) {
+      setEditFieldErrors(fieldErrs);
+      setEditError("Please select both course and sales batch.");
+      return;
+    }
+    setEditFieldErrors({});
+    setConfirmOpen(true);
+  };
+
   const saveCourseAndBatch = async () => {
     if (!id || student?.is_moved_to_batch) return;
+    const fieldErrs = validateCourseAndBatch();
+    if (Object.keys(fieldErrs).length > 0) {
+      setConfirmOpen(false);
+      setEditFieldErrors(fieldErrs);
+      setEditError("Please select both course and sales batch.");
+      return;
+    }
     setConfirmOpen(false);
     setEditSaving(true);
     setEditError(null);
@@ -821,7 +851,7 @@ export default function StudentDetailClient() {
             {salesBatchesError && <p className="text-sm text-destructive">{salesBatchesError}</p>}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-1">
-                <Label>Course</Label>
+                <Label>Course <span className="text-destructive">*</span></Label>
                 <select
                   disabled={student.is_moved_to_batch || editSaving}
                   className={`w-full rounded-md border bg-background px-3 py-2 ${editFieldErrors.course ? "border-destructive" : "border-input"}`}
@@ -841,7 +871,7 @@ export default function StudentDetailClient() {
                 {editFieldErrors.course && <p className="text-sm text-destructive">{editFieldErrors.course}</p>}
               </div>
               <div className="grid gap-1">
-                <Label>Sales batch</Label>
+                <Label>Sales batch <span className="text-destructive">*</span></Label>
                 <select
                   disabled={student.is_moved_to_batch || editSaving || salesBatchesLoading}
                   className={`w-full rounded-md border bg-background px-3 py-2 ${editFieldErrors.sales_batch ? "border-destructive" : "border-input"}`}
@@ -872,7 +902,7 @@ export default function StudentDetailClient() {
                     (editCourse === (student.course || "") &&
                       (editSalesBatch || "") === (student.sales_batch ? String(student.sales_batch) : ""))
                   }
-                  onClick={() => setConfirmOpen(true)}
+                  onClick={handleSaveCourseBatchClick}
                 >
                   {editSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save changes"}
                 </Button>

@@ -65,7 +65,7 @@ function DemoReviewsPage() {
   }, [searchDebounce, onlyMyReferrals, page, pageSize, getHeaders]);
 
   useEffect(() => {
-    const t = setTimeout(() => setSearchDebounce(searchQuery), 300);
+    const t = setTimeout(() => setSearchDebounce(searchQuery), 3000);
     return () => clearTimeout(t);
   }, [searchQuery]);
 

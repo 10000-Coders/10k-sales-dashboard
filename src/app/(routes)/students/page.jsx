@@ -190,7 +190,7 @@ function StudentsPage() {
   }, [getHeaders, searchDebounce, canSeeAll, filterPerson, filterDateFrom, filterDateTo, filterSalesBatch, page, user?.id]);
 
   useEffect(() => {
-    const t = setTimeout(() => setSearchDebounce(searchQuery), 300);
+    const t = setTimeout(() => setSearchDebounce(searchQuery), 3000);
     return () => clearTimeout(t);
   }, [searchQuery]);
 
