@@ -244,7 +244,7 @@ export default function NewStudentPage() {
     if (PAYMENT_MODES_NEED_RECEIVER.includes(initialPayment.payment_mode) && !initialPayment.receiver) {
       paymentErrors.receiver = "Receiver account is required for UPI, Bank Transfer, and Card payments.";
     }
-    if (isProofScreenshotRequired(initialPayment.payment_mode) && !initialPayment.reference_image) {
+    if (!initialPayment.reference_image) {
       paymentErrors.reference_image = "Proof Screenshot is required.";
     }
     if (!initialPayment.receipt_image) {

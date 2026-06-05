@@ -221,7 +221,7 @@ function LeadsPage() {
   }, [user?.id, user?.role]);
 
   useEffect(() => {
-    const t = setTimeout(() => setSearchDebounce(searchQuery), 300);
+    const t = setTimeout(() => setSearchDebounce(searchQuery), 3000);
     return () => clearTimeout(t);
   }, [searchQuery]);
 
@@ -345,7 +345,7 @@ function LeadsPage() {
             </label>
             {isManagerRole && (
               <Link
-                href="/leads/reassign"
+                href="/leaddemo/reassign"
                 className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-muted/50"
               >
                 <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
@@ -353,7 +353,7 @@ function LeadsPage() {
               </Link>
             )}
             <Link
-              href="/leads/analytics"
+              href="/leaddemo/analytics"
               className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-muted/50"
             >
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
