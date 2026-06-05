@@ -75,6 +75,19 @@ function paymentsCacheKey(prefix, params) {
   return `${prefix}:${params?.toString() ?? ""}`;
 }
 
+function getPaymentBankName(payment, receivers = []) {
+  if (!payment) return null;
+  const receiverId = payment.receiver_id ?? payment.receiver;
+  if (receiverId != null) {
+    const match = receivers.find((r) => String(r.id) === String(receiverId));
+    if (match?.bank_name) return match.bank_name;
+  }
+  if (payment.receiver_display?.includes(" · ")) {
+    return payment.receiver_display.split(" · ").slice(1).join(" · ").trim() || null;
+  }
+  return null;
+}
+
 function clearPaymentsListAndSummaryCache() {
   for (const key of paymentsCache.keys()) {
     if (key.startsWith("payments:") || key.startsWith("batch-summary")) {
@@ -101,7 +114,8 @@ function PaymentsPage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterSalesPerson, setFilterSalesPerson] = useState(""); // sales_person id
   const [filterSalesBatch, setFilterSalesBatch] = useState("");
-  const [filterMentorBatch, setFilterMentorBatch] = useState("");
+  const [mentorBatchQuery, setMentorBatchQuery] = useState("");
+  const [mentorBatchDebounce, setMentorBatchDebounce] = useState("");
   const [filterDateRange, setFilterDateRange] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
@@ -141,7 +155,7 @@ function PaymentsPage() {
   const canVerify = userRole === "manager";
   const canManageReceivers = userRole === "manager";
   const superAdminNeedsBatch =
-    userRole === "super_admin" && !filterSalesBatch && !filterMentorBatch;
+    userRole === "super_admin" && !filterSalesBatch && !mentorBatchDebounce;
 
   const getHeaders = useCallback(() => {
     const h = {};
@@ -162,7 +176,7 @@ function PaymentsPage() {
     if (filterStatus) params.set("status", filterStatus);
     if (filterSalesPerson) params.set("sales_person", filterSalesPerson);
     if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
-    if (filterMentorBatch) params.set("mentor_batch", filterMentorBatch);
+    if (mentorBatchDebounce) params.set("mentor_batch", mentorBatchDebounce);
     if (filterDateRange) params.set("date_range", filterDateRange);
     if (filterDateFrom) params.set("date_from", filterDateFrom);
     if (filterDateTo) params.set("date_to", filterDateTo);
@@ -204,7 +218,7 @@ function PaymentsPage() {
     filterStatus,
     filterSalesPerson,
     filterSalesBatch,
-    filterMentorBatch,
+    mentorBatchDebounce,
     filterDateRange,
     filterDateFrom,
     filterDateTo,
@@ -224,7 +238,7 @@ function PaymentsPage() {
       if (filterStatus) params.set("status", filterStatus);
       if (filterSalesPerson) params.set("sales_person", filterSalesPerson);
       if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
-      if (filterMentorBatch) params.set("mentor_batch", filterMentorBatch);
+      if (mentorBatchDebounce) params.set("mentor_batch", mentorBatchDebounce);
       if (filterDateRange) params.set("date_range", filterDateRange);
       if (filterDateFrom) params.set("date_from", filterDateFrom);
       if (filterDateTo) params.set("date_to", filterDateTo);
@@ -283,12 +297,17 @@ function PaymentsPage() {
     filterStatus,
     filterSalesPerson,
     filterSalesBatch,
-    filterMentorBatch,
+    mentorBatchDebounce,
     filterDateRange,
     filterDateFrom,
     filterDateTo,
     getHeaders,
   ]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setMentorBatchDebounce(mentorBatchQuery), 2000);
+    return () => clearTimeout(t);
+  }, [mentorBatchQuery]);
 
   useEffect(() => {
     fetchPayments();
@@ -341,7 +360,7 @@ function PaymentsPage() {
       receiver
         ? {
             receiver_name: receiver.receiver_name || "",
-            account: receiver.account || "",
+            account: (receiver.account || "").trim().replace(/\s/g, ""),
             bank_name: receiver.bank_name || "",
             branch: receiver.branch || "",
             ifsc: receiver.ifsc || "",
@@ -369,7 +388,7 @@ function PaymentsPage() {
   const handleSaveReceiver = async (e) => {
     e.preventDefault();
     const name = (receiverForm.receiver_name || "").trim();
-    const account = (receiverForm.account || "").trim();
+    const account = (receiverForm.account || "").trim().replace(/\s/g, "");
     const bank = (receiverForm.bank_name || "").trim();
     const branch = (receiverForm.branch || "").trim();
     const ifsc = (receiverForm.ifsc || "").trim();
@@ -378,8 +397,12 @@ function PaymentsPage() {
       setReceiverError("Receiver name must be at least 3 characters.");
       return;
     }
-    if (!/^[0-9]{6,18}$/.test(account)) {
-      setReceiverError("Account number must be 6-18 digits (numbers only).");
+    if (!/^[0-9]{1,64}$/.test(account)) {
+      setReceiverError("Account number must contain digits only.");
+      return;
+    }
+    if (account.length < 6 || account.length > 18) {
+      setReceiverError("Account number must be 6-18 digits.");
       return;
     }
     if (!bank) {
@@ -394,13 +417,22 @@ function PaymentsPage() {
       setReceiverError("Enter a valid IFSC (e.g., HDFC0001234).");
       return;
     }
+    const payload = {
+      receiver_name: name,
+      account,
+      bank_name: bank,
+      branch,
+      ifsc,
+      status: receiverForm.status || "active",
+    };
+
     setReceiverSaving(true);
     setReceiverError(null);
     try {
       if (editingReceiver) {
-        await axios.patch(`/payment-receivers/${editingReceiver.id}/`, receiverForm, { headers: getHeaders() });
+        await axios.patch(`/payment-receivers/${editingReceiver.id}/`, payload, { headers: getHeaders() });
       } else {
-        await axios.post("/payment-receivers/", receiverForm, { headers: getHeaders() });
+        await axios.post("/payment-receivers/", payload, { headers: getHeaders() });
       }
       paymentsCache.delete(paymentsCacheKey("receivers", ""));
       paymentsFetchPromises.delete(paymentsCacheKey("receivers", ""));
@@ -408,7 +440,15 @@ function PaymentsPage() {
       closeReceiverModal();
     } catch (err) {
       const d = err.response?.data;
-      setReceiverError(d?.detail || (d && typeof d === "object" ? JSON.stringify(d) : "Failed to save."));
+      const fieldMsg =
+        d?.account?.[0] ||
+        d?.receiver_name?.[0] ||
+        (d && typeof d === "object"
+          ? Object.values(d)
+              .flat()
+              .find((v) => typeof v === "string")
+          : null);
+      setReceiverError(d?.detail || fieldMsg || "Failed to save.");
     } finally {
       setReceiverSaving(false);
     }
@@ -449,15 +489,15 @@ function PaymentsPage() {
         { headers: getHeaders() }
       );
       
-      // Update main payments list
+      // Update main payments list (include recalculated student_due_amount from API)
       setPayments((prev) =>
-        prev.map((p) => (p.id === paymentId ? { ...p, status: updated.status, notes: updated.notes } : p))
+        prev.map((p) => (p.id === paymentId ? { ...p, ...updated } : p))
       );
 
       // Update batch payments list if it's open
       if (batchPaymentsModalOpen) {
         setBatchPayments((prev) =>
-          prev.map((p) => (p.id === paymentId ? { ...p, status: updated.status, notes: updated.notes } : p))
+          prev.map((p) => (p.id === paymentId ? { ...p, ...updated } : p))
         );
       }
 
@@ -494,11 +534,12 @@ function PaymentsPage() {
       if (filterStatus) params.set("status", filterStatus);
       if (filterSalesPerson) params.set("sales_person", filterSalesPerson);
       if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
-      if (filterMentorBatch) params.set("mentor_batch", filterMentorBatch);
+      if (mentorBatchDebounce) params.set("mentor_batch", mentorBatchDebounce);
       if (filterDateRange) params.set("date_range", filterDateRange);
       if (filterDateFrom) params.set("date_from", filterDateFrom);
       if (filterDateTo) params.set("date_to", filterDateTo);
       params.set("sales_batch", String(row.batch_key || row.batch_name || ""));
+      clearPaymentsListAndSummaryCache();
       const url = `/payments/${params.toString() ? `?${params.toString()}` : ""}`;
       const { data } = await axios.get(url, { headers: getHeaders() });
       const list = data?.results ?? (Array.isArray(data) ? data : []);
@@ -534,6 +575,17 @@ function PaymentsPage() {
     }
     // Fallback to total_amount if backend hasn't added a verified-only field yet
     return Number(row.total_amount || 0) || 0;
+  };
+
+  const getTotalDueAmount = (row) => Number(row.total_due_amount ?? 0) || 0;
+
+  const getStudentDueAmount = (payment) => {
+    if (payment?.student_due_amount != null && payment.student_due_amount !== "") {
+      return Number(payment.student_due_amount) || 0;
+    }
+    const offered = payment?.student_payment_offered;
+    if (offered == null || offered === "") return null;
+    return 0;
   };
 
   // ... withPrivateAuth handles the initial !user and !canView checks for page access ...
@@ -585,8 +637,8 @@ function PaymentsPage() {
               </select>
               <input
                 type="text"
-                value={filterMentorBatch}
-                onChange={(e) => setFilterMentorBatch(e.target.value)}
+                value={mentorBatchQuery}
+                onChange={(e) => setMentorBatchQuery(e.target.value)}
                 placeholder="Mentor batch (id or name)"
                 className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
               />
@@ -647,6 +699,7 @@ function PaymentsPage() {
                 <TableHead>Batch</TableHead>
                 <TableHead>Total Payments</TableHead>
                 <TableHead>Verified Amount</TableHead>
+                <TableHead>Total Due</TableHead>
                 <TableHead>Pending</TableHead>
                 <TableHead>Verified</TableHead>
                 <TableHead>Rejected</TableHead>
@@ -662,6 +715,9 @@ function PaymentsPage() {
                       <TableCell className="font-medium">{row.batch_name || "Unassigned"}</TableCell>
                       <TableCell>{row.total_payments ?? 0}</TableCell>
                       <TableCell>₹ {getVerifiedAmount(row).toLocaleString()}</TableCell>
+                      <TableCell className="font-medium text-orange-700 dark:text-orange-400">
+                        ₹ {getTotalDueAmount(row).toLocaleString()}
+                      </TableCell>
                       <TableCell>{row.pending_count ?? 0}</TableCell>
                       <TableCell>{row.verified_count ?? 0}</TableCell>
                       <TableCell>{row.rejected_count ?? 0}</TableCell>
@@ -720,6 +776,7 @@ function PaymentsPage() {
                       <TableHead>Sales Person</TableHead>
                       <TableHead>Sales Batch</TableHead>
                       <TableHead>Amount</TableHead>
+                      <TableHead>Due</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Mode</TableHead>
                       <TableHead>Status</TableHead>
@@ -741,6 +798,11 @@ function PaymentsPage() {
                         <TableCell>{p.sales_person_name || "Unassigned"}</TableCell>
                         <TableCell>{p.sales_batch_name || "Unassigned"}</TableCell>
                         <TableCell className="font-medium">₹ {Number(p.amount).toLocaleString()}</TableCell>
+                        <TableCell className="font-medium text-orange-700 dark:text-orange-400">
+                          {getStudentDueAmount(p) != null
+                            ? `₹ ${getStudentDueAmount(p).toLocaleString()}`
+                            : "—"}
+                        </TableCell>
                         <TableCell>{formatDate(p.payment_date)}</TableCell>
                         <TableCell>{PAYMENT_MODE_LABELS[p.payment_mode] ?? p.payment_mode}</TableCell>
                         <TableCell>
@@ -860,6 +922,14 @@ function PaymentsPage() {
                             : "—"}
                         </dd>
                       </div>
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <dt className="text-muted-foreground">Amount due</dt>
+                        <dd className="font-semibold text-orange-700 dark:text-orange-400">
+                          {getStudentDueAmount(selectedPayment) != null
+                            ? `₹ ${getStudentDueAmount(selectedPayment).toLocaleString()}`
+                            : "—"}
+                        </dd>
+                      </div>
                     </dl>
                   </div>
 
@@ -877,6 +947,10 @@ function PaymentsPage() {
                       <div className="flex flex-wrap justify-between gap-2">
                         <dt className="text-muted-foreground">Mode</dt>
                         <dd>{PAYMENT_MODE_LABELS[selectedPayment.payment_mode] ?? selectedPayment.payment_mode}</dd>
+                      </div>
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <dt className="text-muted-foreground">Bank name</dt>
+                        <dd>{getPaymentBankName(selectedPayment, receivers) ?? "—"}</dd>
                       </div>
                       {selectedPayment.reference && (
                         <div className="flex flex-wrap justify-between gap-2">
@@ -1195,7 +1269,13 @@ function PaymentsPage() {
                 <input
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
                   value={receiverForm.account}
-                  onChange={(e) => setReceiverForm((f) => ({ ...f, account: e.target.value }))}
+                  onChange={(e) => {
+                    const account = e.target.value.replace(/\s/g, "");
+                    setReceiverForm((f) => ({ ...f, account }));
+                    setReceiverError(null);
+                  }}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   required
                 />
               </div>

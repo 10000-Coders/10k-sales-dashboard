@@ -22,10 +22,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ArrowLeft, Phone, Mail, User, Check, X, ImageIcon, ZoomIn, ZoomOut } from "lucide-react";
+import { Loader2, ArrowLeft, Phone, Mail, User, Check, X, ImageIcon, ZoomIn, ZoomOut, Activity, MessageCircle, Circle } from "lucide-react";
 import { ImageDropzone } from "@/components/ImageDropzone";
 import { cn } from "@/lib/utils";
 import { toast } from "react-toastify";
+import { FollowUpTimer } from "@/components/FollowUpTimer";
+import { isProofScreenshotRequired } from "@/lib/paymentValidation";
 
 const PAYMENT_MODE_OPTIONS = [
   { value: "upi", label: "UPI" },
@@ -35,6 +37,81 @@ const PAYMENT_MODE_OPTIONS = [
 ];
 
 const PAYMENT_MODES_NEED_RECEIVER = ["upi", "bank", "card"];
+
+const ACTIVITY_TYPES = [
+  { value: "call", label: "Call" },
+  { value: "whatsapp", label: "WhatsApp" },
+];
+
+/** Payment / pending-amount follow-up outcomes (matches backend StudentOutcome). */
+const STUDENT_ACTIVITY_OUTCOMES = [
+  { value: "not_answered", label: "Not Answered" },
+  { value: "callback", label: "Callback Scheduled" },
+  { value: "pending_reminder", label: "Pending Amount — Reminded" },
+  { value: "payment_promised", label: "Promised to Pay" },
+  { value: "partial_discussed", label: "Partial Payment Discussed" },
+  { value: "payment_submitted", label: "Payment Submitted (Proof Pending)" },
+  { value: "cannot_pay_now", label: "Cannot Pay Now" },
+  { value: "refused_payment", label: "Refused to Pay" },
+  { value: "wrong_number", label: "Wrong Number" },
+  { value: "completed", label: "Completed" },
+  { value: "dropout", label: "Drop Out" },
+  { value: "other", label: "Other" },
+];
+
+const STUDENT_OUTCOME_LABELS = Object.fromEntries(
+  STUDENT_ACTIVITY_OUTCOMES.map((o) => [o.value, o.label])
+);
+
+function formatStudentOutcome(outcome, outcomeLabel) {
+  if (outcomeLabel) return outcomeLabel;
+  if (outcome && STUDENT_OUTCOME_LABELS[outcome]) return STUDENT_OUTCOME_LABELS[outcome];
+  return outcome ? outcome.replace(/_/g, " ") : "—";
+}
+
+const LEAD_OUTCOME_LABELS = {
+  not_answered: "Not Answered",
+  interested: "Interested",
+  not_interested: "Not Interested",
+  callback: "Callback",
+  wrong_number: "Wrong Number",
+  enrolled: "Enrolled",
+  other: "Other",
+};
+
+function formatActivityOutcome(activity) {
+  if (activity?.outcome_label) return activity.outcome_label;
+  if (activity?.subject_type === "student") {
+    return formatStudentOutcome(activity.outcome, null);
+  }
+  return LEAD_OUTCOME_LABELS[activity?.outcome] || activity?.outcome?.replace(/_/g, " ") || "—";
+}
+
+function getActivityIcon(type) {
+  switch (type) {
+    case "call":
+      return Phone;
+    case "whatsapp":
+      return MessageCircle;
+    default:
+      return Circle;
+  }
+}
+
+function formatActivityDate(d) {
+  const dt = d ? new Date(d) : new Date();
+  const safeDate = isNaN(dt.getTime()) ? new Date() : dt;
+  const now = new Date();
+  if (safeDate.toDateString() === now.toDateString()) {
+    return safeDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  }
+  return safeDate.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 const COURSE_LABELS = {
   python_fullstack: "Python Fullstack",
@@ -82,8 +159,49 @@ function formatDateTime(d) {
   return isNaN(dt.getTime()) ? "—" : dt.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
+/** datetime-local input value from API ISO string */
+function toDatetimeLocalValue(iso) {
+  if (!iso) return "";
+  const dt = new Date(iso);
+  if (isNaN(dt.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+}
+
+/** API payload from date (YYYY-MM-DD) or datetime-local */
+function toApiDateTime(value) {
+  if (!value) return null;
+  if (value.length === 10) return `${value}T00:00:00`;
+  if (value.length === 16) return `${value}:00`;
+  return value;
+}
+
+/** Latest payment — follow-up is stored on the most recent payment (matches backend). */
+function getPrimaryPaymentForFollowUp(payments) {
+  if (!payments?.length) return null;
+  const sorted = [...payments].sort((a, b) => {
+    const da = new Date(a.payment_date || a.created_at).getTime();
+    const db = new Date(b.payment_date || b.created_at).getTime();
+    if (db !== da) return db - da;
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+  });
+  return sorted[0];
+}
+
 function canVerifyPayments(role) {
   return role === "manager";
+}
+
+/** Dedup initial load: React Strict Mode (dev) mounts twice; each GET also triggers a CORS OPTIONS preflight. */
+let studentDetailCache = { key: null, student: null, payments: null, activities: null, at: 0 };
+let studentDetailFetchPromise = null;
+let studentDetailFetchCacheKey = null;
+const STUDENT_DETAIL_CACHE_MS = 5000;
+
+function invalidateStudentDetailCache() {
+  studentDetailCache = { key: null, student: null, payments: null, activities: null, at: 0 };
+  studentDetailFetchPromise = null;
+  studentDetailFetchCacheKey = null;
 }
 
 export default function StudentDetailClient() {
@@ -93,12 +211,22 @@ export default function StudentDetailClient() {
   const id = params?.id;
   const [student, setStudent] = useState(null);
   const [payments, setPayments] = useState([]);
+  const [allActivities, setAllActivities] = useState([]);
+  const [activityForm, setActivityForm] = useState({
+    activity_type: "call",
+    outcome: "",
+    notes: "",
+    next_follow_up_at: "",
+  });
+  const [activitySubmitting, setActivitySubmitting] = useState(false);
+  const [activityError, setActivityError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
     amount: "",
     payment_date: new Date().toISOString().slice(0, 10),
+    next_payment_follow_up_at: "",
     payment_mode: "upi",
     receiver: "",
     reference: "",
@@ -115,6 +243,10 @@ export default function StudentDetailClient() {
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [verifyingId, setVerifyingId] = useState(null);
+  const [followUpEditValue, setFollowUpEditValue] = useState("");
+  const [followUpSaving, setFollowUpSaving] = useState(false);
+  const [followUpError, setFollowUpError] = useState(null);
+  const [headerFollowUpValue, setHeaderFollowUpValue] = useState("");
   const [salesBatches, setSalesBatches] = useState([]);
   const [salesBatchesLoading, setSalesBatchesLoading] = useState(false);
   const [salesBatchesError, setSalesBatchesError] = useState(null);
@@ -163,6 +295,16 @@ export default function StudentDetailClient() {
     }
   }, [id, getHeaders]);
 
+  const fetchActivityHistory = useCallback(async () => {
+    if (!id) return;
+    try {
+      const { data } = await axios.get(`/students/${id}/activity-history/`, { headers: getHeaders() });
+      setAllActivities(Array.isArray(data) ? data : []);
+    } catch {
+      setAllActivities([]);
+    }
+  }, [id, getHeaders]);
+
   const fetchPaymentReceivers = useCallback(async () => {
     try {
       const { data } = await axios.get("/payment-receivers/", { headers: getHeaders() });
@@ -189,11 +331,84 @@ export default function StudentDetailClient() {
   }, [getHeaders]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || user?.id == null) return;
+
+    const cacheKey = `${id}|${user.id}|${user.role}`;
+    const headers = getHeaders();
+
+    const applyCacheToState = () => {
+      const cached = studentDetailCache;
+      if (cached.key !== cacheKey) return;
+      if (cached.student) {
+        setStudent(cached.student);
+        setEditCourse(cached.student.course || "");
+        setEditSalesBatch(cached.student.sales_batch ? String(cached.student.sales_batch) : "");
+      }
+      setPayments(cached.payments ?? []);
+      setAllActivities(cached.activities ?? []);
+    };
+
+    if (
+      studentDetailCache.key === cacheKey &&
+      Date.now() - studentDetailCache.at < STUDENT_DETAIL_CACHE_MS
+    ) {
+      applyCacheToState();
+      setLoading(false);
+      return;
+    }
+
+    if (studentDetailFetchPromise && studentDetailFetchCacheKey === cacheKey) {
+      setLoading(true);
+      studentDetailFetchPromise
+        .then(() => {
+          applyCacheToState();
+        })
+        .catch(() => {
+          setStudent(null);
+          setPayments([]);
+          setAllActivities([]);
+        })
+        .finally(() => setLoading(false));
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    Promise.all([fetchStudent(), fetchPayments()]).finally(() => setLoading(false));
-  }, [id, fetchStudent, fetchPayments]);
+    studentDetailFetchCacheKey = cacheKey;
+    studentDetailFetchPromise = (async () => {
+      try {
+        const [studentRes, paymentsRes, activitiesRes] = await Promise.all([
+          axios.get(`/students/${id}/`, { headers }),
+          axios.get(`/students/${id}/payments/`, { headers }),
+          axios.get(`/students/${id}/activity-history/`, { headers }),
+        ]);
+        const studentData = studentRes.data;
+        const paymentsList = Array.isArray(paymentsRes.data) ? paymentsRes.data : [];
+        const activitiesList = Array.isArray(activitiesRes.data) ? activitiesRes.data : [];
+        studentDetailCache = {
+          key: cacheKey,
+          student: studentData,
+          payments: paymentsList,
+          activities: activitiesList,
+          at: Date.now(),
+        };
+        setStudent(studentData);
+        setEditCourse(studentData?.course || "");
+        setEditSalesBatch(studentData?.sales_batch ? String(studentData.sales_batch) : "");
+        setPayments(paymentsList);
+        setAllActivities(activitiesList);
+      } catch (err) {
+        setStudent(null);
+        setError(err.response?.data?.detail || "Student not found.");
+        setPayments([]);
+        setAllActivities([]);
+      } finally {
+        setLoading(false);
+        studentDetailFetchPromise = null;
+        studentDetailFetchCacheKey = null;
+      }
+    })();
+  }, [id, user?.id, user?.role, getHeaders]);
 
   useEffect(() => {
     fetchSalesBatches();
@@ -205,6 +420,56 @@ export default function StudentDetailClient() {
     }
   }, [addPaymentOpen, paymentForm.payment_mode, fetchPaymentReceivers]);
 
+  useEffect(() => {
+    if (selectedPayment) {
+      setFollowUpEditValue(toDatetimeLocalValue(selectedPayment.next_payment_follow_up_at));
+      setFollowUpError(null);
+    }
+  }, [selectedPayment]);
+
+  useEffect(() => {
+    setHeaderFollowUpValue(toDatetimeLocalValue(student?.next_payment_follow_up_at));
+  }, [student?.next_payment_follow_up_at]);
+
+  const handleUpdatePaymentFollowUp = async (paymentId, rawValue, onSuccess) => {
+    if (!paymentId) {
+      setFollowUpError("No payment found to update.");
+      return;
+    }
+    const trimmed = (rawValue || "").trim();
+    const apiValue = trimmed ? toApiDateTime(trimmed) : null;
+    if (trimmed && !apiValue) {
+      setFollowUpError("Choose a valid follow-up date and time.");
+      return;
+    }
+    setFollowUpSaving(true);
+    setFollowUpError(null);
+    try {
+      const { data } = await axios.patch(
+        `/payments/${paymentId}/`,
+        { next_payment_follow_up_at: apiValue },
+        { headers: getHeaders() }
+      );
+      invalidateStudentDetailCache();
+      await Promise.all([fetchPayments(), fetchStudent(), fetchActivityHistory()]);
+      setHeaderFollowUpValue(toDatetimeLocalValue(data.next_payment_follow_up_at));
+      if (selectedPayment?.id === paymentId) {
+        setSelectedPayment(data);
+        setFollowUpEditValue(toDatetimeLocalValue(data.next_payment_follow_up_at));
+      }
+      toast.success(apiValue ? "Payment follow-up saved." : "Payment follow-up cleared.");
+      if (onSuccess) onSuccess();
+    } catch (err) {
+      const msg =
+        err.response?.data?.detail ||
+        err.response?.data?.next_payment_follow_up_at?.[0] ||
+        "Failed to update follow-up date.";
+      setFollowUpError(typeof msg === "string" ? msg : "Failed to update follow-up date.");
+    } finally {
+      setFollowUpSaving(false);
+    }
+  };
+
   const handleVerifyPayment = async (paymentId, status, notes = "", onSuccess) => {
     setVerifyingId(paymentId);
     try {
@@ -213,6 +478,7 @@ export default function StudentDetailClient() {
         { status, ...(notes ? { notes } : {}) },
         { headers: getHeaders() }
       );
+      invalidateStudentDetailCache();
       fetchPayments();
       fetchStudent();
       if (onSuccess) onSuccess();
@@ -231,16 +497,76 @@ export default function StudentDetailClient() {
   
   // Total paid as displayed in UI summary (usually means verified + pending)
   const totalPaid = committedAmount; 
-  const pendingAmount = offeredAmount != null ? Math.max(0, offeredAmount - committedAmount) : null;
+  const pendingAmount =
+    student?.amount_due != null
+      ? Number(student.amount_due)
+      : offeredAmount != null
+        ? Math.max(0, offeredAmount - committedAmount)
+        : null;
   
   const isFullyPaid = offeredAmount != null && committedAmount >= offeredAmount;
   const canManageCourseBatch = user?.role === "manager" || user?.role === "super_admin";
+  const primaryFollowUpPayment = getPrimaryPaymentForFollowUp(payments);
+
+  const handleLogStudentActivity = async (e) => {
+    e.preventDefault();
+    if (!id) return;
+    const trimmedNotes = (activityForm.notes || "").trim();
+    if (trimmedNotes.length > 200) {
+      setActivityError("Notes must be 200 characters or less.");
+      return;
+    }
+    if (!activityForm.outcome) {
+      setActivityError("Select an outcome before logging the activity.");
+      return;
+    }
+    setActivitySubmitting(true);
+    setActivityError(null);
+    try {
+      const payload = {
+        activity_type: activityForm.activity_type,
+        outcome: activityForm.outcome,
+        notes: trimmedNotes,
+      };
+      const followUpTrimmed = (activityForm.next_follow_up_at || "").trim();
+      const followUpApi = followUpTrimmed ? toApiDateTime(followUpTrimmed) : null;
+      if (followUpApi) {
+        payload.next_follow_up_at = followUpApi;
+      } else if (followUpTrimmed) {
+        setActivityError("Enter a valid follow-up date and time.");
+        setActivitySubmitting(false);
+        return;
+      }
+      await axios.post(`/students/${id}/activities/`, payload, { headers: getHeaders() });
+      setActivityForm({
+        activity_type: "call",
+        outcome: "",
+        notes: "",
+        next_follow_up_at: "",
+      });
+      invalidateStudentDetailCache();
+      await Promise.all([fetchActivityHistory(), fetchPayments(), fetchStudent()]);
+      toast.success(
+        followUpApi
+          ? "Activity logged. Payment follow-up updated."
+          : "Activity logged."
+      );
+    } catch (err) {
+      setActivityError(err.response?.data?.detail || "Failed to log activity.");
+    } finally {
+      setActivitySubmitting(false);
+    }
+  };
 
   const handleAddPayment = async (e) => {
     e.preventDefault();
     if (!id || !paymentForm.amount || Number(paymentForm.amount) <= 0) return;
-    if (!paymentForm.reference_image || !paymentForm.receipt_image) {
-      setPaymentError("Both Proof Screenshot and Receipt Image are required.");
+    if (!paymentForm.receipt_image) {
+      setPaymentError("Receipt Image is required.");
+      return;
+    }
+    if (isProofScreenshotRequired(paymentForm.payment_mode) && !paymentForm.reference_image) {
+      setPaymentError("Proof Screenshot is required for this payment mode.");
       return;
     }
     if (PAYMENT_MODES_NEED_RECEIVER.includes(paymentForm.payment_mode) && !paymentForm.receiver) {
@@ -262,16 +588,23 @@ export default function StudentDetailClient() {
       formData.append("amount", Number(paymentForm.amount));
       const dateStr = paymentForm.payment_date || new Date().toISOString().slice(0, 10);
       formData.append("payment_date", `${dateStr}T00:00:00`);
+      const followUpStr = (paymentForm.next_payment_follow_up_at || "").trim();
+      if (followUpStr) {
+        formData.append("next_payment_follow_up_at", `${followUpStr}T00:00:00`);
+      }
       formData.append("payment_mode", paymentForm.payment_mode || "upi");
       if (paymentForm.receiver) formData.append("receiver", paymentForm.receiver);
       formData.append("reference", paymentForm.reference || "");
       formData.append("notes", paymentForm.notes || "");
-      formData.append("reference_image", paymentForm.reference_image);
+      if (paymentForm.reference_image) {
+        formData.append("reference_image", paymentForm.reference_image);
+      }
       formData.append("receipt_image", paymentForm.receipt_image);
       await axios.post(`/students/${id}/payments/`, formData, { headers });
       setPaymentForm({
         amount: "",
         payment_date: new Date().toISOString().slice(0, 10),
+        next_payment_follow_up_at: "",
         payment_mode: "upi",
         receiver: "",
         reference: "",
@@ -280,6 +613,7 @@ export default function StudentDetailClient() {
         receipt_image: null,
       });
       setAddPaymentOpen(false);
+      invalidateStudentDetailCache();
       fetchPayments();
       fetchStudent();
     } catch (err) {
@@ -291,8 +625,38 @@ export default function StudentDetailClient() {
     }
   };
 
+  const validateCourseAndBatch = () => {
+    const fieldErrs = {};
+    if (!editCourse.trim()) {
+      fieldErrs.course = "Course is required.";
+    }
+    if (!editSalesBatch.trim()) {
+      fieldErrs.sales_batch = "Sales batch is required.";
+    }
+    return fieldErrs;
+  };
+
+  const handleSaveCourseBatchClick = () => {
+    setEditError(null);
+    const fieldErrs = validateCourseAndBatch();
+    if (Object.keys(fieldErrs).length > 0) {
+      setEditFieldErrors(fieldErrs);
+      setEditError("Please select both course and sales batch.");
+      return;
+    }
+    setEditFieldErrors({});
+    setConfirmOpen(true);
+  };
+
   const saveCourseAndBatch = async () => {
     if (!id || student?.is_moved_to_batch) return;
+    const fieldErrs = validateCourseAndBatch();
+    if (Object.keys(fieldErrs).length > 0) {
+      setConfirmOpen(false);
+      setEditFieldErrors(fieldErrs);
+      setEditError("Please select both course and sales batch.");
+      return;
+    }
     setConfirmOpen(false);
     setEditSaving(true);
     setEditError(null);
@@ -307,6 +671,7 @@ export default function StudentDetailClient() {
         { headers: getHeaders() }
       );
       toast.success("Sales batch / course updated.");
+      invalidateStudentDetailCache();
       fetchStudent();
     } catch (err) {
       const data = err.response?.data;
@@ -397,7 +762,58 @@ export default function StudentDetailClient() {
             <p className="text-sm font-medium">Course: {COURSE_LABELS[student.course] ?? student.course}</p>
           )}
           {student.payment_offered != null && (
-            <p className="text-sm text-muted-foreground">Offered amount: ₹ {Number(student.payment_offered).toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground">
+              Offered amount: ₹ {Number(student.payment_offered).toLocaleString()}
+              {pendingAmount != null && (
+                <>
+                  {" "}
+                  · <span className="font-medium text-orange-700 dark:text-orange-400">
+                    Due: ₹ {pendingAmount.toLocaleString()}
+                  </span>
+                </>
+              )}
+            </p>
+          )}
+          {primaryFollowUpPayment && (
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="grid gap-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Next payment follow-up (optional — clear field and save to remove)
+                  </Label>
+                  <Input
+                    type="datetime-local"
+                    className="h-9 w-auto min-w-[220px] text-sm"
+                    value={headerFollowUpValue}
+                    onChange={(e) => {
+                      setHeaderFollowUpValue(e.target.value);
+                      setFollowUpError(null);
+                    }}
+                  />
+                </div>
+                {student.next_payment_follow_up_at && (
+                  <FollowUpTimer followUpAt={student.next_payment_follow_up_at} className="text-sm pb-2" />
+                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={followUpSaving}
+                  onClick={() =>
+                    handleUpdatePaymentFollowUp(primaryFollowUpPayment.id, headerFollowUpValue)
+                  }
+                >
+                  {followUpSaving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : headerFollowUpValue ? (
+                    "Save follow-up"
+                  ) : (
+                    "Clear follow-up"
+                  )}
+                </Button>
+              </div>
+              {followUpError && <p className="text-xs text-destructive">{followUpError}</p>}
+            </div>
           )}
           {student.college_name && (
             <p className="text-sm text-muted-foreground">College: {student.college_name} · {student.student_degree || ""}</p>
@@ -413,6 +829,10 @@ export default function StudentDetailClient() {
           {student.target_batch_name && (
             <p className="text-sm font-medium">Mentor batch: {student.target_batch_name}</p>
           )}
+          <p className="text-sm text-muted-foreground">
+            Activities — Lead: {student.lead_activities_count ?? 0} · Student:{" "}
+            {student.student_activities_count ?? 0}
+          </p>
         </CardContent>
       </Card>
 
@@ -431,7 +851,7 @@ export default function StudentDetailClient() {
             {salesBatchesError && <p className="text-sm text-destructive">{salesBatchesError}</p>}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-1">
-                <Label>Course</Label>
+                <Label>Course <span className="text-destructive">*</span></Label>
                 <select
                   disabled={student.is_moved_to_batch || editSaving}
                   className={`w-full rounded-md border bg-background px-3 py-2 ${editFieldErrors.course ? "border-destructive" : "border-input"}`}
@@ -451,7 +871,7 @@ export default function StudentDetailClient() {
                 {editFieldErrors.course && <p className="text-sm text-destructive">{editFieldErrors.course}</p>}
               </div>
               <div className="grid gap-1">
-                <Label>Sales batch</Label>
+                <Label>Sales batch <span className="text-destructive">*</span></Label>
                 <select
                   disabled={student.is_moved_to_batch || editSaving || salesBatchesLoading}
                   className={`w-full rounded-md border bg-background px-3 py-2 ${editFieldErrors.sales_batch ? "border-destructive" : "border-input"}`}
@@ -482,7 +902,7 @@ export default function StudentDetailClient() {
                     (editCourse === (student.course || "") &&
                       (editSalesBatch || "") === (student.sales_batch ? String(student.sales_batch) : ""))
                   }
-                  onClick={() => setConfirmOpen(true)}
+                  onClick={handleSaveCourseBatchClick}
                 >
                   {editSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save changes"}
                 </Button>
@@ -521,6 +941,16 @@ export default function StudentDetailClient() {
               <span><strong>Offered:</strong> ₹ {offeredAmount.toLocaleString()}</span>
               <span><strong>Paid so far:</strong> ₹ {totalPaid.toLocaleString()}</span>
               <span><strong>Pending:</strong> ₹ {pendingAmount.toLocaleString()}</span>
+              {primaryFollowUpPayment && (
+                <span className="flex flex-wrap items-center gap-2">
+                  <strong>Next payment follow-up:</strong>
+                  {student.next_payment_follow_up_at ? (
+                    <FollowUpTimer followUpAt={student.next_payment_follow_up_at} className="inline text-sm" />
+                  ) : (
+                    <span className="text-muted-foreground">Not set</span>
+                  )}
+                </span>
+              )}
             </div>
           )}
           {addPaymentOpen && !isFullyPaid && (
@@ -562,6 +992,17 @@ export default function StudentDetailClient() {
                 />
               </div>
               <div>
+                <Label>Next payment follow-up at (optional)</Label>
+                <Input
+                  type="date"
+                  min={paymentForm.payment_date || undefined}
+                  value={paymentForm.next_payment_follow_up_at}
+                  onChange={(e) =>
+                    setPaymentForm((p) => ({ ...p, next_payment_follow_up_at: e.target.value }))
+                  }
+                />
+              </div>
+              <div>
                 <Label>Mode</Label>
                 <select
                   className="w-full rounded-md border border-input bg-background px-3 py-2"
@@ -600,7 +1041,11 @@ export default function StudentDetailClient() {
               <div className="sm:col-span-2">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <ImageDropzone
-                    label="Proof Screenshot *"
+                    label={
+                      isProofScreenshotRequired(paymentForm.payment_mode)
+                        ? "Proof Screenshot *"
+                        : "Proof Screenshot (optional)"
+                    }
                     value={paymentForm.reference_image}
                     onChange={(file) => setPaymentForm((p) => ({ ...p, reference_image: file }))}
                   />
@@ -630,6 +1075,7 @@ export default function StudentDetailClient() {
                 <TableRow>
                   <TableHead>Amount</TableHead>
                   <TableHead>Date</TableHead>
+                  <TableHead>Next follow-up</TableHead>
                   <TableHead>Mode</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Proof Screenshot</TableHead>
@@ -644,6 +1090,13 @@ export default function StudentDetailClient() {
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">₹ {Number(p.amount).toLocaleString()}</TableCell>
                     <TableCell>{formatDate(p.payment_date)}</TableCell>
+                    <TableCell>
+                      {p.next_payment_follow_up_at ? (
+                        <FollowUpTimer followUpAt={p.next_payment_follow_up_at} className="text-[11px]" />
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
                     <TableCell>{p.payment_mode}</TableCell>
                     <TableCell>
                       <span className={cn(
@@ -728,6 +1181,127 @@ export default function StudentDetailClient() {
               </TableBody>
             </Table>
           )}
+
+          <div className="mt-8 space-y-6 border-t pt-8">
+            <div>
+              <h3 className="flex items-center gap-2 text-lg font-semibold">
+                <Activity className="h-5 w-5" />
+                Contact & activity history
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                All calls and WhatsApp — from lead stage and after enrollment (
+                {student.lead_activities_count ?? 0} lead · {student.student_activities_count ?? 0} student).
+              </p>
+            </div>
+
+            <form onSubmit={handleLogStudentActivity} className="space-y-4 rounded-lg border bg-muted/20 p-4">
+              {activityError && <p className="text-sm text-destructive">{activityError}</p>}
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Log new student contact (payment follow-up)
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="grid gap-1">
+                  <Label className="text-xs text-muted-foreground">Type</Label>
+                  <select
+                    value={activityForm.activity_type}
+                    onChange={(e) => setActivityForm((p) => ({ ...p, activity_type: e.target.value }))}
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                  >
+                    {ACTIVITY_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-1">
+                  <Label className="text-xs text-muted-foreground">Payment follow-up outcome</Label>
+                  <select
+                    value={activityForm.outcome}
+                    onChange={(e) => setActivityForm((p) => ({ ...p, outcome: e.target.value }))}
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                  >
+                    <option value="" disabled>Select outcome</option>
+                    {STUDENT_ACTIVITY_OUTCOMES.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-1">
+                  <Label className="text-xs text-muted-foreground">Next payment follow-up (optional)</Label>
+                  <Input
+                    type="datetime-local"
+                    value={activityForm.next_follow_up_at}
+                    onChange={(e) => setActivityForm((p) => ({ ...p, next_follow_up_at: e.target.value }))}
+                    className="h-9 text-sm"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label>Notes</Label>
+                <textarea
+                  value={activityForm.notes}
+                  onChange={(e) => setActivityForm((p) => ({ ...p, notes: e.target.value }))}
+                  placeholder="Optional notes (max 200 chars)"
+                  rows={2}
+                  maxLength={200}
+                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <Button type="submit" disabled={activitySubmitting} size="sm">
+                {activitySubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                Log student activity
+              </Button>
+            </form>
+
+            {allActivities.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No activities recorded yet.</p>
+            ) : (
+              <ul className="space-y-3">
+                {allActivities.map((a) => {
+                  const Icon = getActivityIcon(a.activity_type);
+                  const isLead = a.subject_type === "lead";
+                  return (
+                    <li
+                      key={`${a.subject_type}-${a.id}`}
+                      className="flex gap-3 rounded-md border p-3 text-sm"
+                    >
+                      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={cn(
+                              "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase",
+                              isLead
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-orange-100 text-orange-800"
+                            )}
+                          >
+                            {isLead ? "Lead" : "Student"}
+                          </span>
+                          <span className="font-medium capitalize">{a.activity_type}</span>
+                          <span className="text-muted-foreground">·</span>
+                          <span>{formatActivityOutcome(a)}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatActivityDate(a.activity_at)}
+                          </span>
+                        </div>
+                        {a.sales_person_name ? (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            By {a.sales_person_name}
+                          </p>
+                        ) : null}
+                        {a.notes ? <p className="mt-1 text-muted-foreground">{a.notes}</p> : null}
+                        {a.next_follow_up_at ? (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Next follow-up: {formatDateTime(a.next_follow_up_at)}
+                          </p>
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -781,6 +1355,7 @@ export default function StudentDetailClient() {
                   setSelectedImageField("reference_image");
                   setShowRejectInput(false);
                   setRejectReason("");
+                  setFollowUpError(null);
                 }}
                 aria-label="Close"
               >
@@ -823,6 +1398,46 @@ export default function StudentDetailClient() {
                       <div className="flex flex-wrap justify-between gap-2">
                         <dt className="text-muted-foreground">Date</dt>
                         <dd>{formatDateTime(selectedPayment.payment_date)}</dd>
+                      </div>
+                      <div className="space-y-2 sm:col-span-2">
+                        <dt className="text-muted-foreground">Next payment follow-up</dt>
+                        <dd className="space-y-2">
+                          <Input
+                            type="datetime-local"
+                            className="h-9 max-w-xs text-sm"
+                            value={followUpEditValue}
+                            onChange={(e) => {
+                              setFollowUpEditValue(e.target.value);
+                              setFollowUpError(null);
+                            }}
+                          />
+                          {selectedPayment.next_payment_follow_up_at && (
+                            <FollowUpTimer
+                              followUpAt={selectedPayment.next_payment_follow_up_at}
+                              className="text-sm"
+                            />
+                          )}
+                          {followUpError && (
+                            <p className="text-xs text-destructive">{followUpError}</p>
+                          )}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            disabled={followUpSaving}
+                            onClick={() =>
+                              handleUpdatePaymentFollowUp(selectedPayment.id, followUpEditValue)
+                            }
+                          >
+                            {followUpSaving ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : followUpEditValue ? (
+                              "Save follow-up date"
+                            ) : (
+                              "Clear follow-up"
+                            )}
+                          </Button>
+                        </dd>
                       </div>
                       <div className="flex flex-wrap justify-between gap-2">
                         <dt className="text-muted-foreground">Mode</dt>

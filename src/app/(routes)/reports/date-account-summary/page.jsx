@@ -63,8 +63,9 @@ function DateAccountSummaryPage() {
   const user = useSelector((state) => state.userAuth?.user);
   const userRole = (user?.role || "").toLowerCase();
   const canView = !!user;
+  const canFilterBySalesPerson = userRole === "manager" || userRole === "super_admin";
 
-  const { salesPersons } = useSalesPersons();
+  const { persons } = useSalesPersons({ enabled: canFilterBySalesPerson });
   const { salesBatches } = useSalesBatches();
 
   const [receivers, setReceivers] = useState([]);
@@ -244,11 +245,11 @@ function DateAccountSummaryPage() {
 
   const salesPersonOptions = useMemo(
     () =>
-      (salesPersons || []).map((p) => ({
+      (persons || []).map((p) => ({
         id: String(p.id),
         name: p.name || `User ${p.id}`,
       })),
-    [salesPersons]
+    [persons]
   );
 
   const handlePreset = useCallback(
@@ -370,8 +371,8 @@ function DateAccountSummaryPage() {
                 value={salesPersonId}
                 onChange={(e) => setSalesPersonId(e.target.value)}
                 className="h-9 rounded-md border border-input bg-background px-3 text-sm min-w-[220px]"
-                disabled={userRole !== "manager" && userRole !== "super_admin"}
-                title={userRole !== "manager" && userRole !== "super_admin" ? "Manager/Super Admin only" : ""}
+                disabled={!canFilterBySalesPerson}
+                title={!canFilterBySalesPerson ? "Manager/Super Admin only" : ""}
               >
                 <option value="">All</option>
                 {salesPersonOptions.map((p) => (

@@ -3,7 +3,7 @@
 import { useLayoutEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { usePathname, useRouter } from "next/navigation";
-import { RBAC_CONFIG, LOGIN_ROUTE, DEFAULT_REDIRECT } from "@/shared/static/rbacConfig";
+import { RBAC_CONFIG, LOGIN_ROUTE, DEFAULT_REDIRECT, MANAGER_ONLY_PATHS } from "@/shared/static/rbacConfig";
 import { logout } from "@/redux/features/user/userAuth";
 import { isSessionExpired, clearLoginAt } from "@/lib/sessionExpiry";
 
@@ -29,13 +29,20 @@ export default function withPrivateAuth(Component) {
         return;
       }
 
-      // 3. Authorization Check (Role-based)
+      // 3. Manager-only routes (e.g. lead transfer)
       const userRole = user.role;
+      const isManagerOnlyRoute = MANAGER_ONLY_PATHS.some(
+        (path) => pathname === path || pathname.startsWith(`${path}/`)
+      );
+      if (isManagerOnlyRoute && userRole !== "manager") {
+        router.push(DEFAULT_REDIRECT);
+        return;
+      }
+
+      // 4. Authorization Check (Role-based)
       const allowedPaths = RBAC_CONFIG[userRole] || [];
 
-      // Check if current path is allowed for the role
-      // Simple exact match or startWith check depending on nesting
-      const isAllowed = allowedPaths.some(path => 
+      const isAllowed = allowedPaths.some((path) =>
         pathname === path || (path !== "/" && pathname.startsWith(path))
       );
 

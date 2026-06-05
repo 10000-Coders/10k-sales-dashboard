@@ -172,6 +172,8 @@ function BatchesPage() {
         try {
           const params = new URLSearchParams();
           params.set("sales_batch", key);
+          params.set("page", "1");
+          params.set("page_size", "200");
           const { data } = await axios.get(`/students/?${params.toString()}`, { headers: getHeaders() });
           const list = data?.results ?? (Array.isArray(data) ? data : []);
           batchStudentsCache.set(key, { data: list, at: Date.now() });

@@ -5,6 +5,7 @@ import { FiRefreshCw } from 'react-icons/fi';
 import { FiX, FiChevronDown, FiCopy, FiCheck, FiFilter, FiSearch, FiUsers, FiFileText, FiTrendingUp, FiChevronUp, FiDownload } from 'react-icons/fi';
 import { BsLinkedin } from 'react-icons/bs';
 import useToast from '@/hooks/useToast';
+import { useDebounce } from '@/hooks/useDebounce';
 import MarkdownRenderer from '@/components/shared/MarkdownRenderer';
 import { exportLeaderboardToExcel, exportPublicChallengeToExcel } from '@/utils/excelExport';
 
@@ -28,9 +29,10 @@ const LeaderboardModal = ({
   const [filters, setFilters] = useState({
     participantType: 'all', // 'all' or 'success' (success submits = solved at least 1)
     batch: '',
-    search: '',
     leaderboardType: 'all', // 'all', 'mcq', 'coding'
   });
+  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 2000);
   const [leaderboardEntries, setLeaderboardEntries] = useState(initialEntries || []);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false); // Start collapsed by default
@@ -142,8 +144,8 @@ const LeaderboardModal = ({
     }
 
     // Filter by search (student name)
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
+    if (debouncedSearch.trim()) {
+      const searchLower = debouncedSearch.trim().toLowerCase();
       filtered = filtered.filter(entry => {
         const studentName = entry.student_name || entry.student?.name || entry.student?.student_name || '';
         return studentName.toLowerCase().includes(searchLower);
@@ -169,7 +171,7 @@ const LeaderboardModal = ({
     });
 
     return filtered;
-  }, [leaderboardEntries, filters]);
+  }, [leaderboardEntries, filters, debouncedSearch]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -662,20 +664,23 @@ const LeaderboardModal = ({
               </label>
               <input
                 type="text"
-                value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by name..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-Vivid_Tangelo focus:border-Vivid_Tangelo text-sm"
               />
             </div>
           </div>
-          {(filters.participantType !== 'all' || filters.batch || filters.search) && (
+          {(filters.participantType !== 'all' || filters.batch || searchQuery) && (
             <div className="mt-3 flex items-center justify-between">
               <span className="text-xs text-gray-600">
                 Showing {filteredEntries.length} of {leaderboardEntries.length} entries
               </span>
               <button
-                onClick={() => setFilters({ participantType: 'all', batch: '', search: '' })}
+                onClick={() => {
+                  setFilters({ participantType: 'all', batch: '', leaderboardType: filters.leaderboardType });
+                  setSearchQuery('');
+                }}
                 className="text-xs text-Vivid_Tangelo hover:text-[#E84975] font-medium"
               >
                 Clear Filters

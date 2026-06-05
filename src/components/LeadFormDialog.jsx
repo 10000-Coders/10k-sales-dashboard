@@ -1,26 +1,28 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Dialog } from "@headlessui/react";
+import Select from "react-select";
 import axios from "@/axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { formSelectStyles, formSelectMenuPortalTarget } from "@/lib/reactSelectStyles";
 import { Loader2, User, Phone, Mail, Share2, Calendar, Activity, X, AlertCircle, CheckCircle2 } from "lucide-react";
+import { inquirySourceOptionsForValue } from "@/constants/leadInquirySource";
+import { LEAD_STATUS_FORM_OPTIONS } from "@/constants/leadStatus";
+import { getAllStudents } from "@/utils/referrialApis";
 
-const STATUS_OPTIONS = [
-  { value: "", label: "Select status" },
-  { value: "new", label: "New" },
-  { value: "contacted", label: "Contacted" },
-  { value: "interested", label: "Interested" },
-  { value: "not_interested", label: "Not Interested" },
-  { value: "callback", label: "Callback" },
-  { value: "wrong_number", label: "Wrong Number" },
-];
+const STATUS_OPTIONS = LEAD_STATUS_FORM_OPTIONS;
 
 function normalizeMobile(value) {
-  return String(value || "").replace(/\D/g, "").slice(0, 10);
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length === 12 && digits.startsWith("91")) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith("0")) return digits.slice(1);
+  if (digits.length > 10) return digits.slice(-10);
+  return digits;
 }
 
 const initialForm = {
@@ -28,6 +30,9 @@ const initialForm = {
   mobile: "",
   email: "",
   source: "",
+  referrer: "",
+  referred_by_name: "",
+  referred_by_batch: "",
   status: "",
   next_follow_up_at: "",
 };
@@ -37,6 +42,36 @@ export function LeadFormDialog({ open, onClose, lead = null, currentUserId, onSu
   const [form, setForm] = useState(initialForm);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
+  const [batchOptions, setBatchOptions] = useState([]);
+  const [studentOptions, setStudentOptions] = useState([]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [studentSearch, setStudentSearch] = useState("");
+  const studentSearchDebounceRef = useRef(null);
+  const isFriendSource = (form.source || "").trim().toLowerCase() === "friend";
+
+  const batchSelectOptions = useMemo(
+    () => batchOptions.map((name) => ({ value: name, label: name })),
+    [batchOptions]
+  );
+
+  const selectedBatchOption = useMemo(
+    () => batchSelectOptions.find((o) => o.value === form.referred_by_batch) || null,
+    [batchSelectOptions, form.referred_by_batch]
+  );
+
+  const studentSelectOptions = useMemo(
+    () =>
+      studentOptions.map((student) => ({
+        value: String(student.id),
+        label: `${student.student_name}${student.batch_name ? ` - ${student.batch_name}` : ""}`,
+      })),
+    [studentOptions]
+  );
+
+  const selectedStudentOption = useMemo(
+    () => studentSelectOptions.find((o) => o.value === String(form.referrer)) || null,
+    [studentSelectOptions, form.referrer]
+  );
 
   useEffect(() => {
     if (open) {
@@ -46,6 +81,9 @@ export function LeadFormDialog({ open, onClose, lead = null, currentUserId, onSu
           mobile: lead.mobile ?? "",
           email: lead.email ?? "",
           source: lead.source ?? "",
+          referrer: lead.referrer ?? "",
+          referred_by_name: lead.referred_by_name ?? "",
+          referred_by_batch: lead.referred_by_batch ?? "",
           status: lead.status ?? "new",
           next_follow_up_at: lead.next_follow_up_at ? lead.next_follow_up_at.slice(0, 16) : "",
         });
@@ -53,11 +91,107 @@ export function LeadFormDialog({ open, onClose, lead = null, currentUserId, onSu
         setForm(initialForm);
       }
       setErrors({});
+      setStudentSearch("");
     }
   }, [open, lead]);
 
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await getAllStudents({ page: 1, page_size: 1, mode: "All" });
+        const payload = response || {};
+        const filters = payload?.filters || {};
+        const batches = Array.isArray(filters.available_batches) ? filters.available_batches : [];
+        if (!cancelled) setBatchOptions(batches);
+      } catch {
+        if (!cancelled) setBatchOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !isFriendSource) return;
+    const selectedBatch = (form.referred_by_batch || "").trim();
+    if (!selectedBatch) {
+      setStudentOptions([]);
+      setStudentSearch("");
+      return;
+    }
+
+    if (studentSearchDebounceRef.current) {
+      clearTimeout(studentSearchDebounceRef.current);
+    }
+
+    let cancelled = false;
+    studentSearchDebounceRef.current = setTimeout(() => {
+      setStudentsLoading(true);
+      (async () => {
+        try {
+          const response = await getAllStudents({
+            page: 1,
+            page_size: 100,
+            mode: "All",
+            batches: [selectedBatch],
+            search: studentSearch.trim(),
+            sort_by: "student_name",
+            sort_order: "asc",
+          });
+          const payload = response || {};
+          const rows = Array.isArray(payload?.data?.results) ? payload.data.results : [];
+          const mapped = rows.map((student) => ({
+            id: student.id,
+            student_name: student.student_name || "",
+            batch_name: student.batch_name || selectedBatch,
+          }));
+          if (!cancelled) {
+            if (
+              isEdit &&
+              lead?.referrer &&
+              lead?.referred_by_name &&
+              !mapped.some((s) => String(s.id) === String(lead.referrer))
+            ) {
+              mapped.unshift({
+                id: lead.referrer,
+                student_name: lead.referred_by_name,
+                batch_name: lead.referred_by_batch || selectedBatch,
+              });
+            }
+            setStudentOptions(mapped);
+          }
+        } catch {
+          if (!cancelled) setStudentOptions([]);
+        } finally {
+          if (!cancelled) setStudentsLoading(false);
+        }
+      })();
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      if (studentSearchDebounceRef.current) {
+        clearTimeout(studentSearchDebounceRef.current);
+      }
+    };
+  }, [open, isFriendSource, form.referred_by_batch, studentSearch, isEdit, lead]);
+
   const handleChange = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    if (field === "source" && String(value || "").trim().toLowerCase() !== "friend") {
+      setStudentSearch("");
+      setForm((prev) => ({
+        ...prev,
+        source: value,
+        referrer: "",
+        referred_by_name: "",
+        referred_by_batch: "",
+      }));
+    } else {
+      setForm((prev) => ({ ...prev, [field]: value }));
+    }
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
   };
 
@@ -69,7 +203,12 @@ const validateForm = () => {
   else if (mobileDigits.length !== 10) nextErrors.mobile = "Mobile must be exactly 10 digits.";
   const email = (form.email || "").trim();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) nextErrors.email = "Enter a valid email.";
+  if (isFriendSource && !email) nextErrors.email = "Email is required for Friend source.";
   if (!(form.source || "").trim()) nextErrors.source = "Source is required.";
+  if (isFriendSource) {
+    if (!(form.referred_by_batch || "").trim()) nextErrors.referred_by_batch = "Batch is required.";
+    if (!form.referrer) nextErrors.referrer = "Student name is required.";
+  }
   if (!(form.status || "").trim()) nextErrors.status = "Status is required.";
    if (form.next_follow_up_at) {
      const dt = new Date(form.next_follow_up_at);
@@ -87,6 +226,14 @@ const validateForm = () => {
       email: (form.email || "").trim(),
       source: (form.source || "").trim(),
     };
+    if (isFriendSource) {
+      payload.referrer = form.referrer ? Number(form.referrer) : null;
+      payload.referred_by_name = (form.referred_by_name || "").trim();
+      payload.referred_by_batch = (form.referred_by_batch || "").trim();
+    } else {
+      payload.referred_by_name = "";
+      payload.referred_by_batch = "";
+    }
     if (!(isEdit && lead?.status === "enrolled")) {
       payload.status = form.status;
     }
@@ -217,17 +364,111 @@ const validateForm = () => {
               <div className="grid gap-2">
                 <Label htmlFor="source" className="text-xs font-semibold text-gray-700 uppercase">Inquiry Source *</Label>
                 <div className="relative">
-                  <Share2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
+                  <Share2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none z-10" />
+                  <select
                     id="source"
                     value={form.source}
                     onChange={(e) => handleChange("source", e.target.value)}
-                    placeholder="Website, Referral, etc."
-                    className={cn("pl-10 h-11", errors.source && "border-destructive ring-destructive")}
-                  />
+                    className={cn(
+                      "flex h-11 w-full rounded-md border bg-background pl-10 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                      errors.source ? "border-destructive" : "border-input"
+                    )}
+                  >
+                    {inquirySourceOptionsForValue(form.source).map((opt) => (
+                      <option key={opt.value || "empty"} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 {errors.source && <p className="text-[10px] font-bold text-destructive uppercase">{errors.source}</p>}
               </div>
+
+              {isFriendSource && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="referred_by_batch" className="text-xs font-semibold text-gray-700 uppercase">Referred By Batch *</Label>
+                    <Select
+                      inputId="referred_by_batch"
+                      options={batchSelectOptions}
+                      value={selectedBatchOption}
+                      onChange={(option) => {
+                        const value = option?.value || "";
+                        setForm((prev) => ({
+                          ...prev,
+                          referred_by_batch: value,
+                          referrer: "",
+                          referred_by_name: "",
+                        }));
+                        setStudentSearch("");
+                        setErrors((prev) => ({
+                          ...prev,
+                          referred_by_batch: undefined,
+                          referrer: undefined,
+                        }));
+                      }}
+                      styles={formSelectStyles}
+                      error={!!errors.referred_by_batch}
+                      isSearchable
+                      isClearable
+                      openMenuOnFocus
+                      placeholder="select batch"
+                      menuPortalTarget={formSelectMenuPortalTarget}
+                      menuPosition="fixed"
+                      noOptionsMessage={() => "No batch found"}
+                    />
+                    {errors.referred_by_batch && <p className="text-[10px] font-bold text-destructive uppercase">{errors.referred_by_batch}</p>}
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="referrer" className="text-xs font-semibold text-gray-700 uppercase">Referred By Name *</Label>
+                    <Select
+                      inputId="referrer"
+                      options={studentSelectOptions}
+                      value={selectedStudentOption}
+                      onChange={(option) => {
+                        const value = option?.value || "";
+                        const selected = studentOptions.find((s) => String(s.id) === String(value));
+                        setForm((prev) => ({
+                          ...prev,
+                          referrer: value,
+                          referred_by_name: selected?.student_name || "",
+                          referred_by_batch: selected?.batch_name || prev.referred_by_batch,
+                        }));
+                        setStudentSearch("");
+                        setErrors((prev) => ({ ...prev, referrer: undefined }));
+                      }}
+                      onInputChange={(inputValue, { action }) => {
+                        if (action === "input-change") {
+                          setStudentSearch(inputValue);
+                        } else if (action === "menu-close" || action === "set-value") {
+                          setStudentSearch("");
+                        }
+                        return inputValue;
+                      }}
+                      filterOption={() => true}
+                      styles={formSelectStyles}
+                      error={!!errors.referrer}
+                      isSearchable
+                      isClearable
+                      isDisabled={!form.referred_by_batch}
+                      isLoading={studentsLoading}
+                      openMenuOnFocus
+                      placeholder={
+                        !form.referred_by_batch
+                          ? "Select a batch first"
+                          : "select student"
+                      }
+                      menuPortalTarget={formSelectMenuPortalTarget}
+                      menuPosition="fixed"
+                      noOptionsMessage={() =>
+                        studentsLoading ? "Loading..." : "No students in this batch"
+                      }
+                    />
+                    {errors.referrer && <p className="text-[10px] font-bold text-destructive uppercase">{errors.referrer}</p>}
+                  </div>
+                </>
+              )}
 
               <div className="grid gap-2">
                 <Label htmlFor="status" className="text-xs font-semibold text-gray-700 uppercase">Relationship Status *</Label>
