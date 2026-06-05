@@ -75,6 +75,19 @@ function paymentsCacheKey(prefix, params) {
   return `${prefix}:${params?.toString() ?? ""}`;
 }
 
+function getPaymentBankName(payment, receivers = []) {
+  if (!payment) return null;
+  const receiverId = payment.receiver_id ?? payment.receiver;
+  if (receiverId != null) {
+    const match = receivers.find((r) => String(r.id) === String(receiverId));
+    if (match?.bank_name) return match.bank_name;
+  }
+  if (payment.receiver_display?.includes(" · ")) {
+    return payment.receiver_display.split(" · ").slice(1).join(" · ").trim() || null;
+  }
+  return null;
+}
+
 function clearPaymentsListAndSummaryCache() {
   for (const key of paymentsCache.keys()) {
     if (key.startsWith("payments:") || key.startsWith("batch-summary")) {
@@ -347,7 +360,7 @@ function PaymentsPage() {
       receiver
         ? {
             receiver_name: receiver.receiver_name || "",
-            account: receiver.account || "",
+            account: (receiver.account || "").trim().replace(/\s/g, ""),
             bank_name: receiver.bank_name || "",
             branch: receiver.branch || "",
             ifsc: receiver.ifsc || "",
@@ -375,7 +388,7 @@ function PaymentsPage() {
   const handleSaveReceiver = async (e) => {
     e.preventDefault();
     const name = (receiverForm.receiver_name || "").trim();
-    const account = (receiverForm.account || "").trim();
+    const account = (receiverForm.account || "").trim().replace(/\s/g, "");
     const bank = (receiverForm.bank_name || "").trim();
     const branch = (receiverForm.branch || "").trim();
     const ifsc = (receiverForm.ifsc || "").trim();
@@ -384,8 +397,12 @@ function PaymentsPage() {
       setReceiverError("Receiver name must be at least 3 characters.");
       return;
     }
-    if (!/^[0-9]{6,18}$/.test(account)) {
-      setReceiverError("Account number must be 6-18 digits (numbers only).");
+    if (!/^[0-9]{1,64}$/.test(account)) {
+      setReceiverError("Account number must contain digits only.");
+      return;
+    }
+    if (account.length < 6 || account.length > 18) {
+      setReceiverError("Account number must be 6-18 digits.");
       return;
     }
     if (!bank) {
@@ -400,13 +417,22 @@ function PaymentsPage() {
       setReceiverError("Enter a valid IFSC (e.g., HDFC0001234).");
       return;
     }
+    const payload = {
+      receiver_name: name,
+      account,
+      bank_name: bank,
+      branch,
+      ifsc,
+      status: receiverForm.status || "active",
+    };
+
     setReceiverSaving(true);
     setReceiverError(null);
     try {
       if (editingReceiver) {
-        await axios.patch(`/payment-receivers/${editingReceiver.id}/`, receiverForm, { headers: getHeaders() });
+        await axios.patch(`/payment-receivers/${editingReceiver.id}/`, payload, { headers: getHeaders() });
       } else {
-        await axios.post("/payment-receivers/", receiverForm, { headers: getHeaders() });
+        await axios.post("/payment-receivers/", payload, { headers: getHeaders() });
       }
       paymentsCache.delete(paymentsCacheKey("receivers", ""));
       paymentsFetchPromises.delete(paymentsCacheKey("receivers", ""));
@@ -414,7 +440,15 @@ function PaymentsPage() {
       closeReceiverModal();
     } catch (err) {
       const d = err.response?.data;
-      setReceiverError(d?.detail || (d && typeof d === "object" ? JSON.stringify(d) : "Failed to save."));
+      const fieldMsg =
+        d?.account?.[0] ||
+        d?.receiver_name?.[0] ||
+        (d && typeof d === "object"
+          ? Object.values(d)
+              .flat()
+              .find((v) => typeof v === "string")
+          : null);
+      setReceiverError(d?.detail || fieldMsg || "Failed to save.");
     } finally {
       setReceiverSaving(false);
     }
@@ -914,6 +948,10 @@ function PaymentsPage() {
                         <dt className="text-muted-foreground">Mode</dt>
                         <dd>{PAYMENT_MODE_LABELS[selectedPayment.payment_mode] ?? selectedPayment.payment_mode}</dd>
                       </div>
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <dt className="text-muted-foreground">Bank name</dt>
+                        <dd>{getPaymentBankName(selectedPayment, receivers) ?? "—"}</dd>
+                      </div>
                       {selectedPayment.reference && (
                         <div className="flex flex-wrap justify-between gap-2">
                           <dt className="text-muted-foreground">Reference</dt>
@@ -1231,7 +1269,13 @@ function PaymentsPage() {
                 <input
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
                   value={receiverForm.account}
-                  onChange={(e) => setReceiverForm((f) => ({ ...f, account: e.target.value }))}
+                  onChange={(e) => {
+                    const account = e.target.value.replace(/\s/g, "");
+                    setReceiverForm((f) => ({ ...f, account }));
+                    setReceiverError(null);
+                  }}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   required
                 />
               </div>
