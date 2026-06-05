@@ -34,7 +34,7 @@ let studentsCache = { key: null, data: null, pagination: null, at: 0 };
 let studentsFetchPromise = null;
 let studentsFetchCacheKey = null;
 const STUDENTS_CACHE_MS = 5000;
-const STUDENTS_PAGE_SIZE = 100;
+const STUDENTS_PAGE_SIZE = 50;
 
 /** Manager and Super Admin see all students and can filter by person; Admin/Counselor see only their own. */
 function canSeeAllStudents(role) {
@@ -158,6 +158,8 @@ function StudentsPage() {
         setLoading(true);
         setError(null);
         const params = new URLSearchParams();
+        params.set("page", String(effectivePage));
+        params.set("page_size", String(STUDENTS_PAGE_SIZE));
         if (searchDebounce.trim()) params.set("search", searchDebounce.trim());
         if (canSeeAll && filterPerson) params.set("sales_person", filterPerson);
         if (filterDateFrom) params.set("created_after", filterDateFrom);
