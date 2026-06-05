@@ -58,7 +58,7 @@ const PublicChallengeManager = () => {
   const error = useSelector((state) => state.publicChallenges.error);
 
   const [searchInput, setSearchInput] = useState("");
-  const debouncedSearch = useDebounce(searchInput, 400);
+  const debouncedSearch = useDebounce(searchInput, 3000);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
