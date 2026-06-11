@@ -1,4 +1,5 @@
 import coreApi from '@/lib/coreApi';
+import { sortUniqueBatchNames } from '@/utils/sortBatchNames';
 
 const appendArrayParam = (queryParams, key, value = []) => {
     if (Array.isArray(value) && value.length > 0) {
@@ -60,5 +61,15 @@ export const getAllStudents = async (params = {}, config = {}) => {
     const response = await coreApi.get(`/mentor/students/all/?${queryString}`, config);
     return response.data;
 };
+
+/** All batches for dropdowns via mentor API (no 50-item cap), returned in sorted order. */
+export async function getAllBatchNames(config = {}) {
+    const response = await coreApi.get('/mentor/batches/all/', config);
+    const results = Array.isArray(response.data?.results) ? response.data.results : [];
+    const names = results
+        .filter((batch) => !batch?.is_deleted)
+        .map((batch) => batch.batch_name);
+    return sortUniqueBatchNames(names);
+}
 
 export default getAllStudents;
