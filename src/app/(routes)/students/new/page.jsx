@@ -565,6 +565,7 @@ export default function NewStudentPage() {
             <div className="sm:col-span-2">
               <div className="grid items-start gap-4 sm:grid-cols-2">
                 <ImageDropzone
+                  convertToWebp
                   label={
                     isProofScreenshotRequired(initialPayment.payment_mode)
                       ? "Proof Screenshot *"
@@ -575,6 +576,7 @@ export default function NewStudentPage() {
                   onChange={(file) => setInitialPayment((p) => ({ ...p, reference_image: file }))}
                 />
                 <ImageDropzone
+                  convertToWebp
                   label="Receipt Image *"
                   value={initialPayment.receipt_image}
                   id="payment-field-receipt-image"

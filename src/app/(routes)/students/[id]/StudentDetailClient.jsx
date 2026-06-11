@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "react-toastify";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
 import { isProofScreenshotRequired } from "@/lib/paymentValidation";
+import { useSalesBatchDropdown } from "@/hooks/useSalesData";
 
 const PAYMENT_MODE_OPTIONS = [
   { value: "upi", label: "UPI" },
@@ -247,9 +248,6 @@ export default function StudentDetailClient() {
   const [followUpSaving, setFollowUpSaving] = useState(false);
   const [followUpError, setFollowUpError] = useState(null);
   const [headerFollowUpValue, setHeaderFollowUpValue] = useState("");
-  const [salesBatches, setSalesBatches] = useState([]);
-  const [salesBatchesLoading, setSalesBatchesLoading] = useState(false);
-  const [salesBatchesError, setSalesBatchesError] = useState(null);
   const [editCourse, setEditCourse] = useState("");
   const [editSalesBatch, setEditSalesBatch] = useState("");
   const [editSaving, setEditSaving] = useState(false);
@@ -264,6 +262,11 @@ export default function StudentDetailClient() {
     return `${base}/media/${path.replace(/^\//, "")}`;
   };
   const canVerify = canVerifyPayments(user?.role);
+  const {
+    salesBatchDropdown: salesBatches,
+    loading: salesBatchesLoading,
+    error: salesBatchesError,
+  } = useSalesBatchDropdown({ course: editCourse });
 
   const getHeaders = useCallback(() => {
     const h = {};
@@ -312,21 +315,6 @@ export default function StudentDetailClient() {
       setPaymentReceivers(list);
     } catch {
       setPaymentReceivers([]);
-    }
-  }, [getHeaders]);
-
-  const fetchSalesBatches = useCallback(async () => {
-    try {
-      setSalesBatchesLoading(true);
-      setSalesBatchesError(null);
-      const { data } = await axios.get("/sales-batches/", { headers: getHeaders() });
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
-      setSalesBatches(list);
-    } catch (err) {
-      setSalesBatches([]);
-      setSalesBatchesError(err.response?.data?.detail || "Failed to load sales batches.");
-    } finally {
-      setSalesBatchesLoading(false);
     }
   }, [getHeaders]);
 
@@ -409,10 +397,6 @@ export default function StudentDetailClient() {
       }
     })();
   }, [id, user?.id, user?.role, getHeaders]);
-
-  useEffect(() => {
-    fetchSalesBatches();
-  }, [fetchSalesBatches]);
 
   useEffect(() => {
     if (addPaymentOpen && PAYMENT_MODES_NEED_RECEIVER.includes(paymentForm.payment_mode)) {
@@ -614,8 +598,7 @@ export default function StudentDetailClient() {
       });
       setAddPaymentOpen(false);
       invalidateStudentDetailCache();
-      fetchPayments();
-      fetchStudent();
+      void Promise.all([fetchPayments(), fetchStudent()]);
     } catch (err) {
       const data = err.response?.data;
       const msg = data?.detail || (typeof data === "object" ? JSON.stringify(data) : err.message) || "Failed to add payment.";
@@ -1041,6 +1024,7 @@ export default function StudentDetailClient() {
               <div className="sm:col-span-2">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <ImageDropzone
+                    convertToWebp
                     label={
                       isProofScreenshotRequired(paymentForm.payment_mode)
                         ? "Proof Screenshot *"
@@ -1050,6 +1034,7 @@ export default function StudentDetailClient() {
                     onChange={(file) => setPaymentForm((p) => ({ ...p, reference_image: file }))}
                   />
                   <ImageDropzone
+                    convertToWebp
                     label="Receipt Image *"
                     value={paymentForm.receipt_image}
                     onChange={(file) => setPaymentForm((p) => ({ ...p, receipt_image: file }))}

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import withPrivateAuth from "@/components/withPrivateAuth";
 import axios from "@/axios";
-import { useSalesBatches, useSalesPersons } from "@/hooks/useSalesData";
+import { useSalesBatchDropdown, useSalesPersons } from "@/hooks/useSalesData";
 import { getRangeForPreset } from "@/lib/dateUtils";
 
 import {
@@ -66,7 +66,7 @@ function DateAccountSummaryPage() {
   const canFilterBySalesPerson = userRole === "manager" || userRole === "super_admin";
 
   const { persons } = useSalesPersons({ enabled: canFilterBySalesPerson });
-  const { salesBatches } = useSalesBatches();
+  const { salesBatchDropdown } = useSalesBatchDropdown();
 
   const [receivers, setReceivers] = useState([]);
   const [receiverLoading, setReceiverLoading] = useState(false);
@@ -236,11 +236,11 @@ function DateAccountSummaryPage() {
 
   const salesBatchOptions = useMemo(
     () =>
-      (salesBatches || []).map((b) => ({
+      (salesBatchDropdown || []).map((b) => ({
         id: String(b.id),
         name: b.name || `Batch ${b.id}`,
       })),
-    [salesBatches]
+    [salesBatchDropdown]
   );
 
   const salesPersonOptions = useMemo(
