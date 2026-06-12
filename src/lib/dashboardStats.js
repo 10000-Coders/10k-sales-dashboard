@@ -1,6 +1,3 @@
-import { getRangeForPreset, todayStr } from "@/lib/dateUtils";
-import { SINGLE_DAY_PRESETS } from "@/lib/dashboardConstants";
-
 /** Human-readable period for team table header (en-IN). */
 export function formatStatsPeriodLabel(fromIso, toIso) {
   const fmt = (iso) => {
@@ -14,20 +11,6 @@ export function formatStatsPeriodLabel(fromIso, toIso) {
   if (!from) return "";
   return from === to ? from : `${from} – ${to}`;
 }
-/**
- * Params for stats API: single-day vs range and the date(s).
- * @returns {{ singleDay: boolean, date: string, fromDate: string, toDate: string }}
- */
-export function getStatsParams(preset, fromDate, toDate) {
-  const singleDay = SINGLE_DAY_PRESETS.has(preset);
-  const date = singleDay
-    ? preset === "today"
-      ? todayStr()
-      : getRangeForPreset("yesterday").from
-    : fromDate;
-  return { singleDay, date, fromDate, toDate };
-}
-
 /**
  * Normalize one person's stats from API (snake_case) to a consistent shape.
  */
