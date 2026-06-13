@@ -1,21 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "@/axios";
-import { getStatsParams, normalizeStats } from "@/lib/dashboardStats";
+import { normalizeStats } from "@/lib/dashboardStats";
 
 function buildSalesHeaders(userId, userRole) {
   const headers = {};
   if (userId != null) headers["X-Sales-Person-Id"] = String(userId);
   if (userRole) headers["X-Sales-Person-Role"] = userRole;
   return headers;
-}
-
-async function fetchStatsSingleDay({ date, salesPersonId, headers }) {
-  const params = new URLSearchParams({ date });
-  if (salesPersonId != null) {
-    params.set("sales_person", String(salesPersonId));
-  }
-  const { data } = await axios.get(`/stats/?${params.toString()}`, { headers });
-  return data;
 }
 
 async function fetchStatsRange({ from, to, salesPersonId, headers }) {
@@ -31,9 +22,7 @@ async function fetchStatsRange({ from, to, salesPersonId, headers }) {
  * Fetches my stats and (for manager) team stats for the given period.
  * Calls the API on mount and whenever the period or user changes.
  */
-export function useDashboardStats({ preset, fromDate, toDate, userId, userRole, isManager }) {
-  const { singleDay, date: singleDayDate } = getStatsParams(preset, fromDate, toDate);
-
+export function useDashboardStats({ fromDate, toDate, userId, userRole, isManager }) {
   const [myStats, setMyStats] = useState(null);
   const [teamStats, setTeamStats] = useState(null);
   const [loadingMy, setLoadingMy] = useState(false);
@@ -41,10 +30,14 @@ export function useDashboardStats({ preset, fromDate, toDate, userId, userRole, 
   const [refreshing, setRefreshing] = useState(false);
   const [errorMy, setErrorMy] = useState(false);
   const [errorTeam, setErrorTeam] = useState(false);
+  const requestSeqRef = useRef(0);
 
   const loadStats = useCallback(
     async ({ manualRefresh = false } = {}) => {
       if (!userId) return;
+
+      const requestSeq = ++requestSeqRef.current;
+      const isStale = () => requestSeq !== requestSeqRef.current;
 
       const headers = buildSalesHeaders(userId, userRole);
 
@@ -52,7 +45,11 @@ export function useDashboardStats({ preset, fromDate, toDate, userId, userRole, 
         setRefreshing(true);
       } else {
         setLoadingMy(true);
-        if (isManager) setLoadingTeam(true);
+        setMyStats(null);
+        if (isManager) {
+          setLoadingTeam(true);
+          setTeamStats(null);
+        }
       }
 
       setErrorMy(false);
@@ -60,20 +57,26 @@ export function useDashboardStats({ preset, fromDate, toDate, userId, userRole, 
 
       const loadMyStats = async () => {
         try {
-          const raw = singleDay
-            ? await fetchStatsSingleDay({ date: singleDayDate, salesPersonId: userId, headers })
-            : await fetchStatsRange({ from: fromDate, to: toDate, salesPersonId: userId, headers });
+          const raw = await fetchStatsRange({
+            from: fromDate,
+            to: toDate,
+            salesPersonId: userId,
+            headers,
+          });
+          if (isStale()) return;
           setMyStats(normalizeStats(raw));
         } catch {
+          if (isStale()) return;
           setErrorMy(true);
           if (!manualRefresh) setMyStats(null);
         } finally {
-          if (!manualRefresh) setLoadingMy(false);
+          if (!manualRefresh && !isStale()) setLoadingMy(false);
         }
       };
 
       const loadTeamStats = async () => {
         if (!isManager) {
+          if (isStale()) return;
           setTeamStats(null);
           setErrorTeam(false);
           if (!manualRefresh) setLoadingTeam(false);
@@ -81,15 +84,15 @@ export function useDashboardStats({ preset, fromDate, toDate, userId, userRole, 
         }
 
         try {
-          const raw = singleDay
-            ? await fetchStatsSingleDay({ date: singleDayDate, headers })
-            : await fetchStatsRange({ from: fromDate, to: toDate, headers });
+          const raw = await fetchStatsRange({ from: fromDate, to: toDate, headers });
+          if (isStale()) return;
           setTeamStats(normalizeStats(raw));
         } catch {
+          if (isStale()) return;
           setErrorTeam(true);
           if (!manualRefresh) setTeamStats(null);
         } finally {
-          if (!manualRefresh) setLoadingTeam(false);
+          if (!manualRefresh && !isStale()) setLoadingTeam(false);
         }
       };
 
@@ -99,7 +102,7 @@ export function useDashboardStats({ preset, fromDate, toDate, userId, userRole, 
         if (manualRefresh) setRefreshing(false);
       }
     },
-    [userId, userRole, isManager, singleDay, singleDayDate, fromDate, toDate]
+    [userId, userRole, isManager, fromDate, toDate]
   );
 
   useEffect(() => {
@@ -120,6 +123,5 @@ export function useDashboardStats({ preset, fromDate, toDate, userId, userRole, 
     errorMy,
     errorTeam,
     refreshStats,
-    singleDay,
   };
 }

@@ -16,6 +16,7 @@ import withPrivateAuth from '@/components/withPrivateAuth';
 import SpinnerLoader from '@/components/SpinnerLoader';
 import { getAllStudentsFromBackend } from '@/redux/features/referralForm/referralFormSlice';
 import StudentReferralModal from '@/components/referrals/StudentReferralModal';
+import { getAllBatchNames } from '@/utils/referrialApis';
 
 const initialFilterState = {
   searchInput: '',
@@ -49,12 +50,10 @@ const AllStudentsPage = () => {
   all_students_backend_page_size = 25,
   all_students_backend_loading = false,
   all_students_backend_error = null,
-  filter_options_backend = {
-    available_batches: [],
-  },
 } = useSelector((state) => state.referralForm || {});
 
   const [filter, setFilter] = useState(initialFilterState);
+  const [allBatchNames, setAllBatchNames] = useState([]);
   const [sortField, setSortField] = useState('student_name');
   const [sortDirection, setSortDirection] = useState('asc');
   const [page, setPage] = useState(1);
@@ -101,6 +100,21 @@ const AllStudentsPage = () => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const batches = await getAllBatchNames();
+        if (!cancelled) setAllBatchNames(batches);
+      } catch {
+        if (!cancelled) setAllBatchNames([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (
       all_students_backend_current_page &&
       all_students_backend_current_page !== page
@@ -127,13 +141,11 @@ const AllStudentsPage = () => {
   }, []);
 
   const batchOptions = useMemo(() => {
-    return (filter_options_backend?.available_batches || [])
-      .map((batchName) => ({
-        label: batchName,
-        value: batchName,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [filter_options_backend]);
+    return allBatchNames.map((batchName) => ({
+      label: batchName,
+      value: batchName,
+    }));
+  }, [allBatchNames]);
 
   const currentPageData = all_students_backend || [];
   const totalPages = all_students_backend_total_pages || 1;

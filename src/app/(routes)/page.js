@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { LayoutDashboard, RefreshCw, TrendingUp, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getRangeForPreset, todayStr } from "@/lib/dateUtils";
+import { formatStatsPeriodLabel } from "@/lib/dashboardStats";
 import withPrivateAuth from "@/components/withPrivateAuth";
 import { isManager } from "@/lib/dashboardConstants";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
@@ -21,8 +22,16 @@ function HomePage() {
   const [fromDate, setFromDate] = useState(todayStr());
   const [toDate, setToDate] = useState(todayStr());
 
-  const { myStats, teamStats, loading, refreshing, errorMy, errorTeam, refreshStats } = useDashboardStats({
-    preset,
+  const {
+    myStats,
+    teamStats,
+    loadingMy,
+    loadingTeam,
+    refreshing,
+    errorMy,
+    errorTeam,
+    refreshStats,
+  } = useDashboardStats({
     fromDate,
     toDate,
     userId: user?.id,
@@ -47,6 +56,8 @@ function HomePage() {
     setPreset("");
   }, []);
 
+  const teamPeriodLabel = formatStatsPeriodLabel(fromDate, toDate);
+
   return (
     <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <Card className="overflow-hidden border-0 shadow-md ring-1 ring-black/[0.04]">
@@ -69,7 +80,7 @@ function HomePage() {
                 variant="outline"
                 size="lg"
                 onClick={refreshStats}
-                disabled={refreshing || loading}
+                disabled={refreshing || loadingMy || loadingTeam}
                 className="h-12 shrink-0 gap-2.5 self-start px-6 text-base font-semibold sm:self-center"
                 aria-label="Refresh latest stats"
               >
@@ -93,18 +104,18 @@ function HomePage() {
                 />
               </section>
 
-              <section aria-busy={loading}>
+              <section aria-busy={loadingMy}>
                 <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
                   <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <TrendingUp className="h-4 w-4" aria-hidden />
                   </span>
                   My performance
                 </h3>
-                <StatsCards stats={myStats} loading={loading && !myStats} error={errorMy} />
+                <StatsCards stats={myStats} loading={loadingMy} error={errorMy} />
               </section>
 
               {isManagerRole && (
-                <section aria-busy={loading}>
+                <section aria-busy={loadingTeam}>
                   <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
                     <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600">
                       <Users className="h-4 w-4" aria-hidden />
@@ -112,9 +123,14 @@ function HomePage() {
                     Team performance
                   </h3>
                   <TeamStatsTable
+                    key={`team-${fromDate}-${toDate}-${preset}`}
                     teamStats={teamStats}
-                    loading={loading && !teamStats?.by_person?.length}
+                    loading={loadingTeam}
                     error={errorTeam}
+                    onRetry={refreshStats}
+                    periodLabel={teamPeriodLabel}
+                    fromDate={fromDate}
+                    toDate={toDate}
                   />
                 </section>
               )}

@@ -12,7 +12,7 @@ import { formSelectStyles, formSelectMenuPortalTarget } from "@/lib/reactSelectS
 import { Loader2, User, Phone, Mail, Share2, Calendar, Activity, X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { inquirySourceOptionsForValue } from "@/constants/leadInquirySource";
 import { LEAD_STATUS_FORM_OPTIONS } from "@/constants/leadStatus";
-import { getAllStudents } from "@/utils/referrialApis";
+import { getAllStudents, getAllBatchNames } from "@/utils/referrialApis";
 
 const STATUS_OPTIONS = LEAD_STATUS_FORM_OPTIONS;
 
@@ -100,10 +100,7 @@ export function LeadFormDialog({ open, onClose, lead = null, currentUserId, onSu
     let cancelled = false;
     (async () => {
       try {
-        const response = await getAllStudents({ page: 1, page_size: 1, mode: "All" });
-        const payload = response || {};
-        const filters = payload?.filters || {};
-        const batches = Array.isArray(filters.available_batches) ? filters.available_batches : [];
+        const batches = await getAllBatchNames();
         if (!cancelled) setBatchOptions(batches);
       } catch {
         if (!cancelled) setBatchOptions([]);
