@@ -28,6 +28,7 @@ import * as XLSX from "xlsx";
 import { parseLeadsWorkbook, mapLeadsExcelToBulkPayload } from "@/utils/parseLeadsExcel";
 import { formatApiError } from "@/utils/formatApiError";
 import { LEAD_STATUS_FILTER_OPTIONS, LEAD_STATUS_STYLES } from "@/constants/leadStatus";
+import { LEAD_SOURCE_FILTER_OPTIONS } from "@/constants/leadInquirySource";
 import {
   bulkCreateLeads,
   MAX_BULK_LEAD_IMPORT,
@@ -55,6 +56,7 @@ const LEADS_CACHE_MS = 5000;
 const LEADS_PAGE_SIZE = 100;
 
 const STATUS_OPTIONS = LEAD_STATUS_FILTER_OPTIONS;
+const SOURCE_OPTIONS = LEAD_SOURCE_FILTER_OPTIONS;
 
 function formatDate(d) {
   const dt = d ? new Date(d) : new Date();
@@ -86,6 +88,7 @@ function LeadsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
   const [filterStatus, setFilterStatus] = useState("");
+  const [filterSource, setFilterSource] = useState("");
   const [filterPerson, setFilterPerson] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
@@ -132,7 +135,7 @@ function LeadsPage() {
 
   const fetchLeads = useCallback(async (forceRefresh = false, pageOverride) => {
     const effectivePage = pageOverride ?? page;
-    const cacheKey = `${filterStatus}|${filterPerson}|${filterDateFrom}|${filterDateTo}|${searchDebounce}|${effectivePage}|${user?.id}`;
+    const cacheKey = `${filterStatus}|${filterSource}|${filterPerson}|${filterDateFrom}|${filterDateTo}|${searchDebounce}|${effectivePage}|${user?.id}`;
 
     if (forceRefresh) {
       leadsCache = { key: null, data: null, pagination: null, at: 0 };
@@ -176,6 +179,7 @@ function LeadsPage() {
         params.set("page", String(effectivePage));
         params.set("page_size", String(LEADS_PAGE_SIZE));
         if (filterStatus) params.set("status", filterStatus);
+        if (filterSource) params.set("source", filterSource);
         if (filterDateFrom) params.set("created_after", filterDateFrom);
         if (filterDateTo) params.set("created_before", filterDateTo);
         if (searchDebounce.trim()) params.set("search", searchDebounce.trim());
@@ -211,7 +215,7 @@ function LeadsPage() {
       }
     })();
     await leadsFetchPromise;
-  }, [filterStatus, filterPerson, filterDateFrom, filterDateTo, searchDebounce, page, isManagerRole, user?.id, setUpcomingFollowUpsFromLeads]);
+  }, [filterStatus, filterSource, filterPerson, filterDateFrom, filterDateTo, searchDebounce, page, isManagerRole, user?.id, setUpcomingFollowUpsFromLeads]);
 
   const getHeaders = useCallback(() => {
     const h = {};
@@ -227,7 +231,7 @@ function LeadsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [filterStatus, filterPerson, filterDateFrom, filterDateTo, searchDebounce]);
+  }, [filterStatus, filterSource, filterPerson, filterDateFrom, filterDateTo, searchDebounce]);
 
   useEffect(() => {
     fetchLeads();
@@ -312,8 +316,8 @@ function LeadsPage() {
               <CardTitle className="text-2xl">{isManagerRole ? "All leads" : "My leads"}</CardTitle>
               <CardDescription>
                 {isManagerRole
-                  ? "View all leads, filter by counselor, status and date. See who owns each lead and track activity."
-                  : "Track your own leads. Filter by status and date."}
+                  ? "View all leads, filter by counselor, status, source and date. See who owns each lead and track activity."
+                  : "Track your own leads. Filter by status, source and date."}
               </CardDescription>
             </div>
             <Button onClick={openAdd}>
@@ -377,9 +381,22 @@ function LeadsPage() {
               className={cn(
                 "h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               )}
+              aria-label="Filter by status"
             >
               {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+                <option key={o.value || "all-status"} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <select
+              value={filterSource}
+              onChange={(e) => setFilterSource(e.target.value)}
+              className={cn(
+                "h-9 min-w-[150px] rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              )}
+              aria-label="Filter by inquiry source"
+            >
+              {SOURCE_OPTIONS.map((o) => (
+                <option key={o.value || "all-source"} value={o.value}>{o.label}</option>
               ))}
             </select>
             {isManagerRole && (
