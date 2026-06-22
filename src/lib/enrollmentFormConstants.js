@@ -11,6 +11,8 @@ export const COURSE_OPTIONS = [
   { value: "mern", label: "MERN" },
   { value: "data_science", label: "Data Science" },
   { value: "devops", label: "DevOps" },
+  { value: "data_analytics", label: "Data Analytics" },
+  { value: "cybersecurity", label: "Cyber security" },
 ];
 
 export const COURSE_LABELS = {
@@ -19,6 +21,8 @@ export const COURSE_LABELS = {
   mern: "MERN",
   data_science: "Data Science",
   devops: "DevOps",
+  data_analytics: "Data Analytics",
+  cybersecurity: "Cyber security",
 };
 
 export const COURSE_VALUES = new Set([
@@ -27,6 +31,8 @@ export const COURSE_VALUES = new Set([
   "mern",
   "data_science",
   "devops",
+  "data_analytics",
+  "cybersecurity",
 ]);
 
 export const YEAR_MIN = 2010;
@@ -43,6 +49,7 @@ export const INITIAL_ENROLLMENT_FORM = {
   guardian_relation_2: "",
   guardian_email: "",
   college_name: "",
+  college_branch_name: "",
   tpo_name: "",
   tpo_number: "",
   tpo_email: "",

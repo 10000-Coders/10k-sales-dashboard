@@ -62,6 +62,8 @@ const COURSE_LABELS = {
   mern: "MERN",
   data_science: "Data Science",
   devops: "DevOps",
+  data_analytics: "Data Analytics",
+  cybersecurity: "Cyber security",
 };
 
 /** Module-level cache + in-flight dedup to avoid duplicate payments/batch-summary/receivers API calls (e.g. Strict Mode) */
@@ -73,19 +75,6 @@ let batchSummaryInFlightPromise = null;
 
 function paymentsCacheKey(prefix, params) {
   return `${prefix}:${params?.toString() ?? ""}`;
-}
-
-function getPaymentBankName(payment, receivers = []) {
-  if (!payment) return null;
-  const receiverId = payment.receiver_id ?? payment.receiver;
-  if (receiverId != null) {
-    const match = receivers.find((r) => String(r.id) === String(receiverId));
-    if (match?.bank_name) return match.bank_name;
-  }
-  if (payment.receiver_display?.includes(" · ")) {
-    return payment.receiver_display.split(" · ").slice(1).join(" · ").trim() || null;
-  }
-  return null;
 }
 
 function clearPaymentsListAndSummaryCache() {
@@ -143,6 +132,7 @@ function PaymentsPage() {
     receiver_name: "",
     account: "",
     bank_name: "",
+    upi_id: "",
     branch: "",
     ifsc: "",
     status: "active",
@@ -362,6 +352,7 @@ function PaymentsPage() {
             receiver_name: receiver.receiver_name || "",
             account: (receiver.account || "").trim().replace(/\s/g, ""),
             bank_name: receiver.bank_name || "",
+            upi_id: receiver.upi_id || "",
             branch: receiver.branch || "",
             ifsc: receiver.ifsc || "",
             status: receiver.status || "active",
@@ -370,6 +361,7 @@ function PaymentsPage() {
             receiver_name: "",
             account: "",
             bank_name: "",
+            upi_id: "",
             branch: "",
             ifsc: "",
             status: "active",
@@ -390,6 +382,7 @@ function PaymentsPage() {
     const name = (receiverForm.receiver_name || "").trim();
     const account = (receiverForm.account || "").trim().replace(/\s/g, "");
     const bank = (receiverForm.bank_name || "").trim();
+    const upiId = (receiverForm.upi_id || "").trim();
     const branch = (receiverForm.branch || "").trim();
     const ifsc = (receiverForm.ifsc || "").trim();
 
@@ -397,30 +390,34 @@ function PaymentsPage() {
       setReceiverError("Receiver name must be at least 3 characters.");
       return;
     }
-    if (!/^[0-9]{1,64}$/.test(account)) {
-      setReceiverError("Account number must contain digits only.");
+
+    const hasUpi = !!upiId;
+    const hasBank = !!account || !!bank;
+
+    if (!hasUpi && !hasBank) {
+      setReceiverError("Enter UPI ID or bank account details (account number and bank name).");
       return;
     }
-    if (account.length < 6 || account.length > 18) {
-      setReceiverError("Account number must be 6-18 digits.");
-      return;
-    }
-    if (!bank) {
-      setReceiverError("Bank name is required.");
-      return;
-    }
-    if (!branch || branch.length < 3) {
-      setReceiverError("Branch is required (minimum 3 characters).");
-      return;
+    if (hasBank) {
+      if (!account || !/^[0-9]{6,18}$/.test(account)) {
+        setReceiverError("Account number must be 6–18 digits.");
+        return;
+      }
+      if (!bank) {
+        setReceiverError("Bank name is required when account number is provided.");
+        return;
+      }
     }
     if (ifsc && !/^[A-Za-z]{4}0[0-9A-Za-z]{6}$/.test(ifsc)) {
       setReceiverError("Enter a valid IFSC (e.g., HDFC0001234).");
       return;
     }
+
     const payload = {
       receiver_name: name,
-      account,
-      bank_name: bank,
+      upi_id: upiId,
+      account: account || null,
+      bank_name: bank || null,
       branch,
       ifsc,
       status: receiverForm.status || "active",
@@ -441,6 +438,7 @@ function PaymentsPage() {
     } catch (err) {
       const d = err.response?.data;
       const fieldMsg =
+        d?.upi_id?.[0] ||
         d?.account?.[0] ||
         d?.receiver_name?.[0] ||
         (d && typeof d === "object"
@@ -455,13 +453,13 @@ function PaymentsPage() {
   };
 
   const handleDeleteReceiver = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this payment receiver? This action cannot be undone.")) return;
+    if (!window.confirm("Are you sure you want to delete this bank account? This action cannot be undone.")) return;
     try {
       await axios.delete(`/payment-receivers/${id}/`, { headers: getHeaders() });
       setReceivers((prev) => prev.filter((r) => r.id !== id));
     } catch (err) {
       const d = err.response?.data;
-      alert(d?.detail || "Failed to delete receiver. Please try again.");
+      alert(d?.detail || "Failed to delete bank account. Please try again.");
     }
   };
 
@@ -673,7 +671,7 @@ function PaymentsPage() {
                   onClick={() => setReceiverListModalOpen(true)}
                   className="h-9"
                 >
-                  Banks
+                  Bank
                 </Button>
               )}
             </div>
@@ -950,8 +948,14 @@ function PaymentsPage() {
                       </div>
                       <div className="flex flex-wrap justify-between gap-2">
                         <dt className="text-muted-foreground">Bank name</dt>
-                        <dd>{getPaymentBankName(selectedPayment, receivers) ?? "—"}</dd>
+                        <dd>{selectedPayment.receiver_display ?? "—"}</dd>
                       </div>
+                      {selectedPayment.transaction_id && (
+                        <div className="flex flex-wrap justify-between gap-2">
+                          <dt className="text-muted-foreground">Transaction ID</dt>
+                          <dd className="break-all">{selectedPayment.transaction_id}</dd>
+                        </div>
+                      )}
                       {selectedPayment.reference && (
                         <div className="flex flex-wrap justify-between gap-2">
                           <dt className="text-muted-foreground">Reference</dt>
@@ -1177,12 +1181,13 @@ function PaymentsPage() {
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               ) : receivers.length === 0 ? (
-                <p className="py-4 text-sm text-muted-foreground">No receiver accounts yet. Add one to show in UPI/bank payment form.</p>
+                <p className="py-4 text-sm text-muted-foreground">No bank accounts yet. Add one to show in UPI/bank payment form.</p>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Receiver name</TableHead>
+                      <TableHead>UPI ID</TableHead>
                       <TableHead>Account</TableHead>
                       <TableHead>Bank · Branch</TableHead>
                       <TableHead>IFSC</TableHead>
@@ -1194,7 +1199,8 @@ function PaymentsPage() {
                     {receivers.map((r) => (
                       <TableRow key={r.id}>
                         <TableCell className="font-medium">{r.receiver_name}</TableCell>
-                        <TableCell className="font-mono text-sm">{r.account}</TableCell>
+                        <TableCell className="font-mono text-sm">{r.upi_id || "—"}</TableCell>
+                        <TableCell className="font-mono text-sm">{r.account || "—"}</TableCell>
                         <TableCell className="text-muted-foreground">
                           {r.bank_name}
                           {r.branch ? ` · ${r.branch}` : ""}
@@ -1235,7 +1241,7 @@ function PaymentsPage() {
         </div>
       )}
 
-      {/* Payment receiver add/edit modal — Manager only */}
+      {/* Manager bank add/edit modal */}
       {receiverModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
@@ -1265,27 +1271,33 @@ function PaymentsPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Account number *</label>
+                <label className="text-sm font-medium">UPI ID</label>
+                <input
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={receiverForm.upi_id}
+                  onChange={(e) => setReceiverForm((f) => ({ ...f, upi_id: e.target.value }))}
+                  placeholder="e.g. name@ybl"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Account number</label>
                 <input
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
                   value={receiverForm.account}
                   onChange={(e) => {
-                    const account = e.target.value.replace(/\s/g, "");
-                    setReceiverForm((f) => ({ ...f, account }));
+                    const nextAccount = e.target.value.replace(/\s/g, "");
+                    setReceiverForm((f) => ({ ...f, account: nextAccount }));
                     setReceiverError(null);
                   }}
                   inputMode="numeric"
-                  pattern="[0-9]*"
-                  required
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Bank name *</label>
+                <label className="text-sm font-medium">Bank name</label>
                 <input
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={receiverForm.bank_name}
                   onChange={(e) => setReceiverForm((f) => ({ ...f, bank_name: e.target.value }))}
-                  required
                 />
               </div>
               <div>

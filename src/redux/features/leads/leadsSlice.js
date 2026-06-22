@@ -53,7 +53,7 @@ export const bulkCreateLeads = createAsyncThunk(
 /** Fetch one page of leads owned by a counselor (manager reassign UI). */
 export const fetchLeadsForReassign = createAsyncThunk(
   "leads/fetchLeadsForReassign",
-  async ({ salesPersonId, page = 1, pageSize = REASSIGN_PAGE_SIZE }, { getState, rejectWithValue }) => {
+  async ({ salesPersonId, page = 1, pageSize = REASSIGN_PAGE_SIZE, search = "" }, { getState, rejectWithValue }) => {
     if (!salesPersonId) {
       return rejectWithValue({ detail: "Select a counselor to load leads." });
     }
@@ -65,6 +65,8 @@ export const fetchLeadsForReassign = createAsyncThunk(
         page: String(page),
         page_size: String(pageSize),
       });
+      const searchTrimmed = String(search || "").trim();
+      if (searchTrimmed) params.set("search", searchTrimmed);
       const { data } = await axios.get(`/leads/?${params.toString()}`, { headers });
       const list = data?.results ?? (Array.isArray(data) ? data : []);
 

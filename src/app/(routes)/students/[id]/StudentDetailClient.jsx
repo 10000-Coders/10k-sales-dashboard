@@ -22,12 +22,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ArrowLeft, Phone, Mail, User, Check, X, ImageIcon, ZoomIn, ZoomOut, Activity, MessageCircle, Circle } from "lucide-react";
+import { Loader2, ArrowLeft, Phone, Mail, User, Check, X, ImageIcon, ZoomIn, ZoomOut, Activity, MessageCircle, Circle, KeyRound } from "lucide-react";
 import { ImageDropzone } from "@/components/ImageDropzone";
 import { cn } from "@/lib/utils";
 import { toast } from "react-toastify";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
-import { isProofScreenshotRequired } from "@/lib/paymentValidation";
+import { isProofScreenshotRequired, isTransactionIdRequired, paymentReceiversForMode } from "@/lib/paymentValidation";
+import { useSalesBatchDropdown } from "@/hooks/useSalesData";
 
 const PAYMENT_MODE_OPTIONS = [
   { value: "upi", label: "UPI" },
@@ -113,12 +114,24 @@ function formatActivityDate(d) {
   });
 }
 
+function formatStudentPassword(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const digitsOnly = raw.replace(/\D/g, "");
+  if (digitsOnly && digitsOnly.length === raw.length) {
+    return digitsOnly;
+  }
+  return raw;
+}
+
 const COURSE_LABELS = {
   python_fullstack: "Python Fullstack",
   java_fullstack: "Java Fullstack",
   mern: "MERN",
   data_science: "Data Science",
   devops: "DevOps",
+  data_analytics: "Data Analytics",
+  cybersecurity: "Cyber security",
 };
 
 const COURSE_OPTIONS = [
@@ -127,6 +140,8 @@ const COURSE_OPTIONS = [
   { value: "mern", label: "MERN" },
   { value: "data_science", label: "Data Science" },
   { value: "devops", label: "DevOps" },
+  { value: "data_analytics", label: "Data Analytics" },
+  { value: "cybersecurity", label: "Cyber security" },
 ];
 
 /**
@@ -229,6 +244,7 @@ export default function StudentDetailClient() {
     next_payment_follow_up_at: "",
     payment_mode: "upi",
     receiver: "",
+    transaction_id: "",
     reference: "",
     notes: "",
     reference_image: null,
@@ -247,9 +263,6 @@ export default function StudentDetailClient() {
   const [followUpSaving, setFollowUpSaving] = useState(false);
   const [followUpError, setFollowUpError] = useState(null);
   const [headerFollowUpValue, setHeaderFollowUpValue] = useState("");
-  const [salesBatches, setSalesBatches] = useState([]);
-  const [salesBatchesLoading, setSalesBatchesLoading] = useState(false);
-  const [salesBatchesError, setSalesBatchesError] = useState(null);
   const [editCourse, setEditCourse] = useState("");
   const [editSalesBatch, setEditSalesBatch] = useState("");
   const [editSaving, setEditSaving] = useState(false);
@@ -264,6 +277,11 @@ export default function StudentDetailClient() {
     return `${base}/media/${path.replace(/^\//, "")}`;
   };
   const canVerify = canVerifyPayments(user?.role);
+  const {
+    salesBatchDropdown: salesBatches,
+    loading: salesBatchesLoading,
+    error: salesBatchesError,
+  } = useSalesBatchDropdown({ course: editCourse });
 
   const getHeaders = useCallback(() => {
     const h = {};
@@ -312,21 +330,6 @@ export default function StudentDetailClient() {
       setPaymentReceivers(list);
     } catch {
       setPaymentReceivers([]);
-    }
-  }, [getHeaders]);
-
-  const fetchSalesBatches = useCallback(async () => {
-    try {
-      setSalesBatchesLoading(true);
-      setSalesBatchesError(null);
-      const { data } = await axios.get("/sales-batches/", { headers: getHeaders() });
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
-      setSalesBatches(list);
-    } catch (err) {
-      setSalesBatches([]);
-      setSalesBatchesError(err.response?.data?.detail || "Failed to load sales batches.");
-    } finally {
-      setSalesBatchesLoading(false);
     }
   }, [getHeaders]);
 
@@ -409,10 +412,6 @@ export default function StudentDetailClient() {
       }
     })();
   }, [id, user?.id, user?.role, getHeaders]);
-
-  useEffect(() => {
-    fetchSalesBatches();
-  }, [fetchSalesBatches]);
 
   useEffect(() => {
     if (addPaymentOpen && PAYMENT_MODES_NEED_RECEIVER.includes(paymentForm.payment_mode)) {
@@ -570,7 +569,11 @@ export default function StudentDetailClient() {
       return;
     }
     if (PAYMENT_MODES_NEED_RECEIVER.includes(paymentForm.payment_mode) && !paymentForm.receiver) {
-      setPaymentError("Please select a receiver bank account for UPI, Bank Transfer, or Card payments.");
+      setPaymentError("Please select a bank account for UPI, Bank Transfer, or Card payments.");
+      return;
+    }
+    if (isTransactionIdRequired(paymentForm.payment_mode) && !(paymentForm.transaction_id || "").trim()) {
+      setPaymentError("Transaction ID is required for UPI payments.");
       return;
     }
     const newAmount = Number(paymentForm.amount);
@@ -594,7 +597,11 @@ export default function StudentDetailClient() {
       }
       formData.append("payment_mode", paymentForm.payment_mode || "upi");
       if (paymentForm.receiver) formData.append("receiver", paymentForm.receiver);
-      formData.append("reference", paymentForm.reference || "");
+      if (isTransactionIdRequired(paymentForm.payment_mode)) {
+        formData.append("transaction_id", (paymentForm.transaction_id || "").trim());
+      }
+      const reference = (paymentForm.reference || "").trim();
+      if (reference) formData.append("reference", reference);
       formData.append("notes", paymentForm.notes || "");
       if (paymentForm.reference_image) {
         formData.append("reference_image", paymentForm.reference_image);
@@ -607,6 +614,7 @@ export default function StudentDetailClient() {
         next_payment_follow_up_at: "",
         payment_mode: "upi",
         receiver: "",
+        transaction_id: "",
         reference: "",
         notes: "",
         reference_image: null,
@@ -614,8 +622,7 @@ export default function StudentDetailClient() {
       });
       setAddPaymentOpen(false);
       invalidateStudentDetailCache();
-      fetchPayments();
-      fetchStudent();
+      void Promise.all([fetchPayments(), fetchStudent()]);
     } catch (err) {
       const data = err.response?.data;
       const msg = data?.detail || (typeof data === "object" ? JSON.stringify(data) : err.message) || "Failed to add payment.";
@@ -752,6 +759,12 @@ export default function StudentDetailClient() {
               <Mail className="h-4 w-4" />
               <span>{student.student_email || "—"}</span>
             </div>
+            {student.password && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <KeyRound className="h-4 w-4" />
+                <span className="font-mono tabular-nums tracking-wide">{formatStudentPassword(student.password)}</span>
+              </div>
+            )}
           </div>
           {student.guardian_number_1 && (
             <p className="text-sm text-muted-foreground">
@@ -816,7 +829,11 @@ export default function StudentDetailClient() {
             </div>
           )}
           {student.college_name && (
-            <p className="text-sm text-muted-foreground">College: {student.college_name} · {student.student_degree || ""}</p>
+            <p className="text-sm text-muted-foreground">
+              College: {student.college_name}
+              {student.college_branch_name ? ` · ${student.college_branch_name}` : ""}
+              {student.student_degree ? ` · ${student.student_degree}` : ""}
+            </p>
           )}
           {(student.tpo_name || student.tpo_number || student.tpo_email) && (
             <p className="text-sm text-muted-foreground">
@@ -1007,7 +1024,14 @@ export default function StudentDetailClient() {
                 <select
                   className="w-full rounded-md border border-input bg-background px-3 py-2"
                   value={paymentForm.payment_mode}
-                  onChange={(e) => setPaymentForm((p) => ({ ...p, payment_mode: e.target.value, receiver: "" }))}
+                  onChange={(e) =>
+                    setPaymentForm((p) => ({
+                      ...p,
+                      payment_mode: e.target.value,
+                      receiver: "",
+                      transaction_id: e.target.value === "upi" ? p.transaction_id : "",
+                    }))
+                  }
                 >
                   {PAYMENT_MODE_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
@@ -1016,31 +1040,47 @@ export default function StudentDetailClient() {
               </div>
               {PAYMENT_MODES_NEED_RECEIVER.includes(paymentForm.payment_mode) && (
                 <div>
-                  <Label>Receiver account *</Label>
+                  <Label>{paymentForm.payment_mode === "upi" ? "UPI account *" : "Bank account *"}</Label>
                   <select
                     className="w-full rounded-md border border-input bg-background px-3 py-2"
                     value={paymentForm.receiver}
                     onChange={(e) => setPaymentForm((p) => ({ ...p, receiver: e.target.value }))}
                   >
-                    <option value="">Select receiver account</option>
-                    {paymentReceivers.map((r) => (
+                    <option value="">
+                      {paymentForm.payment_mode === "upi" ? "Select UPI account" : "Select bank account"}
+                    </option>
+                    {paymentReceiversForMode(paymentReceivers, paymentForm.payment_mode).map((r) => (
                       <option key={r.id} value={r.id}>
-                        {r.receiver_name} · {r.bank_name}
+                        {r.receiver_name} · {paymentForm.payment_mode === "upi" ? r.upi_id : r.bank_name || r.account || "—"}
                       </option>
                     ))}
                   </select>
                 </div>
               )}
+              {isTransactionIdRequired(paymentForm.payment_mode) && (
+                <div>
+                  <Label htmlFor="payment-field-transaction-id">Transaction ID *</Label>
+                  <Input
+                    id="payment-field-transaction-id"
+                    value={paymentForm.transaction_id}
+                    onChange={(e) => setPaymentForm((p) => ({ ...p, transaction_id: e.target.value }))}
+                    placeholder="e.g. UPI transaction ID"
+                  />
+                </div>
+              )}
               <div>
-                <Label>Reference</Label>
+                <Label htmlFor="payment-field-reference">Reference (optional)</Label>
                 <Input
+                  id="payment-field-reference"
                   value={paymentForm.reference}
                   onChange={(e) => setPaymentForm((p) => ({ ...p, reference: e.target.value }))}
+                  placeholder="Cheque number or other note"
                 />
               </div>
               <div className="sm:col-span-2">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <ImageDropzone
+                    convertToWebp
                     label={
                       isProofScreenshotRequired(paymentForm.payment_mode)
                         ? "Proof Screenshot *"
@@ -1050,6 +1090,7 @@ export default function StudentDetailClient() {
                     onChange={(file) => setPaymentForm((p) => ({ ...p, reference_image: file }))}
                   />
                   <ImageDropzone
+                    convertToWebp
                     label="Receipt Image *"
                     value={paymentForm.receipt_image}
                     onChange={(file) => setPaymentForm((p) => ({ ...p, receipt_image: file }))}
@@ -1443,6 +1484,12 @@ export default function StudentDetailClient() {
                         <dt className="text-muted-foreground">Mode</dt>
                         <dd className="capitalize">{selectedPayment.payment_mode}</dd>
                       </div>
+                      {selectedPayment.transaction_id && (
+                        <div className="flex flex-wrap justify-between gap-2">
+                          <dt className="text-muted-foreground">Transaction ID</dt>
+                          <dd className="break-all">{selectedPayment.transaction_id}</dd>
+                        </div>
+                      )}
                       {selectedPayment.reference && (
                         <div className="flex flex-wrap justify-between gap-2">
                           <dt className="text-muted-foreground">Reference</dt>

@@ -89,7 +89,7 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
 
   const handleLogout = async () => {
     setLoggingOut(true);
-    clearLoginAt(); // clear 48h session timestamp
+    clearLoginAt(); // clear 7-day session timestamp
     await new Promise(resolve => setTimeout(resolve, 500));
     dispatch(logout());
     router.replace("/login");
