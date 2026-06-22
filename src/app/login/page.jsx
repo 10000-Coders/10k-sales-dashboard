@@ -85,7 +85,7 @@ export default function LoginPage() {
     }
     const res = await dispatch(login({ email, otp }));
     if (login.fulfilled.match(res)) {
-      setLoginAt(); // 24h session
+      setLoginAt(); // 7-day session
       showSuccessToast("Logged in successfully.", "top-right", "light");
       router.push("/");
     } else {

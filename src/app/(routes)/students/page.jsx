@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import axios from "@/axios";
-import { useSalesPersons, useSalesBatches } from "@/hooks/useSalesData";
+import { useSalesPersons, useSalesBatchDropdown } from "@/hooks/useSalesData";
 import {
   Card,
   CardContent,
@@ -47,6 +47,8 @@ const COURSE_LABELS = {
   mern: "MERN",
   data_science: "Data Science",
   devops: "DevOps",
+  data_analytics: "Data Analytics",
+  cybersecurity: "Cyber security",
 };
 
 function formatDate(d) {
@@ -93,7 +95,7 @@ function StudentsPage() {
   const user = useSelector((state) => state.userAuth?.user);
   const canSeeAll = canSeeAllStudents(user?.role);
   const { persons } = useSalesPersons({ enabled: canSeeAll });
-  const { salesBatches, loading: salesBatchesLoading } = useSalesBatches();
+  const { salesBatchDropdown, loading: salesBatchesLoading } = useSalesBatchDropdown();
 
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -267,7 +269,7 @@ function StudentsPage() {
               disabled={salesBatchesLoading}
             >
               <option value="">{salesBatchesLoading ? "Loading sales batches..." : "All Sales Batches"}</option>
-              {salesBatches.map((b) => (
+              {salesBatchDropdown.map((b) => (
                 <option key={b.id} value={String(b.id)}>{b.name}</option>
               ))}
             </select>
@@ -326,7 +328,7 @@ function StudentsPage() {
                       {canSeeAll && (
                         <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
                           <div className="flex flex-col gap-0.5">
-                            <span>{s.sales_person_name || s.uploaded_by_name || "—"}</span>
+                            <span>{s.sales_person_name || "—"}</span>
                             <span className="text-xs">{formatDate(s.created_at)}</span>
                           </div>
                         </TableCell>

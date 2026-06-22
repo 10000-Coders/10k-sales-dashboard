@@ -34,6 +34,8 @@ const COURSE_LABELS = {
   mern: "MERN",
   data_science: "Data Science",
   devops: "DevOps",
+  data_analytics: "Data Analytics",
+  cybersecurity: "Cyber security",
 };
 
 const COURSE_OPTIONS = [
@@ -42,6 +44,8 @@ const COURSE_OPTIONS = [
   { value: "mern", label: "MERN" },
   { value: "data_science", label: "Data Science" },
   { value: "devops", label: "DevOps" },
+  { value: "data_analytics", label: "Data Analytics" },
+  { value: "cybersecurity", label: "Cyber security" },
 ];
 
 function canManageSalesBatches(role) {

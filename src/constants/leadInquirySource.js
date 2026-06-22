@@ -1,6 +1,5 @@
 /** Inquiry source values stored on Lead.source (API / DB). */
-export const INQUIRY_SOURCE_OPTIONS = [
-  { value: "", label: "Select inquiry source" },
+export const LEAD_SOURCE_VALUES = [
   { value: "website", label: "Website" },
   { value: "whatsapp", label: "WhatsApp" },
   { value: "call", label: "Call" },
@@ -9,6 +8,18 @@ export const INQUIRY_SOURCE_OPTIONS = [
   { value: "outsource", label: "Outsource" },
   { value: "social_media", label: "Social Media" },
   { value: "family_member", label: "Family Member" },
+];
+
+/** Leads list filter — includes all sources + unknown (empty source). */
+export const LEAD_SOURCE_FILTER_OPTIONS = [
+  { value: "", label: "All sources" },
+  ...LEAD_SOURCE_VALUES,
+  { value: "unknown", label: "Unknown / not set" },
+];
+
+export const INQUIRY_SOURCE_OPTIONS = [
+  { value: "", label: "Select inquiry source" },
+  ...LEAD_SOURCE_VALUES,
 ];
 
 const LABEL_BY_VALUE = Object.fromEntries(

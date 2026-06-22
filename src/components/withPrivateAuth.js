@@ -21,7 +21,7 @@ export default function withPrivateAuth(Component) {
         return;
       }
 
-      // 2. Session expiry: 48 hours — force re-login
+      // 2. Session expiry: 7 days — force re-login
       if (isSessionExpired()) {
         clearLoginAt();
         dispatch(logout());

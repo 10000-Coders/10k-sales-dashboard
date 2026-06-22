@@ -42,6 +42,25 @@ export const fetchSalesBatches = createAsyncThunk(
   }
 );
 
+/** Slim list for dropdowns: GET /sales-batches/dropdown/ (id, name, course). Optional course filter. */
+export const fetchSalesBatchDropdown = createAsyncThunk(
+  "salesData/fetchSalesBatchDropdown",
+  async (course, { getState, rejectWithValue }) => {
+    try {
+      const state = getState();
+      const headers = getHeadersFromState(state);
+      const params = course ? { course } : undefined;
+      const { data } = await axios.get("/sales-batches/dropdown/", { headers, params });
+      return {
+        course: course || "",
+        batches: Array.isArray(data) ? data : [],
+      };
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.detail || "Failed to load sales batches.");
+    }
+  }
+);
+
 const salesDataSlice = createSlice({
   name: "salesData",
   initialState: {
@@ -53,6 +72,11 @@ const salesDataSlice = createSlice({
     salesBatchesFetchedAt: null,
     salesBatchesError: null,
     salesBatchesLoading: false,
+    salesBatchDropdown: [],
+    salesBatchDropdownCourse: "",
+    salesBatchDropdownFetchedAt: null,
+    salesBatchDropdownError: null,
+    salesBatchDropdownLoading: false,
   },
   reducers: {
     invalidatePersons: (state) => {
@@ -60,6 +84,9 @@ const salesDataSlice = createSlice({
     },
     invalidateSalesBatches: (state) => {
       state.salesBatchesFetchedAt = null;
+    },
+    invalidateSalesBatchDropdown: (state) => {
+      state.salesBatchDropdownFetchedAt = null;
     },
     setPersons: (state, action) => {
       state.persons = action.payload;
@@ -95,6 +122,20 @@ const salesDataSlice = createSlice({
         state.salesBatchesError = action.payload;
         state.salesBatchesLoading = false;
       })
+      .addCase(fetchSalesBatchDropdown.pending, (state) => {
+        state.salesBatchDropdownLoading = true;
+      })
+      .addCase(fetchSalesBatchDropdown.fulfilled, (state, action) => {
+        state.salesBatchDropdown = action.payload.batches;
+        state.salesBatchDropdownCourse = action.payload.course;
+        state.salesBatchDropdownFetchedAt = Date.now();
+        state.salesBatchDropdownError = null;
+        state.salesBatchDropdownLoading = false;
+      })
+      .addCase(fetchSalesBatchDropdown.rejected, (state, action) => {
+        state.salesBatchDropdownError = action.payload;
+        state.salesBatchDropdownLoading = false;
+      })
       .addCase(logout.fulfilled, (state) => {
         state.persons = [];
         state.personsFetchedAt = null;
@@ -102,11 +143,16 @@ const salesDataSlice = createSlice({
         state.salesBatches = [];
         state.salesBatchesFetchedAt = null;
         state.salesBatchesError = null;
+        state.salesBatchDropdown = [];
+        state.salesBatchDropdownCourse = "";
+        state.salesBatchDropdownFetchedAt = null;
+        state.salesBatchDropdownError = null;
       });
   },
 });
 
-export const { invalidatePersons, invalidateSalesBatches, setPersons } = salesDataSlice.actions;
+export const { invalidatePersons, invalidateSalesBatches, invalidateSalesBatchDropdown, setPersons } =
+  salesDataSlice.actions;
 export default salesDataSlice.reducer;
 
 /** Check if persons cache is still fresh */
@@ -120,5 +166,13 @@ export function isPersonsCacheFresh(state, maxAgeMs = PERSONS_CACHE_MS) {
 export function isSalesBatchesCacheFresh(state, maxAgeMs = BATCHES_CACHE_MS) {
   const at = state?.salesData?.salesBatchesFetchedAt;
   if (!at) return false;
+  return Date.now() - at < maxAgeMs;
+}
+
+/** Check if sales batch dropdown cache is still fresh for the requested course filter */
+export function isSalesBatchDropdownCacheFresh(state, course = "", maxAgeMs = BATCHES_CACHE_MS) {
+  const at = state?.salesData?.salesBatchDropdownFetchedAt;
+  if (!at) return false;
+  if ((state?.salesData?.salesBatchDropdownCourse || "") !== (course || "")) return false;
   return Date.now() - at < maxAgeMs;
 }
