@@ -47,6 +47,8 @@ const COURSE_LABELS = {
   mern: "MERN",
   data_science: "Data Science",
   devops: "DevOps",
+  data_analytics: "Data Analytics",
+  cybersecurity: "Cyber security",
 };
 
 function formatDate(d) {

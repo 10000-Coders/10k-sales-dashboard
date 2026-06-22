@@ -391,7 +391,7 @@ function DateAccountSummaryPage() {
                 <option value="">All</option>
                 {receivers.map((r) => (
                   <option key={r.id} value={String(r.id)}>
-                    {r.receiver_name}{r.bank_name ? ` – ${r.bank_name}` : ""}
+                    {r.receiver_name}{r.bank_name || r.upi_id ? ` – ${r.bank_name || r.upi_id}` : ""}
                   </option>
                 ))}
               </select>

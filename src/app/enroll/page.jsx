@@ -112,6 +112,7 @@ function EnrollFormContent() {
         guardian_relation_2: form.guardian_relation_2?.trim() || "",
         guardian_email: form.guardian_email?.trim() || "",
         college_name: form.college_name?.trim() || "",
+        college_branch_name: form.college_branch_name?.trim() || "",
         tpo_name: form.tpo_name?.trim() || "",
         tpo_number: normalizeMobile(form.tpo_number) || "",
         tpo_email: form.tpo_email?.trim() || "",

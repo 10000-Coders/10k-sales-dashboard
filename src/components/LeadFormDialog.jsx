@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { formSelectStyles, formSelectMenuPortalTarget } from "@/lib/reactSelectStyles";
 import { Loader2, User, Phone, Mail, Share2, Calendar, Activity, X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { inquirySourceOptionsForValue } from "@/constants/leadInquirySource";
+import { LEAD_COURSE_VALUES } from "@/constants/leadCourse";
 import { LEAD_STATUS_FORM_OPTIONS } from "@/constants/leadStatus";
 import { getAllStudents, getAllBatchNames } from "@/utils/referrialApis";
 
@@ -34,6 +35,8 @@ const initialForm = {
   referred_by_name: "",
   referred_by_batch: "",
   status: "",
+  course: "",
+  is_related: false,
   next_follow_up_at: "",
 };
 
@@ -85,6 +88,8 @@ export function LeadFormDialog({ open, onClose, lead = null, currentUserId, onSu
           referred_by_name: lead.referred_by_name ?? "",
           referred_by_batch: lead.referred_by_batch ?? "",
           status: lead.status ?? "new",
+          course: lead.course ?? "",
+          is_related: Boolean(lead.is_related),
           next_follow_up_at: lead.next_follow_up_at ? lead.next_follow_up_at.slice(0, 16) : "",
         });
       } else {
@@ -222,6 +227,8 @@ const validateForm = () => {
       mobile: normalizeMobile(form.mobile),
       email: (form.email || "").trim(),
       source: (form.source || "").trim(),
+      course: (form.course || "").trim(),
+      is_related: Boolean(form.is_related),
     };
     if (isFriendSource) {
       payload.referrer = form.referrer ? Number(form.referrer) : null;
@@ -379,6 +386,41 @@ const validateForm = () => {
                   </select>
                 </div>
                 {errors.source && <p className="text-[10px] font-bold text-destructive uppercase">{errors.source}</p>}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="course" className="text-xs font-semibold text-gray-700 uppercase">Interested Course</Label>
+                <select
+                  id="course"
+                  value={form.course}
+                  onChange={(e) => handleChange("course", e.target.value)}
+                  className={cn(
+                    "flex h-11 w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                    errors.course ? "border-destructive" : "border-input"
+                  )}
+                >
+                  <option value="">Select course (optional)</option>
+                  {LEAD_COURSE_VALUES.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                {errors.course && <p className="text-[10px] font-bold text-destructive uppercase">{errors.course}</p>}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="is_related" className="text-xs font-semibold text-gray-700 uppercase">Related Lead</Label>
+                <label className="flex h-11 items-center gap-3 rounded-md border border-input bg-background px-3">
+                  <input
+                    id="is_related"
+                    type="checkbox"
+                    checked={Boolean(form.is_related)}
+                    onChange={(e) => handleChange("is_related", e.target.checked)}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                  <span className="text-sm text-gray-700">Mark as related lead</span>
+                </label>
               </div>
 
               {isFriendSource && (

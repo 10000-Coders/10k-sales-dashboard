@@ -9,7 +9,8 @@ export function trimCellValue(value, { collapseInner = true } = {}) {
   return s;
 }
 
-/** Row labels like "May 1st", "May 2nd-3rd", "January 2026" — not lead data */function isMonthSectionLabel(text) {
+/** Row labels like "May 1st", "May 2nd-3rd", "January 2026" — not lead data */
+function isMonthSectionLabel(text) {
   const t = String(text ?? "").trim();
   if (!t || t.includes("@")) return false;
   const monthPattern =
@@ -84,6 +85,9 @@ function normalizeMobileDigits(value) {
 }
 
 function cleanExcelPhone(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return normalizeMobileDigits(String(Math.trunc(value)));
+  }
   let s = trimCellValue(value, { collapseInner: false }).replace(/\s+/g, "");
   if (!s) return "";
   if (s.toLowerCase().startsWith("p:")) s = s.slice(2).trim();
@@ -100,7 +104,7 @@ function parseAddedTime(value) {
 
 /**
  * Map one parsed Excel row to bulk-create API shape.
- * Only: Name, Phone, Email, Medium, Added Time — all other columns ignored.
+ * Columns: Name, Phone, Email, Added Time, Related (yes → is_related).
  */
 export function mapExcelRowToLeadPayload(row, salesPersonId) {
   const name = trimCellValue(row.Name);
@@ -115,6 +119,7 @@ export function mapExcelRowToLeadPayload(row, salesPersonId) {
     email,
     status: "new",
     source: "website",
+    is_related: true,
   };
   if (next_follow_up_at) payload.next_follow_up_at = next_follow_up_at;
   return payload;

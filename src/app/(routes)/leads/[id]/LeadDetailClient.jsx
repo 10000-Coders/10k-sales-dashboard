@@ -153,21 +153,14 @@ export default function LeadDetailClient() {
       if (activityForm.next_follow_up_at) {
         payload.next_follow_up_at = activityForm.next_follow_up_at;
       }
+      const nextFollowUp = activityForm.next_follow_up_at;
       await axios.post(`/leads/${id}/activities/`, payload);
-      // If user didn't set a new follow-up, clear the lead's next_follow_up_at
-      if (!activityForm.next_follow_up_at) {
-        try {
-          await axios.patch(`/leads/${id}/`, { next_follow_up_at: null });
-        } catch (err) {
-          console.error("Failed to clear next follow-up on lead:", err);
-        }
-      }
       setActivityForm({ activity_type: "call", outcome: "", notes: "", next_follow_up_at: "" });
-      fetchLead();
+      await fetchLead();
       fetchActivities();
       if (updateLeadInFollowUpList && lead?.id) {
         updateLeadInFollowUpList(lead.id, {
-          next_follow_up_at: activityForm.next_follow_up_at || null,
+          next_follow_up_at: nextFollowUp || null,
         });
       }
     } catch (err) {

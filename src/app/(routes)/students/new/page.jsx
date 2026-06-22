@@ -19,11 +19,10 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { ImageDropzone } from "@/components/ImageDropzone";
 import { validateMarks, normalizeMobile } from "@/lib/studentFormValidations";
 import { validateEnrollmentForm, canGenerateEnrollmentQr } from "@/lib/validateEnrollmentForm";
-import { INITIAL_ENROLLMENT_FORM, COURSE_OPTIONS } from "@/lib/enrollmentFormConstants";
+import { INITIAL_ENROLLMENT_FORM, COURSE_OPTIONS, COURSE_VALUES } from "@/lib/enrollmentFormConstants";
 import StudentEnrollmentFields from "@/components/enrollment/StudentEnrollmentFields";
 import EnrollmentQrModal from "@/components/enrollment/EnrollmentQrModal";
-import { useEnrollmentOtp } from "@/hooks/useEnrollmentOtp";
-import { isProofScreenshotRequired } from "@/lib/paymentValidation";
+import { isProofScreenshotRequired, isTransactionIdRequired, paymentReceiversForMode } from "@/lib/paymentValidation";
 import { QrCode } from "lucide-react";
 
 const PAYMENT_MODE_OPTIONS = [
@@ -55,6 +54,7 @@ export default function NewStudentPage() {
     next_payment_follow_up_at: "",
     payment_mode: "upi",
     receiver: "",
+    transaction_id: "",
     reference: "",
     notes: "",
     reference_image: null,
@@ -75,9 +75,6 @@ export default function NewStudentPage() {
   const [qrGenerating, setQrGenerating] = useState(false);
   const [qrError, setQrError] = useState(null);
 
-  const otp = useEnrollmentOtp(form);
-  const { emailVerified, mobileVerified } = otp;
-
   const getHeaders = useCallback(() => {
     const h = {};
     if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
@@ -96,11 +93,13 @@ export default function NewStudentPage() {
         .get(`/leads/${leadIdParam}/`, { headers: h })
         .then(({ data }) => {
           const mobile = data.mobile ? normalizeMobile(String(data.mobile)) : "";
+          const leadCourse = (data.course || data.enrolled_student_course || "").trim();
           setForm((f) => ({
             ...f,
             student_name: (data.name || f.student_name).replace(/[0-9]/g, "").trim() || f.student_name,
             student_email: data.email || f.student_email,
             student_mobile: mobile || f.student_mobile,
+            course: COURSE_VALUES.has(leadCourse) ? leadCourse : f.course,
           }));
         })
         .catch(() => {})
@@ -194,20 +193,6 @@ export default function NewStudentPage() {
     setFieldErrors({});
     setPaymentFieldErrors({});
 
-    if (!emailVerified || !mobileVerified) {
-      setFieldErrors((prev) => ({
-        ...prev,
-        ...(emailVerified ? {} : { student_email: "Verify email with OTP to continue." }),
-        ...(mobileVerified ? {} : { student_mobile: "Verify mobile with OTP to continue." }),
-      }));
-      if (!emailVerified && typeof document !== "undefined") {
-        document.getElementById("field-student_email")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      } else if (!mobileVerified && typeof document !== "undefined") {
-        document.getElementById("field-student_mobile")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-      return false;
-    }
-
     const errors = validateEnrollmentForm(form);
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -242,10 +227,13 @@ export default function NewStudentPage() {
       paymentErrors.payment_mode = "Initial payment mode is required.";
     }
     if (PAYMENT_MODES_NEED_RECEIVER.includes(initialPayment.payment_mode) && !initialPayment.receiver) {
-      paymentErrors.receiver = "Receiver account is required for UPI, Bank Transfer, and Card payments.";
+      paymentErrors.receiver = "Bank account is required for UPI, Bank Transfer, and Card payments.";
     }
-    if (!initialPayment.reference_image) {
-      paymentErrors.reference_image = "Proof Screenshot is required.";
+    if (isTransactionIdRequired(initialPayment.payment_mode) && !(initialPayment.transaction_id || "").trim()) {
+      paymentErrors.transaction_id = "Transaction ID is required for UPI payments.";
+    }
+    if (isProofScreenshotRequired(initialPayment.payment_mode) && !initialPayment.reference_image) {
+      paymentErrors.reference_image = "Proof Screenshot is required for this payment mode.";
     }
     if (!initialPayment.receipt_image) {
       paymentErrors.receipt_image = "Receipt Image is required.";
@@ -262,6 +250,8 @@ export default function NewStudentPage() {
         next_payment_follow_up_at: "payment-field-next-follow-up",
         payment_mode: "payment-field-mode",
         receiver: "payment-field-receiver",
+        transaction_id: "payment-field-transaction-id",
+        reference: "payment-field-reference",
         reference_image: "payment-field-reference-image",
         receipt_image: "payment-field-receipt-image",
       };
@@ -300,6 +290,7 @@ export default function NewStudentPage() {
         guardian_relation_2: form.guardian_relation_2?.trim() || "",
         guardian_email: form.guardian_email?.trim() || "",
         college_name: form.college_name?.trim() || "",
+        college_branch_name: form.college_branch_name?.trim() || "",
         tpo_name: form.tpo_name?.trim() || "",
         tpo_number: normalizeMobile(form.tpo_number) || "",
         tpo_email: form.tpo_email?.trim() || "",
@@ -327,7 +318,11 @@ export default function NewStudentPage() {
         }
         formData.append("payment_mode", initialPayment.payment_mode || "upi");
         if (initialPayment.receiver) formData.append("receiver", initialPayment.receiver);
-        formData.append("reference", initialPayment.reference || "");
+        if (isTransactionIdRequired(initialPayment.payment_mode)) {
+          formData.append("transaction_id", (initialPayment.transaction_id || "").trim());
+        }
+        const reference = (initialPayment.reference || "").trim();
+        if (reference) formData.append("reference", reference);
         formData.append("notes", initialPayment.notes || "");
         if (initialPayment.reference_image) {
           formData.append("reference_image", initialPayment.reference_image);
@@ -401,7 +396,10 @@ export default function NewStudentPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">
-              {fromReferral ? "Enrolling from referral." : "Enrolling from lead."} Fill student details below and add initial payment.
+              {fromReferral
+                ? "Enrolling from referral. Name, email, and mobile are pre-filled where available."
+                : "Enrolling from lead. Name, email, mobile, and course are pre-filled from the lead when set."}{" "}
+              Fill remaining student details below and add initial payment.
             </p>
           </CardContent>
         </Card>
@@ -455,7 +453,6 @@ export default function NewStudentPage() {
               salesBatchesError={salesBatchesError}
               availableSalesBatches={availableSalesBatches}
               selectedSalesBatch={selectedSalesBatch}
-              {...otp}
             />
           </CardContent>
         </Card>
@@ -518,7 +515,14 @@ export default function NewStudentPage() {
                 id="payment-field-mode"
                 className="w-full rounded-md border border-input bg-background px-3 py-2"
                 value={initialPayment.payment_mode}
-                onChange={(e) => setInitialPayment((p) => ({ ...p, payment_mode: e.target.value, receiver: "" }))}
+                onChange={(e) =>
+                  setInitialPayment((p) => ({
+                    ...p,
+                    payment_mode: e.target.value,
+                    receiver: "",
+                    transaction_id: e.target.value === "upi" ? p.transaction_id : "",
+                  }))
+                }
               >
                 {PAYMENT_MODE_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -530,7 +534,7 @@ export default function NewStudentPage() {
             </div>
             {PAYMENT_MODES_NEED_RECEIVER.includes(initialPayment.payment_mode) && (
               <div>
-                <Label>Receiver account *</Label>
+                <Label>{initialPayment.payment_mode === "upi" ? "UPI account *" : "Bank account *"}</Label>
                 <select
                   id="payment-field-receiver"
                   className="w-full rounded-md border border-input bg-background px-3 py-2"
@@ -539,11 +543,15 @@ export default function NewStudentPage() {
                   disabled={paymentReceiversLoading}
                 >
                   <option value="">
-                    {paymentReceiversLoading ? "Loading receiver accounts..." : "Select receiver account"}
+                    {paymentReceiversLoading
+                      ? "Loading accounts..."
+                      : initialPayment.payment_mode === "upi"
+                        ? "Select UPI account"
+                        : "Select bank account"}
                   </option>
-                  {paymentReceivers.map((r) => (
+                  {paymentReceiversForMode(paymentReceivers, initialPayment.payment_mode).map((r) => (
                     <option key={r.id} value={r.id}>
-                      {r.receiver_name} Â· {r.bank_name}
+                      {r.receiver_name} · {initialPayment.payment_mode === "upi" ? r.upi_id : r.bank_name || r.account || "—"}
                     </option>
                   ))}
                 </select>
@@ -555,11 +563,27 @@ export default function NewStudentPage() {
                 )}
               </div>
             )}
+            {isTransactionIdRequired(initialPayment.payment_mode) && (
+              <div>
+                <Label htmlFor="payment-field-transaction-id">Transaction ID *</Label>
+                <Input
+                  id="payment-field-transaction-id"
+                  value={initialPayment.transaction_id}
+                  onChange={(e) => setInitialPayment((p) => ({ ...p, transaction_id: e.target.value }))}
+                  placeholder="e.g. UPI transaction ID"
+                />
+                {paymentFieldErrors.transaction_id && (
+                  <p className="mt-1 text-sm text-destructive">{paymentFieldErrors.transaction_id}</p>
+                )}
+              </div>
+            )}
             <div>
-              <Label>Reference / Transaction ID</Label>
+              <Label htmlFor="payment-field-reference">Reference (optional)</Label>
               <Input
+                id="payment-field-reference"
                 value={initialPayment.reference}
                 onChange={(e) => setInitialPayment((p) => ({ ...p, reference: e.target.value }))}
+                placeholder="Cheque number or other note"
               />
             </div>
             <div className="sm:col-span-2">
@@ -604,16 +628,13 @@ export default function NewStudentPage() {
         </Card>
 
         <div className="flex flex-col items-end gap-2">
-          {(!emailVerified || !mobileVerified) && (
-            <p className="text-sm text-muted-foreground">Verify student email and mobile with OTP above to continue.</p>
-          )}
           <div className="flex gap-4">
             <Button type="button" variant="outline" onClick={() => setCancelConfirmOpen(true)} disabled={saving || loadingLead}>
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={saving || loadingLead || !emailVerified || !mobileVerified}
+              disabled={saving || loadingLead}
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Review & Submit"}
             </Button>
@@ -648,7 +669,13 @@ export default function NewStudentPage() {
               <div><span className="text-muted-foreground">Initial Payment:</span> <span className="font-medium">{initialPayment.amount ? `₹ ${Number(initialPayment.amount).toLocaleString()}` : "—"}</span></div>
               <div><span className="text-muted-foreground">Next payment follow-up:</span> <span className="font-medium">{initialPayment.next_payment_follow_up_at || "—"}</span></div>
               <div><span className="text-muted-foreground">Payment Mode:</span> <span className="font-medium">{PAYMENT_MODE_OPTIONS.find((m) => m.value === initialPayment.payment_mode)?.label || initialPayment.payment_mode || "—"}</span></div>
-              <div><span className="text-muted-foreground">Receiver:</span> <span className="font-medium">{paymentReceivers.find((r) => String(r.id) === String(initialPayment.receiver))?.receiver_name || "—"}</span></div>
+              <div><span className="text-muted-foreground">Bank:</span> <span className="font-medium">{paymentReceivers.find((r) => String(r.id) === String(initialPayment.receiver))?.receiver_name || "—"}</span></div>
+              {isTransactionIdRequired(initialPayment.payment_mode) && (
+                <div><span className="text-muted-foreground">Transaction ID:</span> <span className="font-medium">{initialPayment.transaction_id?.trim() || "—"}</span></div>
+              )}
+              {initialPayment.reference?.trim() && (
+                <div><span className="text-muted-foreground">Reference:</span> <span className="font-medium">{initialPayment.reference.trim()}</span></div>
+              )}
               <div><span className="text-muted-foreground">Proof Screenshot:</span> <span className="font-medium">{initialPayment.reference_image?.name || "—"}</span></div>
               <div><span className="text-muted-foreground">Receipt Image:</span> <span className="font-medium">{initialPayment.receipt_image?.name || "—"}</span></div>
             </div>

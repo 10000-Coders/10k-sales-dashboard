@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
 import { toast } from "react-toastify";
@@ -31,6 +32,7 @@ import {
   Loader2,
   Phone,
   Mail,
+  Search,
 } from "lucide-react";
 import {
   bulkReassignLeads,
@@ -88,6 +90,8 @@ export default function LeadReassignClient() {
   const [transferCountInput, setTransferCountInput] = useState("");
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [page, setPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchDebounce, setSearchDebounce] = useState("");
 
   const targetPersons = useMemo(
     () => persons.filter((p) => String(p.id) !== fromPersonId),
@@ -116,20 +120,33 @@ export default function LeadReassignClient() {
     setTransferCountInput("");
     setSelectedIds(new Set());
     setToPersonId("");
+    setSearchQuery("");
+    setSearchDebounce("");
   }, [fromPersonId]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearchDebounce(searchQuery.trim()), 3000);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setPage(1);
+    setTransferCountInput("");
+    setSelectedIds(new Set());
+  }, [searchDebounce]);
 
   const loadLeads = useCallback(() => {
     if (!fromPersonId) {
       toast.warn("Select a counselor to load leads from.");
       return;
     }
-    dispatch(fetchLeadsForReassign({ salesPersonId: fromPersonId, page }));
-  }, [dispatch, fromPersonId, page]);
+    dispatch(fetchLeadsForReassign({ salesPersonId: fromPersonId, page, search: searchDebounce }));
+  }, [dispatch, fromPersonId, page, searchDebounce]);
 
   useEffect(() => {
     if (!fromPersonId || !isManager) return;
-    dispatch(fetchLeadsForReassign({ salesPersonId: fromPersonId, page }));
-  }, [dispatch, fromPersonId, isManager, page]);
+    dispatch(fetchLeadsForReassign({ salesPersonId: fromPersonId, page, search: searchDebounce }));
+  }, [dispatch, fromPersonId, isManager, page, searchDebounce]);
 
   const transferCount = useMemo(() => {
     const parsed = Number.parseInt(transferCountInput, 10);
@@ -206,7 +223,7 @@ export default function LeadReassignClient() {
 
       setTransferCountInput("");
       setSelectedIds(new Set());
-      dispatch(fetchLeadsForReassign({ salesPersonId: fromPersonId, page }));
+      dispatch(fetchLeadsForReassign({ salesPersonId: fromPersonId, page, search: searchDebounce }));
     } catch (err) {
       const detail =
         err?.detail ||
@@ -283,6 +300,18 @@ export default function LeadReassignClient() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="relative min-w-[200px] max-w-sm flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name, mobile, or email..."
+                className="h-9 pl-9"
+                disabled={!fromPersonId}
+                aria-label="Search leads by name"
+              />
             </div>
             <Button
               type="button"

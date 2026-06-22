@@ -478,6 +478,21 @@ export default function StudentEnrollmentFields({
           <p className="mt-1 text-sm text-destructive">{fieldErrors.college_name}</p>
         )}
       </div>
+      <div id="field-college_branch_name">
+        <Label>Branch or department in your college</Label>
+        <Input
+          value={form.college_branch_name}
+          onChange={(e) => {
+            setForm((f) => ({ ...f, college_branch_name: e.target.value }));
+            clearError("college_branch_name");
+          }}
+          placeholder="e.g. CSE, ECE, Mechanical"
+          className={fieldErrors.college_branch_name ? "border-destructive" : ""}
+        />
+        {fieldErrors.college_branch_name && (
+          <p className="mt-1 text-sm text-destructive">{fieldErrors.college_branch_name}</p>
+        )}
+      </div>
       <div id="field-tpo_name">
         <Label>TPO name <span className="text-destructive">*</span></Label>
         <Input
