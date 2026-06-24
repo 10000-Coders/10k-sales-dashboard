@@ -8,6 +8,16 @@ export const LEAD_SOURCE_VALUES = [
   { value: "outsource", label: "Outsource" },
   { value: "social_media", label: "Social Media" },
   { value: "family_member", label: "Family Member" },
+  { value: "college_team", label: "College Team" },
+  { value: "meta_uday", label: "Meta Uday" },
+  { value: "meta_sai_kiran", label: "Meta Sai kiran" },
+  { value: "meta_whatsapp_uday", label: "Meta WhatsApp Uday" },
+  { value: "meta_whatsapp_sai_kiran", label: "Meta WhatsApp Sai kiran" },
+  { value: "incoming_call", label: "Incoming Call" },
+  { value: "suresh_referals", label: "SURESH Referals" },
+  { value: "crm_referals", label: "CRM Referals" },
+  { value: "pm_referals", label: "PM Referals" },
+  { value: "triner_referals", label: "TRINER Referals" },
 ];
 
 /** Leads list filter — includes all sources + unknown (empty source). */

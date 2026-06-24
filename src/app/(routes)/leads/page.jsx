@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import axios from "@/axios";
 import { useSalesPersons } from "@/hooks/useSalesData";
 import {
@@ -24,22 +24,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { LeadFormDialog } from "@/components/LeadFormDialog";
 import { Loader2, UserPlus, Pencil, Phone, Mail, Search, ChevronDown, ChevronLeft, ChevronRight, Upload, ArrowRightLeft, BarChart3 } from "lucide-react";
-import * as XLSX from "xlsx";
-import { parseLeadsWorkbook, mapLeadsExcelToBulkPayload } from "@/utils/parseLeadsExcel";
-import { formatApiError } from "@/utils/formatApiError";
 import { LEAD_STATUS_FILTER_OPTIONS, LEAD_STATUS_STYLES } from "@/constants/leadStatus";
 import { getInquirySourceLabel, LEAD_SOURCE_FILTER_OPTIONS } from "@/constants/leadInquirySource";
 import {
   LEAD_COURSE_FILTER_OPTIONS,
   LEAD_IS_RELATED_FILTER_OPTIONS,
   getLeadCourseLabel,
+  getLeadRelatedLabel,
+  LEAD_RELATED_BADGE_STYLES,
+  normalizeLeadRelatedValue,
 } from "@/constants/leadCourse";
-import {
-  bulkCreateLeads,
-  MAX_BULK_LEAD_IMPORT,
-  selectLeadsBulkCreateLoading,
-} from "@/redux/features/leads/leadsSlice";
-import { toast } from "react-toastify";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
@@ -163,9 +157,7 @@ function LeadMultiSelectFilter({
 
 function LeadsPage() {
   const router = useRouter();
-  const dispatch = useDispatch();
   const user = useSelector((state) => state.userAuth?.user);
-  const bulkCreateLoading = useSelector(selectLeadsBulkCreateLoading);
   const isManagerRole = isManager(user?.role);
   const { persons, refetch: refetchPersons } = useSalesPersons({ enabled: isManagerRole });
   const { setUpcomingFollowUpsFromLeads } = useFollowUp();
@@ -358,56 +350,6 @@ function LeadsPage() {
     router.push(`/leads/${lead.id}`);
   };
 
-  const handleExcelUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    if (ext !== "xlsx" && ext !== "xls") {
-      toast.warn("Only .xlsx and .xls files are allowed.");
-      e.target.value = "";
-      return;
-    }
-
-    if (!user?.id) {
-      toast.error("You must be logged in to import leads.");
-      e.target.value = "";
-      return;
-    }
-
-    try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const parsedRows = parseLeadsWorkbook(workbook);
-      const leads = mapLeadsExcelToBulkPayload(parsedRows, user.id);
-
-      if (leads.length === 0) {
-        toast.warn("No valid rows found. Each row needs Name and Phone.");
-        return;
-      }
-
-      const result = await dispatch(bulkCreateLeads({ leads })).unwrap();
-      const { created_count = 0, failed_count = 0 } = result;
-      const message = result.detail || "Import completed.";
-
-      if (created_count > 0) {
-        if (failed_count > 0) {
-          toast.warn(message);
-        } else {
-          toast.success(message);
-        }
-        setPage(1);
-        fetchLeads(true, 1);
-      } else {
-        toast.warn(message);
-      }
-    } catch (err) {
-      toast.error(formatApiError(err, "Failed to import leads from Excel."));
-    } finally {
-      e.target.value = "";
-    }
-  };
-
   return (
     <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <Card>
@@ -428,26 +370,13 @@ function LeadsPage() {
             
           </div>
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            <label
-              className={cn(
-                "inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm",
-                bulkCreateLoading ? "pointer-events-none opacity-60" : "cursor-pointer hover:bg-muted/50"
-              )}
+            <Link
+              href="/bulk-upload"
+              className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-muted/50"
             >
-              {bulkCreateLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              ) : (
-                <Upload className="h-4 w-4 text-muted-foreground" />
-              )}
-              <span>{bulkCreateLoading ? "Importing…" : "Upload Excel (.xlsx, .xls)"}</span>
-              <input
-                type="file"
-                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                className="sr-only"
-                disabled={bulkCreateLoading}
-                onChange={handleExcelUpload}
-              />
-            </label>
+              <Upload className="h-4 w-4 text-muted-foreground" />
+              Bulk upload
+            </Link>
             {isManagerRole && (
               <Link
                 href="/leaddemo/reassign"
@@ -700,12 +629,10 @@ function LeadsPage() {
                           <span
                             className={cn(
                               "inline-flex whitespace-nowrap rounded-full px-1.5 py-px text-[9px] font-medium",
-                              lead.is_related
-                                ? "bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/20"
-                                : "bg-red-500/10 text-red-700 ring-1 ring-red-500/20"
+                              LEAD_RELATED_BADGE_STYLES[normalizeLeadRelatedValue(lead.is_related)]
                             )}
                           >
-                            {lead.is_related ? "Related" : "Irrelated"}
+                            {getLeadRelatedLabel(lead.is_related)}
                           </span>
                         </div>
                       </TableCell>
