@@ -42,7 +42,7 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
   useEffect(() => {
     if (pathname?.startsWith("/public-challenges")) {
       setActiveItem(SCHOLARSHIP_TEST_NAV_LABEL);
-    } else if (pathname?.startsWith("/leads")) {
+    } else if (pathname?.startsWith("/leads") || pathname?.startsWith("/bulk-upload")) {
       setActiveItem("Leads");
     } else if (pathname?.startsWith("/referrals")) {
       setActiveItem("Referrals");
