@@ -3,5 +3,6 @@
 /students/new   /students/new   200
 /students/new/  /students/new   200
 /students/*     /students/0     200
+/bulk-upload    /bulk-upload    200
 /leads/*        /leads/0        200
 /activities/*   /activities/0   200

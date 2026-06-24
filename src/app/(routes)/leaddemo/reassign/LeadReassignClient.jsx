@@ -45,10 +45,16 @@ import {
   selectReassignLeadsLoading,
   selectReassignPagination,
 } from "@/redux/features/leads/leadsSlice";
-import { LEAD_STATUS_STYLES } from "@/constants/leadStatus";
+import { LEAD_STATUS_STYLES, LEAD_STATUS_FILTER_OPTIONS } from "@/constants/leadStatus";
+import { LEAD_SOURCE_FILTER_OPTIONS } from "@/constants/leadInquirySource";
 
 const LEAD_TABLE_HEAD = "whitespace-nowrap align-middle py-1.5 text-[11px] font-medium text-muted-foreground";
 const LEAD_TABLE_CELL = "align-middle py-1.5 text-[11px]";
+const FILTER_SELECT_CLASS =
+  "h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+const STATUS_OPTIONS = LEAD_STATUS_FILTER_OPTIONS;
+const SOURCE_OPTIONS = LEAD_SOURCE_FILTER_OPTIONS;
 
 function formatDateTime(d) {
   if (!d) return "—";
@@ -92,6 +98,8 @@ export default function LeadReassignClient() {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchDebounce, setSearchDebounce] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterSource, setFilterSource] = useState("");
 
   const targetPersons = useMemo(
     () => persons.filter((p) => String(p.id) !== fromPersonId),
@@ -122,6 +130,8 @@ export default function LeadReassignClient() {
     setToPersonId("");
     setSearchQuery("");
     setSearchDebounce("");
+    setFilterStatus("");
+    setFilterSource("");
   }, [fromPersonId]);
 
   useEffect(() => {
@@ -133,20 +143,36 @@ export default function LeadReassignClient() {
     setPage(1);
     setTransferCountInput("");
     setSelectedIds(new Set());
-  }, [searchDebounce]);
+  }, [searchDebounce, filterStatus, filterSource]);
 
   const loadLeads = useCallback(() => {
     if (!fromPersonId) {
       toast.warn("Select a counselor to load leads from.");
       return;
     }
-    dispatch(fetchLeadsForReassign({ salesPersonId: fromPersonId, page, search: searchDebounce }));
-  }, [dispatch, fromPersonId, page, searchDebounce]);
+    dispatch(
+      fetchLeadsForReassign({
+        salesPersonId: fromPersonId,
+        page,
+        search: searchDebounce,
+        status: filterStatus,
+        source: filterSource,
+      })
+    );
+  }, [dispatch, fromPersonId, page, searchDebounce, filterStatus, filterSource]);
 
   useEffect(() => {
     if (!fromPersonId || !isManager) return;
-    dispatch(fetchLeadsForReassign({ salesPersonId: fromPersonId, page, search: searchDebounce }));
-  }, [dispatch, fromPersonId, isManager, page, searchDebounce]);
+    dispatch(
+      fetchLeadsForReassign({
+        salesPersonId: fromPersonId,
+        page,
+        search: searchDebounce,
+        status: filterStatus,
+        source: filterSource,
+      })
+    );
+  }, [dispatch, fromPersonId, isManager, page, searchDebounce, filterStatus, filterSource]);
 
   const transferCount = useMemo(() => {
     const parsed = Number.parseInt(transferCountInput, 10);
@@ -223,7 +249,15 @@ export default function LeadReassignClient() {
 
       setTransferCountInput("");
       setSelectedIds(new Set());
-      dispatch(fetchLeadsForReassign({ salesPersonId: fromPersonId, page, search: searchDebounce }));
+      dispatch(
+        fetchLeadsForReassign({
+          salesPersonId: fromPersonId,
+          page,
+          search: searchDebounce,
+          status: filterStatus,
+          source: filterSource,
+        })
+      );
     } catch (err) {
       const detail =
         err?.detail ||
@@ -313,6 +347,44 @@ export default function LeadReassignClient() {
                 aria-label="Search leads by name"
               />
             </div>
+            <div className="flex min-w-[140px] flex-col gap-1">
+              <label htmlFor="filter-status" className="text-xs font-medium text-muted-foreground">
+                Status
+              </label>
+              <select
+                id="filter-status"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                disabled={!fromPersonId}
+                className={cn(FILTER_SELECT_CLASS, "min-w-[140px]")}
+                aria-label="Filter by status"
+              >
+                {STATUS_OPTIONS.map((o) => (
+                  <option key={o.value || "all-status"} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex min-w-[160px] flex-col gap-1">
+              <label htmlFor="filter-source" className="text-xs font-medium text-muted-foreground">
+                Inquiry source
+              </label>
+              <select
+                id="filter-source"
+                value={filterSource}
+                onChange={(e) => setFilterSource(e.target.value)}
+                disabled={!fromPersonId}
+                className={cn(FILTER_SELECT_CLASS, "min-w-[160px]")}
+                aria-label="Filter by inquiry source"
+              >
+                {SOURCE_OPTIONS.map((o) => (
+                  <option key={o.value || "all-source"} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <Button
               type="button"
               variant="secondary"
@@ -397,7 +469,10 @@ export default function LeadReassignClient() {
             </p>
           ) : totalCount === 0 ? (
             <div className="py-6 text-center text-muted-foreground">
-              <p>No leads assigned to {fromPersonName || "this counselor"}.</p>
+              <p>
+                No leads assigned to {fromPersonName || "this counselor"}
+                {filterStatus || filterSource ? " matching the selected filters" : ""}.
+              </p>
               <p className="mt-2 text-xs">
                 On the main Leads page, filter by counselor to confirm who owns leads, then select that person here.
               </p>

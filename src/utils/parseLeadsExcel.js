@@ -104,9 +104,9 @@ function parseAddedTime(value) {
 
 /**
  * Map one parsed Excel row to bulk-create API shape.
- * Columns: Name, Phone, Email, Added Time, Related (yes → is_related).
+ * Source must be passed via `selectedSource` from the UI dropdown (never from Excel).
  */
-export function mapExcelRowToLeadPayload(row, salesPersonId) {
+export function mapExcelRowToLeadPayload(row, salesPersonId, { selectedSource, relatedType = "none" } = {}) {
   const name = trimCellValue(row.Name);
   const mobile = cleanExcelPhone(row.Phone ?? row.phone);
   const email = trimCellValue(row.Email);
@@ -118,17 +118,55 @@ export function mapExcelRowToLeadPayload(row, salesPersonId) {
     mobile,
     email,
     status: "new",
-    source: "website",
-    is_related: true,
+    source: selectedSource,
+    is_related: relatedType || "none",
+    referred_by_name: trimCellValue(row["Referred By"] ?? row.referred_by_name) || "",
+    referred_by_batch: trimCellValue(row["Referred By Batch"] ?? row.referred_by_batch) || "",
   };
   if (next_follow_up_at) payload.next_follow_up_at = next_follow_up_at;
   return payload;
 }
 
-/** Map parsed Excel rows; drops rows missing name or mobile. */
-export function mapLeadsExcelToBulkPayload(rows, salesPersonId) {
+/** Validate one Excel row; returns missing field labels for UI. */
+export function validateExcelLeadRow(row) {
+  const name = trimCellValue(row.Name);
+  const mobile = cleanExcelPhone(row.Phone ?? row.phone);
+  const email = trimCellValue(row.Email);
+  const missing = [];
+
+  if (!name) missing.push("Name");
+  if (!mobile) missing.push("Phone");
+  else if (mobile.length !== 10) missing.push("Valid 10-digit Phone");
+
+  return {
+    name: name || "—",
+    mobile: mobile || "—",
+    email: email || "—",
+    missing,
+    isValid: missing.length === 0,
+  };
+}
+
+/** Build preview rows for bulk import UI (keeps invalid rows visible). */
+export function prepareBulkLeadImportRows(rows, salesPersonId, { selectedSource, relatedType = "none" } = {}) {
   if (!salesPersonId) return [];
-  return rows
-    .map((row) => mapExcelRowToLeadPayload(row, salesPersonId))
-    .filter((lead) => lead.name && lead.mobile);
+  return rows.map((row, index) => {
+    const validation = validateExcelLeadRow(row);
+    const canBuildPayload = validation.isValid && Boolean(selectedSource);
+    return {
+      rowNumber: index + 1,
+      raw: row,
+      validation,
+      payload: canBuildPayload
+        ? mapExcelRowToLeadPayload(row, salesPersonId, { selectedSource, relatedType })
+        : null,
+    };
+  });
+}
+
+/** Map parsed Excel rows; only rows that pass validation. */
+export function mapLeadsExcelToBulkPayload(rows, salesPersonId, options = {}) {
+  return prepareBulkLeadImportRows(rows, salesPersonId, options)
+    .filter((item) => item.payload)
+    .map((item) => item.payload);
 }
