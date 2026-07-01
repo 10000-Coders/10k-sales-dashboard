@@ -14,11 +14,16 @@ export const FollowUpNotification = () => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  const activeFollowUps = upcomingFollowUps.filter(l => {
-    const due = new Date(l.next_follow_up_at).getTime();
-    const now = Date.now() - serverTimeOffset;
-    return due - now < 3600000; // Show in dropdown if due in next 1 hour or overdue
-  }).sort((a, b) => new Date(a.next_follow_up_at) - new Date(b.next_follow_up_at));
+  const activeFollowUps = upcomingFollowUps
+    .filter((item) => {
+      const due = new Date(item.followUpAt).getTime();
+      const now = Date.now() - serverTimeOffset;
+      return due - now < 3600000; // due in next 1 hour or overdue
+    })
+    .sort((a, b) => new Date(a.followUpAt) - new Date(b.followUpAt));
+
+  const leadCount = activeFollowUps.filter((i) => i.type === "lead").length;
+  const studentCount = activeFollowUps.filter((i) => i.type === "student").length;
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -89,7 +94,12 @@ export const FollowUpNotification = () => {
           )}
           <div className="flex items-center justify-between border-b px-4 py-3">
             <h3 className="text-sm font-semibold">Upcoming Follow-ups</h3>
-            <span className="text-xs text-muted-foreground">{activeFollowUps.length} active</span>
+            <span className="text-xs text-muted-foreground">
+              {activeFollowUps.length} active
+              {leadCount > 0 || studentCount > 0
+                ? ` · ${leadCount} lead${leadCount === 1 ? "" : "s"}${studentCount > 0 ? `, ${studentCount} student${studentCount === 1 ? "" : "s"}` : ""}`
+                : ""}
+            </span>
           </div>
           <div className="max-h-[400px] overflow-auto py-2">
             {activeFollowUps.length === 0 ? (
@@ -98,19 +108,30 @@ export const FollowUpNotification = () => {
                 <p className="mt-2 text-sm text-muted-foreground">No urgent follow-ups</p>
               </div>
             ) : (
-              activeFollowUps.map((lead) => (
+              activeFollowUps.map((item) => (
                 <button
-                  key={lead.id}
+                  key={`${item.type}-${item.id}`}
                   className="flex w-full items-start gap-3 border-b border-muted/30 px-4 py-3 text-left transition-colors hover:bg-muted/50 last:border-0"
                   onClick={() => {
-                    router.push(`/leads/${lead.id}`);
+                    router.push(item.href);
                     setIsOpen(false);
                   }}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm font-medium">{lead.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-medium">{item.name}</p>
+                      <span
+                        className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase ${
+                          item.type === "student"
+                            ? "bg-violet-100 text-violet-800"
+                            : "bg-blue-100 text-blue-800"
+                        }`}
+                      >
+                        {item.type === "student" ? "Student" : "Lead"}
+                      </span>
+                    </div>
                     <div className="mt-1 flex items-center justify-between">
-                      <FollowUpTimer followUpAt={lead.next_follow_up_at} className="text-xs" />
+                      <FollowUpTimer followUpAt={item.followUpAt} className="text-xs" />
                       <ChevronRight className="h-3 w-3 text-muted-foreground" />
                     </div>
                   </div>
@@ -119,17 +140,31 @@ export const FollowUpNotification = () => {
             )}
           </div>
           {activeFollowUps.length > 0 && (
-            <div className="border-t px-4 py-2">
-              <Button
-                variant="link"
-                className="h-auto w-full p-0 text-xs text-primary"
-                onClick={() => {
-                  router.push("/leads");
-                  setIsOpen(false);
-                }}
-              >
-                View all leads
-              </Button>
+            <div className="flex gap-2 border-t px-4 py-2">
+              {leadCount > 0 && (
+                <Button
+                  variant="link"
+                  className="h-auto flex-1 p-0 text-xs text-primary"
+                  onClick={() => {
+                    router.push("/leads");
+                    setIsOpen(false);
+                  }}
+                >
+                  View leads
+                </Button>
+              )}
+              {studentCount > 0 && (
+                <Button
+                  variant="link"
+                  className="h-auto flex-1 p-0 text-xs text-primary"
+                  onClick={() => {
+                    router.push("/students");
+                    setIsOpen(false);
+                  }}
+                >
+                  View students
+                </Button>
+              )}
             </div>
           )}
         </div>

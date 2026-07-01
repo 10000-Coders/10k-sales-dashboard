@@ -12,7 +12,7 @@ const SW_PATH = "/follow-up-sw.js";
 const NOTIFY_BEFORE_MS = 2 * 60 * 1000; // 2 min before due
 const NOTIFY_AFTER_MS = 30 * 60 * 1000; // 30 min after due (catch missed checks)
 const NOTIFY_COOLDOWN_MS = 15 * 60 * 1000;
-const LEADS_REFRESH_MS = 5 * 60 * 1000;
+const REFRESH_MS = 5 * 60 * 1000;
 const POLL_INTERVAL_MS = 5000;
 const MAX_SCHEDULE_MS = 24 * 60 * 60 * 1000;
 const CHIME_DURATION_MS = 10 * 1000;
@@ -32,17 +32,52 @@ function filterFollowUpLeads(leads) {
   return (leads || []).filter((l) => l.next_follow_up_at && l.status !== "enrolled");
 }
 
-function shouldNotifyLead(diffMs) {
+function filterFollowUpStudents(students) {
+  return (students || []).filter(
+    (s) => s.next_payment_follow_up_at && s.display_status !== "rejected"
+  );
+}
+
+function toLeadFollowUpItem(lead) {
+  return {
+    type: "lead",
+    id: lead.id,
+    name: lead.name,
+    mobile: lead.mobile,
+    followUpAt: lead.next_follow_up_at,
+    href: `/leads/${lead.id}`,
+  };
+}
+
+function toStudentFollowUpItem(student) {
+  return {
+    type: "student",
+    id: student.id,
+    name: student.student_name,
+    mobile: student.student_mobile,
+    followUpAt: student.next_payment_follow_up_at,
+    href: `/students/${student.id}`,
+  };
+}
+
+function buildFollowUpItems(leads, students) {
+  return [
+    ...filterFollowUpLeads(leads).map(toLeadFollowUpItem),
+    ...filterFollowUpStudents(students).map(toStudentFollowUpItem),
+  ];
+}
+
+function shouldNotify(diffMs) {
   return diffMs <= NOTIFY_BEFORE_MS && diffMs > -NOTIFY_AFTER_MS;
 }
 
-function wasRecentlyNotified(leadId) {
-  const lastNotified = localStorage.getItem(`notified_lead_${leadId}`);
+function wasRecentlyNotified(type, id) {
+  const lastNotified = localStorage.getItem(`notified_${type}_${id}`);
   return lastNotified && Date.now() - parseInt(lastNotified, 10) < NOTIFY_COOLDOWN_MS;
 }
 
-function markLeadNotified(leadId) {
-  localStorage.setItem(`notified_lead_${leadId}`, Date.now().toString());
+function markNotified(type, id) {
+  localStorage.setItem(`notified_${type}_${id}`, Date.now().toString());
 }
 
 const SERVER_TIME_STORAGE_KEY = "sales_dashboard_server_time_offset";
@@ -78,7 +113,9 @@ export const FollowUpProvider = ({ children }) => {
   const [serverTimeOffset, setServerTimeOffset] = useState(() => getStoredServerTimeOffset() ?? 0);
   const [permission, setPermission] = useState("default");
 
-  const leadsRef = useRef([]);
+  const leadsDataRef = useRef([]);
+  const studentsDataRef = useRef([]);
+  const itemsRef = useRef([]);
   const audioCtxRef = useRef(null);
   const swRegistrationRef = useRef(null);
   const scheduledTimersRef = useRef(new Map());
@@ -176,16 +213,20 @@ export const FollowUpProvider = ({ children }) => {
     }
   }, []);
 
-  const showDesktopNotification = useCallback(async (lead) => {
+  const showDesktopNotification = useCallback(async (item) => {
     if (typeof window === "undefined" || Notification.permission !== "granted") return;
 
-    const body = `Follow-up due for ${lead.name} (${lead.mobile || "no mobile"})`;
-    const leadUrl = `${window.location.origin}/leads/${lead.id}`;
+    const isStudent = item.type === "student";
+    const title = isStudent ? "Payment Follow-up Reminder" : "Follow-up Reminder";
+    const body = isStudent
+      ? `Payment follow-up due for ${item.name} (${item.mobile || "no mobile"})`
+      : `Follow-up due for ${item.name} (${item.mobile || "no mobile"})`;
+    const itemUrl = `${window.location.origin}${item.href}`;
     const options = {
       body,
       icon: "/favicon.ico",
-      tag: `follow-up-${lead.id}`,
-      data: { url: leadUrl },
+      tag: `follow-up-${item.type}-${item.id}`,
+      data: { url: itemUrl },
       requireInteraction: true,
       silent: false,
     };
@@ -193,7 +234,7 @@ export const FollowUpProvider = ({ children }) => {
     const reg = swRegistrationRef.current;
     if (reg?.showNotification) {
       try {
-        await reg.showNotification("Follow-up Reminder", options);
+        await reg.showNotification(title, options);
         return;
       } catch {
         /* fall through */
@@ -202,37 +243,37 @@ export const FollowUpProvider = ({ children }) => {
 
     if (reg?.active) {
       try {
-        reg.active.postMessage({
-          type: "SHOW_NOTIFICATION",
-          title: "Follow-up Reminder",
-          options,
-        });
+        reg.active.postMessage({ type: "SHOW_NOTIFICATION", title, options });
         return;
       } catch {
         /* fall through */
       }
     }
 
-    const notification = new Notification("Follow-up Reminder", options);
+    const notification = new Notification(title, options);
     notification.onclick = () => {
       window.focus();
-      window.location.href = `/leads/${lead.id}`;
+      window.location.href = item.href;
     };
   }, []);
 
   const triggerNotification = useCallback(
-    (lead) => {
-      if (wasRecentlyNotified(lead.id)) return;
-      markLeadNotified(lead.id);
+    (item) => {
+      if (wasRecentlyNotified(item.type, item.id)) return;
+      markNotified(item.type, item.id);
 
-      showDesktopNotification(lead);
+      showDesktopNotification(item);
 
       if (typeof document !== "undefined" && !document.hidden) {
-        toast.info(`Follow-up due for ${lead.name} (${lead.mobile || "no mobile"})`, {
+        const isStudent = item.type === "student";
+        const message = isStudent
+          ? `Payment follow-up due for ${item.name} (${item.mobile || "no mobile"})`
+          : `Follow-up due for ${item.name} (${item.mobile || "no mobile"})`;
+        toast.info(message, {
           autoClose: 15000,
           onClick: () => {
             window.focus();
-            window.location.href = `/leads/${lead.id}`;
+            window.location.href = item.href;
           },
         });
         playChime();
@@ -241,22 +282,22 @@ export const FollowUpProvider = ({ children }) => {
     [playChime, showDesktopNotification]
   );
 
-  const tryNotifyLead = useCallback(
-    (lead, nowServer) => {
-      const followUpTime = new Date(lead.next_follow_up_at).getTime();
+  const tryNotifyItem = useCallback(
+    (item, nowServer) => {
+      const followUpTime = new Date(item.followUpAt).getTime();
       const diff = followUpTime - nowServer;
-      if (shouldNotifyLead(diff)) {
-        triggerNotification(lead);
+      if (shouldNotify(diff)) {
+        triggerNotification(item);
       }
     },
     [triggerNotification]
   );
 
   const checkNotifications = useCallback(() => {
-    if (!leadsRef.current.length || typeof window === "undefined") return;
+    if (!itemsRef.current.length || typeof window === "undefined") return;
     const nowServer = Date.now() - serverTimeOffsetRef.current;
-    leadsRef.current.forEach((lead) => tryNotifyLead(lead, nowServer));
-  }, [tryNotifyLead]);
+    itemsRef.current.forEach((item) => tryNotifyItem(item, nowServer));
+  }, [tryNotifyItem]);
 
   const clearScheduledTimers = useCallback(() => {
     scheduledTimersRef.current.forEach((id) => clearTimeout(id));
@@ -264,75 +305,114 @@ export const FollowUpProvider = ({ children }) => {
   }, []);
 
   const scheduleFollowUpTimers = useCallback(
-    (leads) => {
+    (items) => {
       clearScheduledTimers();
-      if (!leads.length) return;
+      if (!items.length) return;
 
       const nowServer = Date.now() - serverTimeOffsetRef.current;
 
-      leads.forEach((lead) => {
-        const followUpTime = new Date(lead.next_follow_up_at).getTime();
+      items.forEach((item) => {
+        const followUpTime = new Date(item.followUpAt).getTime();
         const delay = followUpTime - nowServer;
         if (delay < 0 || delay > MAX_SCHEDULE_MS) return;
 
+        const timerKey = `${item.type}-${item.id}`;
         const timerId = setTimeout(() => {
-          tryNotifyLead(lead, Date.now() - serverTimeOffsetRef.current);
+          tryNotifyItem(item, Date.now() - serverTimeOffsetRef.current);
         }, delay);
-        scheduledTimersRef.current.set(lead.id, timerId);
+        scheduledTimersRef.current.set(timerKey, timerId);
       });
     },
-    [clearScheduledTimers, tryNotifyLead]
+    [clearScheduledTimers, tryNotifyItem]
   );
 
-  const applyLeads = useCallback(
-    (leads) => {
-      const filtered = filterFollowUpLeads(leads);
-      setUpcomingFollowUps(filtered);
-      leadsRef.current = filtered;
-      scheduleFollowUpTimers(filtered);
+  const mergeAndApply = useCallback(
+    (leads, students) => {
+      const items = buildFollowUpItems(leads, students);
+      setUpcomingFollowUps(items);
+      itemsRef.current = items;
+      scheduleFollowUpTimers(items);
     },
     [scheduleFollowUpTimers]
   );
 
   const setUpcomingFollowUpsFromLeads = useCallback(
     (leads) => {
-      applyLeads(leads);
+      leadsDataRef.current = leads || [];
+      mergeAndApply(leadsDataRef.current, studentsDataRef.current);
     },
-    [applyLeads]
+    [mergeAndApply]
+  );
+
+  const setUpcomingFollowUpsFromStudents = useCallback(
+    (students) => {
+      studentsDataRef.current = students || [];
+      mergeAndApply(leadsDataRef.current, studentsDataRef.current);
+    },
+    [mergeAndApply]
   );
 
   const updateLeadInFollowUpList = useCallback(
     (leadId, updates) => {
-      setUpcomingFollowUps((prev) => {
-        const next = prev.map((l) => (l.id === leadId ? { ...l, ...updates } : l));
-        const filtered = filterFollowUpLeads(next);
-        leadsRef.current = filtered;
-        scheduleFollowUpTimers(filtered);
-        return filtered;
-      });
+      leadsDataRef.current = leadsDataRef.current.map((l) =>
+        l.id === leadId ? { ...l, ...updates } : l
+      );
+      mergeAndApply(leadsDataRef.current, studentsDataRef.current);
     },
-    [scheduleFollowUpTimers]
+    [mergeAndApply]
   );
 
+  const updateStudentInFollowUpList = useCallback(
+    (studentId, updates) => {
+      studentsDataRef.current = studentsDataRef.current.map((s) =>
+        s.id === studentId ? { ...s, ...updates } : s
+      );
+      mergeAndApply(leadsDataRef.current, studentsDataRef.current);
+    },
+    [mergeAndApply]
+  );
+
+  const getAuthHeaders = useCallback(() => {
+    const headers = {};
+    if (user?.id != null) headers["X-Sales-Person-Id"] = String(user.id);
+    if (user?.role) headers["X-Sales-Person-Role"] = user.role;
+    return headers;
+  }, [user?.id, user?.role]);
+
   const fetchFollowUpLeads = useCallback(async () => {
+    if (!user?.id) return [];
+    const params = new URLSearchParams();
+    params.set("page", "1");
+    params.set("page_size", "100");
+    params.set("sales_person", String(user.id));
+    const { data } = await axios.get(`/leads/?${params.toString()}`, { headers: getAuthHeaders() });
+    const list = data?.results ?? (Array.isArray(data) ? data : []);
+    return list.filter((l) => String(l.sales_person) === String(user.id));
+  }, [user?.id, getAuthHeaders]);
+
+  const fetchFollowUpStudents = useCallback(async () => {
+    if (!user?.id) return [];
+    const params = new URLSearchParams();
+    params.set("page", "1");
+    params.set("page_size", "100");
+    const { data } = await axios.get(`/students/?${params.toString()}`, { headers: getAuthHeaders() });
+    return data?.results ?? (Array.isArray(data) ? data : []);
+  }, [user?.id, getAuthHeaders]);
+
+  const fetchAllFollowUps = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const params = new URLSearchParams();
-      params.set("page", "1");
-      params.set("page_size", "100");
-      params.set("sales_person", String(user.id));
-      const headers = {
-        "X-Sales-Person-Id": String(user.id),
-      };
-      if (user.role) headers["X-Sales-Person-Role"] = user.role;
-      const { data } = await axios.get(`/leads/?${params.toString()}`, { headers });
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
-      const mine = list.filter((l) => String(l.sales_person) === String(user.id));
-      applyLeads(mine);
+      const [leads, students] = await Promise.all([
+        fetchFollowUpLeads(),
+        fetchFollowUpStudents(),
+      ]);
+      leadsDataRef.current = leads;
+      studentsDataRef.current = students;
+      mergeAndApply(leads, students);
     } catch (error) {
-      console.error("Failed to refresh follow-up leads:", error);
+      console.error("Failed to refresh follow-ups:", error);
     }
-  }, [user?.id, user?.role, applyLeads]);
+  }, [user?.id, fetchFollowUpLeads, fetchFollowUpStudents, mergeAndApply]);
 
   const requestPermission = useCallback(async () => {
     unlockAudio();
@@ -369,10 +449,10 @@ export const FollowUpProvider = ({ children }) => {
 
   useEffect(() => {
     if (!user?.id) return;
-    fetchFollowUpLeads();
-    const refreshInterval = setInterval(fetchFollowUpLeads, LEADS_REFRESH_MS);
+    fetchAllFollowUps();
+    const refreshInterval = setInterval(fetchAllFollowUps, REFRESH_MS);
     return () => clearInterval(refreshInterval);
-  }, [user?.id, fetchFollowUpLeads]);
+  }, [user?.id, fetchAllFollowUps]);
 
   useEffect(() => {
     const poll = setInterval(checkNotifications, POLL_INTERVAL_MS);
@@ -394,14 +474,16 @@ export const FollowUpProvider = ({ children }) => {
   }, [clearScheduledTimers]);
 
   useEffect(() => {
-    scheduleFollowUpTimers(leadsRef.current);
+    scheduleFollowUpTimers(itemsRef.current);
   }, [serverTimeOffset, scheduleFollowUpTimers]);
 
   const value = {
     upcomingFollowUps,
     serverTimeOffset,
     setUpcomingFollowUpsFromLeads,
+    setUpcomingFollowUpsFromStudents,
     updateLeadInFollowUpList,
+    updateStudentInFollowUpList,
     syncTime,
     permission,
     requestPermission,

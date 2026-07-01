@@ -1,11 +1,9 @@
 import axios from "axios";
 import { getDynamicHeader } from "./interceptManager";
+import { salesBaseUrl } from "@/lib/apiConfig";
 
-// Sales API: backend base (e.g. http://localhost:8000/api) + /sales → http://localhost:8000/api/sales
-const base = process.env.NEXT_PUBLIC_baseUrl || "";
-const salesBase = base ? `${base.replace(/\/$/, "")}/sales` : "/api/sales";
 const instance = axios.create({
-  baseURL: salesBase,
+  baseURL: salesBaseUrl,
 });
 
 instance.interceptors.request.use(

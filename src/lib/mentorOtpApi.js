@@ -1,17 +1,10 @@
 /**
  * Mentor OTP APIs: send and verify OTP for email/mobile.
  * Used for student enrollment (and any flow that needs to verify email/mobile via OTP).
- * Base URL: NEXT_PUBLIC_baseUrl + /mentor (e.g. https://poc.10kcoders.com/api/mentor)
  */
 
 import { getDynamicHeader } from "@/interceptManager";
-
-function getMentorBaseUrl() {
-  const env = process.env.NEXT_PUBLIC_mentorBaseUrl;
-  if (env) return env.replace(/\/$/, "");
-  const base = (process.env.NEXT_PUBLIC_baseUrl || "").replace(/\/$/, "");
-  return base ? `${base}/mentor` : "";
-}
+import { mentorOtpBaseUrl } from "@/lib/apiConfig";
 
 function getOtpHeaders() {
   const headers = { "Content-Type": "application/json" };
@@ -27,8 +20,7 @@ function getOtpHeaders() {
  * @returns { Promise<{ success: boolean, error?: string, code?: string }> }
  */
 export async function sendMentorOtp({ channel, email, mobile, filters }) {
-  const base = getMentorBaseUrl();
-  if (!base) return { success: false, error: "Mentor API not configured." };
+  if (!mentorOtpBaseUrl) return { success: false, error: "Mentor API not configured." };
   try {
     const body = {
       channel,
@@ -36,7 +28,7 @@ export async function sendMentorOtp({ channel, email, mobile, filters }) {
       ...(channel === "mobile" && mobile != null ? { mobile: String(mobile).replace(/\D/g, "").slice(0, 10) } : {}),
     };
     if (Array.isArray(filters) && filters.length) body.filters = filters;
-    const res = await fetch(`${base}/otp/send/`, {
+    const res = await fetch(`${mentorOtpBaseUrl}/otp/send/`, {
       method: "POST",
       headers: getOtpHeaders(),
       body: JSON.stringify(body),
@@ -61,10 +53,9 @@ export async function sendMentorOtp({ channel, email, mobile, filters }) {
  * @returns { Promise<{ success: boolean, error?: string }> }
  */
 export async function verifyMentorOtp({ channel, email, mobile, otp }) {
-  const base = getMentorBaseUrl();
-  if (!base) return { success: false, error: "Mentor API not configured." };
+  if (!mentorOtpBaseUrl) return { success: false, error: "Mentor API not configured." };
   try {
-    const res = await fetch(`${base}/otp/verify/`, {
+    const res = await fetch(`${mentorOtpBaseUrl}/otp/verify/`, {
       method: "POST",
       headers: getOtpHeaders(),
       body: JSON.stringify({
