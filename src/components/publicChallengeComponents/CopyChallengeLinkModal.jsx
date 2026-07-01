@@ -3,8 +3,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FaTimes, FaCopy, FaCheck, FaLink } from 'react-icons/fa';
 import QRCode from 'react-qr-code';
 
+function trimPublicEnv(value) {
+  if (value == null) return '';
+  return String(value).trim().replace(/^['"]|['"]$/g, '');
+}
+
+const _isDev = trimPublicEnv(process.env.NEXT_PUBLIC_env_type) === 'dev';
+
+/** Dev: devscholarship has no DNS; devchallenge hosts scholarship registration in dev. */
 const SCHOLARSHIP_APP_BASE =
-  process.env.NEXT_PUBLIC_SCHOLARSHIP_APP_URL || 'https://scholarship.10000coders.in';
+  trimPublicEnv(process.env.NEXT_PUBLIC_SCHOLARSHIP_APP_URL) ||
+  (_isDev ? 'https://devchallenge.10000coders.in' : 'https://scholarship.10000coders.in');
 /** Modal only builds share URLs for college (scholarship) challenges. */
 const SCHOLARSHIP_CHALLENGE_TYPE = 'COLLEGE_STUDENTS';
 const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term'];

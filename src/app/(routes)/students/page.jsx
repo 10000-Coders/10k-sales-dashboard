@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Loader2, Phone, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
+import { useFollowUp } from "@/context/FollowUpProvider";
 
 /** Manager and Super Admin see all students; Admin/Counselor see only their own. */
 import withPrivateAuth from "@/components/withPrivateAuth";
@@ -93,6 +94,7 @@ function getStatusLabel(displayStatus, displayStatusLabel) {
 function StudentsPage() {
   const router = useRouter();
   const user = useSelector((state) => state.userAuth?.user);
+  const { setUpcomingFollowUpsFromStudents } = useFollowUp();
   const canSeeAll = canSeeAllStudents(user?.role);
   const { persons } = useSalesPersons({ enabled: canSeeAll });
   const { salesBatchDropdown, loading: salesBatchesLoading } = useSalesBatchDropdown();
@@ -128,6 +130,7 @@ function StudentsPage() {
     if (!forceRefresh && studentsCache.key === cacheKey && Date.now() - studentsCache.at < STUDENTS_CACHE_MS) {
       setStudents(studentsCache.data);
       setPagination(studentsCache.pagination);
+      setUpcomingFollowUpsFromStudents(studentsCache.data);
       setLoading(false);
       return;
     }
@@ -139,6 +142,7 @@ function StudentsPage() {
         if (studentsCache.key === cacheKey) {
           setStudents(studentsCache.data);
           setPagination(studentsCache.pagination);
+          setUpcomingFollowUpsFromStudents(studentsCache.data);
         }
       } catch {
         setStudents([]);
@@ -178,6 +182,7 @@ function StudentsPage() {
         studentsCache = { key: cacheKey, data: list, pagination: meta, at: Date.now() };
         setStudents(list);
         setPagination(meta);
+        setUpcomingFollowUpsFromStudents(list);
       } catch (err) {
         setError(err.response?.data?.detail || "Failed to load students.");
         setStudents([]);
@@ -189,7 +194,7 @@ function StudentsPage() {
       }
     })();
     await studentsFetchPromise;
-  }, [getHeaders, searchDebounce, canSeeAll, filterPerson, filterDateFrom, filterDateTo, filterSalesBatch, page, user?.id]);
+  }, [getHeaders, searchDebounce, canSeeAll, filterPerson, filterDateFrom, filterDateTo, filterSalesBatch, page, user?.id, setUpcomingFollowUpsFromStudents]);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounce(searchQuery), 3000);
