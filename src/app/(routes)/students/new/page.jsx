@@ -25,6 +25,14 @@ import EnrollmentQrModal from "@/components/enrollment/EnrollmentQrModal";
 import { isProofScreenshotRequired, isTransactionIdRequired, paymentReceiversForMode } from "@/lib/paymentValidation";
 import { QrCode } from "lucide-react";
 
+/** API payload from date (YYYY-MM-DD) or datetime-local */
+function toApiDateTime(value) {
+  if (!value) return null;
+  if (value.length === 10) return `${value}T00:00:00`;
+  if (value.length === 16) return `${value}:00`;
+  return value;
+}
+
 const PAYMENT_MODE_OPTIONS = [
   { value: "upi", label: "UPI" },
   { value: "bank", label: "Bank Transfer" },
@@ -215,13 +223,15 @@ export default function NewStudentPage() {
     if (!initialPayment.payment_date) {
       paymentErrors.payment_date = "Initial payment date is required.";
     }
-    if (
-      initialPayment.next_payment_follow_up_at &&
-      initialPayment.payment_date &&
-      initialPayment.next_payment_follow_up_at < initialPayment.payment_date
-    ) {
-      paymentErrors.next_payment_follow_up_at =
-        "Next payment follow-up must be on or after the payment date.";
+    if (initialPayment.next_payment_follow_up_at && initialPayment.payment_date) {
+      const followUp = new Date(toApiDateTime(initialPayment.next_payment_follow_up_at));
+      const paymentDate = new Date(`${initialPayment.payment_date}T00:00:00`);
+      if (isNaN(followUp.getTime())) {
+        paymentErrors.next_payment_follow_up_at = "Enter a valid follow-up date and time.";
+      } else if (followUp < paymentDate) {
+        paymentErrors.next_payment_follow_up_at =
+          "Next payment follow-up must be on or after the payment date.";
+      }
     }
     if (!initialPayment.payment_mode) {
       paymentErrors.payment_mode = "Initial payment mode is required.";
@@ -312,9 +322,10 @@ export default function NewStudentPage() {
         const formData = new FormData();
         formData.append("amount", Number(initialPayment.amount));
         formData.append("payment_date", initialPayment.payment_date || new Date().toISOString().slice(0, 10));
-        const followUpDate = (initialPayment.next_payment_follow_up_at || "").trim();
-        if (followUpDate) {
-          formData.append("next_payment_follow_up_at", `${followUpDate}T00:00:00`);
+        const followUpValue = (initialPayment.next_payment_follow_up_at || "").trim();
+        const followUpApi = followUpValue ? toApiDateTime(followUpValue) : null;
+        if (followUpApi) {
+          formData.append("next_payment_follow_up_at", followUpApi);
         }
         formData.append("payment_mode", initialPayment.payment_mode || "upi");
         if (initialPayment.receiver) formData.append("receiver", initialPayment.receiver);
@@ -495,9 +506,9 @@ export default function NewStudentPage() {
                 Next payment follow-up at (optional)
               </Label>
               <Input
-                type="date"
+                type="datetime-local"
                 id="payment-field-next-follow-up"
-                min={initialPayment.payment_date || undefined}
+                min={initialPayment.payment_date ? `${initialPayment.payment_date}T00:00` : undefined}
                 value={initialPayment.next_payment_follow_up_at}
                 onChange={(e) =>
                   setInitialPayment((p) => ({ ...p, next_payment_follow_up_at: e.target.value }))

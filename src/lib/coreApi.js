@@ -1,13 +1,12 @@
 import axios from "axios";
 import { getDynamicHeader } from "@/interceptManager";
+import { mentorBaseUrl } from "@/lib/apiConfig";
 
 /**
- * Main API base (same as mentor app) — for public-challenges, mentor/problems, etc.
- * Sales default axios uses `{base}/sales`; this client uses `{base}` only.
+ * 10kCoders API client — public-challenges, mentor/problems, mentor/students, etc.
  */
-const base = process.env.NEXT_PUBLIC_baseUrl || "";
 const instance = axios.create({
-  baseURL: base ? base.replace(/\/$/, "") : "",
+  baseURL: mentorBaseUrl,
 });
 
 instance.interceptors.request.use(

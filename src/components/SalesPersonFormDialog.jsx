@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Dialog } from "@headlessui/react";
 import axios from "@/axios";
-import baseAxios from "axios";
+import { sendMentorOtp, verifyMentorOtp } from "@/lib/mentorOtpApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -164,16 +164,6 @@ export function SalesPersonFormDialog({
 
   const sendOtp = async (channel) => {
     setOtpError((p) => ({ ...p, [channel]: null }));
-    const headers = typeof getHeaders === "function" ? getHeaders() : {};
-    const mentorUrl = (path) => {
-      const base = (process.env.NEXT_PUBLIC_baseUrl || "").replace(/\/+$/, "");
-      const cleanPath = path.replace(/^\/+/, ""); // e.g. api/mentor/otp/send/
-      // If base already ends with /api and path begins with api/, avoid double api
-      if (base.endsWith("/api") && cleanPath.startsWith("api/")) {
-        return `${base}/${cleanPath.replace(/^api\//, "")}`; // drop one api
-      }
-      return base ? `${base}/${cleanPath}` : `/${cleanPath}`;
-    };
     if (channel === "email") {
       const email = (form.email || "").trim().toLowerCase();
       if (!email) {
@@ -188,7 +178,11 @@ export function SalesPersonFormDialog({
       }
       setSending((p) => ({ ...p, email: true }));
       try {
-        await baseAxios.post(mentorUrl("/api/mentor/otp/send/"), { channel: "email", email }, { headers });
+        const result = await sendMentorOtp({ channel: "email", email });
+        if (!result.success) {
+          setOtpError((p) => ({ ...p, email: result.error || "Failed to send email OTP." }));
+          return;
+        }
         setEmailCooldown(30);
         setEmailSent(true);
       } catch (err) {
@@ -205,7 +199,11 @@ export function SalesPersonFormDialog({
       }
       setSending((p) => ({ ...p, mobile: true }));
       try {
-        await baseAxios.post(mentorUrl("/api/mentor/otp/send/"), { channel: "mobile", mobile }, { headers });
+        const result = await sendMentorOtp({ channel: "mobile", mobile });
+        if (!result.success) {
+          setOtpError((p) => ({ ...p, mobile: result.error || "Failed to send mobile OTP." }));
+          return;
+        }
         setMobileCooldown(30);
         setMobileSent(true);
       } catch (err) {
@@ -219,15 +217,6 @@ export function SalesPersonFormDialog({
 
   const verifyOtp = async (channel) => {
     setOtpError((p) => ({ ...p, [channel]: null }));
-    const headers = typeof getHeaders === "function" ? getHeaders() : {};
-    const mentorUrl = (path) => {
-      const base = (process.env.NEXT_PUBLIC_baseUrl || "").replace(/\/+$/, "");
-      const cleanPath = path.replace(/^\/+/, "");
-      if (base.endsWith("/api") && cleanPath.startsWith("api/")) {
-        return `${base}/${cleanPath.replace(/^api\//, "")}`;
-      }
-      return base ? `${base}/${cleanPath}` : `/${cleanPath}`;
-    };
     if (channel === "email") {
       const email = (form.email || "").trim().toLowerCase();
       if (!email) {
@@ -238,14 +227,19 @@ export function SalesPersonFormDialog({
         setOtpError((p) => ({ ...p, email: "Enter OTP to verify." }));
         return;
       }
-    setVerifying((p) => ({ ...p, email: true }));
-    try {
-      await baseAxios.post(mentorUrl("/api/mentor/otp/verify/"), { channel: "email", email, otp: emailOtp.trim() }, { headers });
-      setEmailVerified(true);
-      setEmailSent(true);
-    } catch (err) {
-      const data = err.response?.data;
-      setOtpError((p) => ({ ...p, email: data?.error || "Email OTP verification failed." }));
+      setVerifying((p) => ({ ...p, email: true }));
+      try {
+        const result = await verifyMentorOtp({ channel: "email", email, otp: emailOtp.trim() });
+        if (!result.success) {
+          setOtpError((p) => ({ ...p, email: result.error || "Email OTP verification failed." }));
+          setEmailVerified(false);
+          return;
+        }
+        setEmailVerified(true);
+        setEmailSent(true);
+      } catch (err) {
+        const data = err.response?.data;
+        setOtpError((p) => ({ ...p, email: data?.error || "Email OTP verification failed." }));
         setEmailVerified(false);
       } finally {
         setVerifying((p) => ({ ...p, email: false }));
@@ -260,14 +254,19 @@ export function SalesPersonFormDialog({
         setOtpError((p) => ({ ...p, mobile: "Enter OTP to verify." }));
         return;
       }
-    setVerifying((p) => ({ ...p, mobile: true }));
-    try {
-      await baseAxios.post(mentorUrl("/api/mentor/otp/verify/"), { channel: "mobile", mobile, otp: mobileOtp.trim() }, { headers });
-      setMobileVerified(true);
-      setMobileSent(true);
-    } catch (err) {
-      const data = err.response?.data;
-      setOtpError((p) => ({ ...p, mobile: data?.error || "Mobile OTP verification failed." }));
+      setVerifying((p) => ({ ...p, mobile: true }));
+      try {
+        const result = await verifyMentorOtp({ channel: "mobile", mobile, otp: mobileOtp.trim() });
+        if (!result.success) {
+          setOtpError((p) => ({ ...p, mobile: result.error || "Mobile OTP verification failed." }));
+          setMobileVerified(false);
+          return;
+        }
+        setMobileVerified(true);
+        setMobileSent(true);
+      } catch (err) {
+        const data = err.response?.data;
+        setOtpError((p) => ({ ...p, mobile: data?.error || "Mobile OTP verification failed." }));
         setMobileVerified(false);
       } finally {
         setVerifying((p) => ({ ...p, mobile: false }));

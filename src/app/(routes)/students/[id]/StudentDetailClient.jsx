@@ -22,13 +22,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ArrowLeft, Phone, Mail, User, Check, X, ImageIcon, ZoomIn, ZoomOut, Activity, MessageCircle, Circle, KeyRound } from "lucide-react";
+import { Loader2, ArrowLeft, Phone, Mail, User, Check, X, ImageIcon, ZoomIn, ZoomOut, Activity, MessageCircle, Circle, KeyRound, Pencil } from "lucide-react";
 import { ImageDropzone } from "@/components/ImageDropzone";
 import { cn } from "@/lib/utils";
 import { toast } from "react-toastify";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
+import { useFollowUp } from "@/context/FollowUpProvider";
 import { isProofScreenshotRequired, isTransactionIdRequired, paymentReceiversForMode } from "@/lib/paymentValidation";
 import { useSalesBatchDropdown } from "@/hooks/useSalesData";
+import StudentDetailsEditForm from "@/components/students/StudentDetailsEditForm";
 
 const PAYMENT_MODE_OPTIONS = [
   { value: "upi", label: "UPI" },
@@ -223,6 +225,7 @@ export default function StudentDetailClient() {
   const params = useParams();
   const router = useRouter();
   const user = useSelector((state) => state.userAuth?.user);
+  const { updateStudentInFollowUpList } = useFollowUp() || {};
   const id = params?.id;
   const [student, setStudent] = useState(null);
   const [payments, setPayments] = useState([]);
@@ -269,6 +272,7 @@ export default function StudentDetailClient() {
   const [editError, setEditError] = useState(null);
   const [editFieldErrors, setEditFieldErrors] = useState({});
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [detailsEditing, setDetailsEditing] = useState(false);
 
   const getMediaUrl = (path) => {
     if (!path) return null;
@@ -457,6 +461,11 @@ export default function StudentDetailClient() {
         setFollowUpEditValue(toDatetimeLocalValue(data.next_payment_follow_up_at));
       }
       toast.success(apiValue ? "Payment follow-up saved." : "Payment follow-up cleared.");
+      if (updateStudentInFollowUpList && id) {
+        updateStudentInFollowUpList(Number(id), {
+          next_payment_follow_up_at: data.next_payment_follow_up_at ?? null,
+        });
+      }
       if (onSuccess) onSuccess();
     } catch (err) {
       const msg =
@@ -505,6 +514,7 @@ export default function StudentDetailClient() {
   
   const isFullyPaid = offeredAmount != null && committedAmount >= offeredAmount;
   const canManageCourseBatch = user?.role === "manager" || user?.role === "super_admin";
+  const canEditDetails = user?.email?.toLowerCase() === "varshini10kcoders@gmail.com";
   const primaryFollowUpPayment = getPrimaryPaymentForFollowUp(payments);
 
   const handleLogStudentActivity = async (e) => {
@@ -522,20 +532,22 @@ export default function StudentDetailClient() {
     setActivitySubmitting(true);
     setActivityError(null);
     try {
+      const followUpTrimmed = (activityForm.next_follow_up_at || "").trim();
+      let followUpApi = null;
+      if (followUpTrimmed) {
+        followUpApi = toApiDateTime(followUpTrimmed);
+        if (!followUpApi) {
+          setActivityError("Enter a valid follow-up date and time.");
+          setActivitySubmitting(false);
+          return;
+        }
+      }
       const payload = {
         activity_type: activityForm.activity_type,
         outcome: activityForm.outcome,
         notes: trimmedNotes,
+        next_follow_up_at: followUpApi,
       };
-      const followUpTrimmed = (activityForm.next_follow_up_at || "").trim();
-      const followUpApi = followUpTrimmed ? toApiDateTime(followUpTrimmed) : null;
-      if (followUpApi) {
-        payload.next_follow_up_at = followUpApi;
-      } else if (followUpTrimmed) {
-        setActivityError("Enter a valid follow-up date and time.");
-        setActivitySubmitting(false);
-        return;
-      }
       await axios.post(`/students/${id}/activities/`, payload, { headers: getHeaders() });
       setActivityForm({
         activity_type: "call",
@@ -545,6 +557,11 @@ export default function StudentDetailClient() {
       });
       invalidateStudentDetailCache();
       await Promise.all([fetchActivityHistory(), fetchPayments(), fetchStudent()]);
+      if (updateStudentInFollowUpList && id) {
+        updateStudentInFollowUpList(Number(id), {
+          next_payment_follow_up_at: followUpApi,
+        });
+      }
       toast.success(
         followUpApi
           ? "Activity logged. Payment follow-up updated."
@@ -592,8 +609,13 @@ export default function StudentDetailClient() {
       const dateStr = paymentForm.payment_date || new Date().toISOString().slice(0, 10);
       formData.append("payment_date", `${dateStr}T00:00:00`);
       const followUpStr = (paymentForm.next_payment_follow_up_at || "").trim();
-      if (followUpStr) {
-        formData.append("next_payment_follow_up_at", `${followUpStr}T00:00:00`);
+      const followUpApi = followUpStr ? toApiDateTime(followUpStr) : null;
+      if (followUpApi) {
+        formData.append("next_payment_follow_up_at", followUpApi);
+      } else if (followUpStr) {
+        setPaymentError("Enter a valid follow-up date and time.");
+        setPaymentSubmitting(false);
+        return;
       }
       formData.append("payment_mode", paymentForm.payment_mode || "upi");
       if (paymentForm.receiver) formData.append("receiver", paymentForm.receiver);
@@ -631,6 +653,13 @@ export default function StudentDetailClient() {
       setPaymentSubmitting(false);
     }
   };
+
+  const handleStudentDetailsUpdated = useCallback((data) => {
+    setStudent(data);
+    setEditCourse(data?.course || "");
+    setEditSalesBatch(data?.sales_batch ? String(data.sales_batch) : "");
+    invalidateStudentDetailCache();
+  }, []);
 
   const validateCourseAndBatch = () => {
     const fieldErrs = {};
@@ -741,15 +770,41 @@ export default function StudentDetailClient() {
                 Lead source: {student.lead_source || "—"} · Uploaded by {student.sales_person_name ?? "—"}
               </CardDescription>
             </div>
-            <span className={cn("rounded-full px-3 py-1 text-sm font-medium", displayStatusBadge)}>
-              {student.display_status_label ?? "—"}
-              {student.is_moved_to_batch && (
-                <span className="ml-1.5 opacity-90">· Moved to batch</span>
+            <div className="flex flex-col items-start gap-2 sm:items-end">
+              <span className={cn("rounded-full px-3 py-1 text-sm font-medium", displayStatusBadge)}>
+                {student.display_status_label ?? "—"}
+                {student.is_moved_to_batch && (
+                  <span className="ml-1.5 opacity-90">· Moved to batch</span>
+                )}
+              </span>
+              {canEditDetails && !detailsEditing && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => setDetailsEditing(true)}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit details
+                </Button>
               )}
-            </span>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {canEditDetails && (
+            <StudentDetailsEditForm
+              studentId={id}
+              student={student}
+              getHeaders={getHeaders}
+              editing={detailsEditing}
+              onEditingChange={setDetailsEditing}
+              onUpdated={handleStudentDetailsUpdated}
+            />
+          )}
+
+          {!detailsEditing && (
           <div className="flex flex-wrap gap-6">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Phone className="h-4 w-4" />
@@ -766,15 +821,17 @@ export default function StudentDetailClient() {
               </div>
             )}
           </div>
-          {student.guardian_number_1 && (
+          )}
+
+          {!detailsEditing && student.guardian_number_1 && (
             <p className="text-sm text-muted-foreground">
               Guardian {student.guardian_relation_1 || ""}: {student.guardian_number_1}
             </p>
           )}
-          {student.course && (
+          {!detailsEditing && student.course && (
             <p className="text-sm font-medium">Course: {COURSE_LABELS[student.course] ?? student.course}</p>
           )}
-          {student.payment_offered != null && (
+          {!detailsEditing && student.payment_offered != null && (
             <p className="text-sm text-muted-foreground">
               Offered amount: ₹ {Number(student.payment_offered).toLocaleString()}
               {pendingAmount != null && (
@@ -1011,8 +1068,8 @@ export default function StudentDetailClient() {
               <div>
                 <Label>Next payment follow-up at (optional)</Label>
                 <Input
-                  type="date"
-                  min={paymentForm.payment_date || undefined}
+                  type="datetime-local"
+                  min={paymentForm.payment_date ? `${paymentForm.payment_date}T00:00` : undefined}
                   value={paymentForm.next_payment_follow_up_at}
                   onChange={(e) =>
                     setPaymentForm((p) => ({ ...p, next_payment_follow_up_at: e.target.value }))

@@ -1,6 +1,10 @@
-// API base URL is set via NEXT_PUBLIC_baseUrl (e.g. http://localhost:8000/api/sales)
+import { mentorBaseUrl, salesBaseUrl } from "@/lib/apiConfig";
+
 const envConfig = {
-  apiBaseUrl: process.env.NEXT_PUBLIC_baseUrl || "/api/sales",
+  mentorBaseUrl,
+  salesBaseUrl,
+  /** @deprecated Use salesBaseUrl or mentorBaseUrl */
+  apiBaseUrl: salesBaseUrl,
 };
 
 export { envConfig };
