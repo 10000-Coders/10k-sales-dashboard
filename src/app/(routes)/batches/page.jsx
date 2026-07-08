@@ -27,26 +27,9 @@ import { Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import useToast from "@/hooks/useToast";
 import Select from "react-select";
+import { COURSE_LABELS, LEAD_COURSE_VALUES } from "@/constants/leadCourse";
 
-const COURSE_LABELS = {
-  python_fullstack: "Python Fullstack",
-  java_fullstack: "Java Fullstack",
-  mern: "MERN",
-  data_science: "Data Science",
-  devops: "DevOps",
-  data_analytics: "Data Analytics",
-  cybersecurity: "Cyber security",
-};
-
-const COURSE_OPTIONS = [
-  { value: "python_fullstack", label: "Python Fullstack" },
-  { value: "java_fullstack", label: "Java Fullstack" },
-  { value: "mern", label: "MERN" },
-  { value: "data_science", label: "Data Science" },
-  { value: "devops", label: "DevOps" },
-  { value: "data_analytics", label: "Data Analytics" },
-  { value: "cybersecurity", label: "Cyber security" },
-];
+const COURSE_OPTIONS = LEAD_COURSE_VALUES;
 
 function canManageSalesBatches(role) {
   return role === "manager" || role === "super_admin";

@@ -31,6 +31,7 @@ import { useFollowUp } from "@/context/FollowUpProvider";
 import { isProofScreenshotRequired, isTransactionIdRequired, paymentReceiversForMode } from "@/lib/paymentValidation";
 import { useSalesBatchDropdown } from "@/hooks/useSalesData";
 import StudentDetailsEditForm from "@/components/students/StudentDetailsEditForm";
+import { COURSE_LABELS, LEAD_COURSE_VALUES } from "@/constants/leadCourse";
 
 const PAYMENT_MODE_OPTIONS = [
   { value: "upi", label: "UPI" },
@@ -126,25 +127,7 @@ function formatStudentPassword(value) {
   return raw;
 }
 
-const COURSE_LABELS = {
-  python_fullstack: "Python Fullstack",
-  java_fullstack: "Java Fullstack",
-  mern: "MERN",
-  data_science: "Data Science",
-  devops: "DevOps",
-  data_analytics: "Data Analytics",
-  cybersecurity: "Cyber security",
-};
-
-const COURSE_OPTIONS = [
-  { value: "python_fullstack", label: "Python Fullstack" },
-  { value: "java_fullstack", label: "Java Fullstack" },
-  { value: "mern", label: "MERN" },
-  { value: "data_science", label: "Data Science" },
-  { value: "devops", label: "DevOps" },
-  { value: "data_analytics", label: "Data Analytics" },
-  { value: "cybersecurity", label: "Cyber security" },
-];
+const COURSE_OPTIONS = LEAD_COURSE_VALUES;
 
 /**
  * @typedef {Object} PaymentItem
