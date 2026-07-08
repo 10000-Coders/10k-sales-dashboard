@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2, Check, X, ImageIcon, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { COURSE_LABELS } from "@/constants/leadCourse";
 
 function formatDate(d) {
   if (!d) return "—";
@@ -54,16 +55,6 @@ const PAYMENT_MODE_LABELS = {
   cash: "Cash",
   card: "Card",
   other: "Other",
-};
-
-const COURSE_LABELS = {
-  python_fullstack: "Python Fullstack",
-  java_fullstack: "Java Fullstack",
-  mern: "MERN",
-  data_science: "Data Science",
-  devops: "DevOps",
-  data_analytics: "Data Analytics",
-  cybersecurity: "Cyber security",
 };
 
 /** Module-level cache + in-flight dedup to avoid duplicate payments/batch-summary/receivers API calls (e.g. Strict Mode) */

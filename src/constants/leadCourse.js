@@ -7,7 +7,14 @@ export const LEAD_COURSE_VALUES = [
   { value: "devops", label: "DevOps" },
   { value: "data_analytics", label: "Data Analytics" },
   { value: "cybersecurity", label: "Cyber security" },
+  { value: "genai", label: "GenAI" },
 ];
+
+export const COURSE_LABELS = Object.fromEntries(
+  LEAD_COURSE_VALUES.map((o) => [o.value, o.label])
+);
+
+export const COURSE_VALUES = new Set(LEAD_COURSE_VALUES.map((o) => o.value));
 
 /** Leads list filter — frontend-only dropdown options. */
 export const LEAD_COURSE_FILTER_OPTIONS = [

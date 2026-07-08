@@ -91,7 +91,7 @@ export default function LeadReassignClient() {
   const transferLoading = useSelector(selectBulkReassignLoading);
   const pagination = useSelector(selectReassignPagination);
 
-  const [fromPersonId, setFromPersonId] = useState("");
+  const [filterPersonId, setFilterPersonId] = useState("");
   const [toPersonId, setToPersonId] = useState("");
   const [transferCountInput, setTransferCountInput] = useState("");
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -100,21 +100,33 @@ export default function LeadReassignClient() {
   const [searchDebounce, setSearchDebounce] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterSource, setFilterSource] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
 
-  const targetPersons = useMemo(
-    () => persons.filter((p) => String(p.id) !== fromPersonId),
-    [persons, fromPersonId]
-  );
+  const targetPersons = useMemo(() => persons, [persons]);
 
-  const fromPersonName =
-    fromPersonOptions.find((p) => String(p.id) === fromPersonId)?.name ??
-    persons.find((p) => String(p.id) === fromPersonId)?.name ??
+  const filterPersonName =
+    fromPersonOptions.find((p) => String(p.id) === filterPersonId)?.name ??
+    persons.find((p) => String(p.id) === filterPersonId)?.name ??
     "";
   const toPersonName = persons.find((p) => String(p.id) === toPersonId)?.name ?? "";
 
   const getSalesPersonName = useCallback(
-    (lead) => lead.sales_person_name || fromPersonName || "—",
-    [fromPersonName]
+    (lead) => lead.sales_person_name || filterPersonName || "—",
+    [filterPersonName]
+  );
+
+  const reassignFetchParams = useMemo(
+    () => ({
+      salesPersonId: filterPersonId,
+      page,
+      search: searchDebounce,
+      status: filterStatus,
+      source: filterSource,
+      createdAfter: filterDateFrom,
+      createdBefore: filterDateTo,
+    }),
+    [filterPersonId, page, searchDebounce, filterStatus, filterSource, filterDateFrom, filterDateTo]
   );
 
   useEffect(() => {
@@ -127,12 +139,7 @@ export default function LeadReassignClient() {
     setPage(1);
     setTransferCountInput("");
     setSelectedIds(new Set());
-    setToPersonId("");
-    setSearchQuery("");
-    setSearchDebounce("");
-    setFilterStatus("");
-    setFilterSource("");
-  }, [fromPersonId]);
+  }, [filterPersonId]);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounce(searchQuery.trim()), 3000);
@@ -143,36 +150,16 @@ export default function LeadReassignClient() {
     setPage(1);
     setTransferCountInput("");
     setSelectedIds(new Set());
-  }, [searchDebounce, filterStatus, filterSource]);
+  }, [searchDebounce, filterStatus, filterSource, filterDateFrom, filterDateTo]);
 
   const loadLeads = useCallback(() => {
-    if (!fromPersonId) {
-      toast.warn("Select a counselor to load leads from.");
-      return;
-    }
-    dispatch(
-      fetchLeadsForReassign({
-        salesPersonId: fromPersonId,
-        page,
-        search: searchDebounce,
-        status: filterStatus,
-        source: filterSource,
-      })
-    );
-  }, [dispatch, fromPersonId, page, searchDebounce, filterStatus, filterSource]);
+    dispatch(fetchLeadsForReassign(reassignFetchParams));
+  }, [dispatch, reassignFetchParams]);
 
   useEffect(() => {
-    if (!fromPersonId || !isManager) return;
-    dispatch(
-      fetchLeadsForReassign({
-        salesPersonId: fromPersonId,
-        page,
-        search: searchDebounce,
-        status: filterStatus,
-        source: filterSource,
-      })
-    );
-  }, [dispatch, fromPersonId, isManager, page, searchDebounce, filterStatus, filterSource]);
+    if (!isManager) return;
+    dispatch(fetchLeadsForReassign(reassignFetchParams));
+  }, [dispatch, isManager, reassignFetchParams]);
 
   const transferCount = useMemo(() => {
     const parsed = Number.parseInt(transferCountInput, 10);
@@ -217,8 +204,8 @@ export default function LeadReassignClient() {
   }, [transferCountInput, transferCount, reassignLeads]);
 
   const handleTransfer = async () => {
-    if (!fromPersonId || !toPersonId) {
-      toast.warn("Select both source and target counselors.");
+    if (!toPersonId) {
+      toast.warn("Select the counselor to transfer leads to.");
       return;
     }
     if (selectedIds.size === 0) {
@@ -229,7 +216,6 @@ export default function LeadReassignClient() {
     try {
       const result = await dispatch(
         bulkReassignLeads({
-          fromSalesPerson: fromPersonId,
           toSalesPerson: toPersonId,
           leadIds: Array.from(selectedIds),
         })
@@ -239,25 +225,17 @@ export default function LeadReassignClient() {
       if (updated_count > 0) {
         toast.success(
           `Transferred ${updated_count} lead${updated_count === 1 ? "" : "s"} to ${result.to_sales_person_name || toPersonName}` +
-            (skipped_count ? ` (${skipped_count} skipped — duplicate mobile at target)` : "")
+            (skipped_count ? ` (${skipped_count} skipped — duplicate mobile or already assigned)` : "")
         );
       } else if (skipped_count > 0) {
-        toast.warn(`No leads transferred. ${skipped_count} skipped (duplicate mobile at target).`);
+        toast.warn(`No leads transferred. ${skipped_count} skipped (duplicate mobile or already assigned).`);
       } else {
         toast.info("No leads were transferred.");
       }
 
       setTransferCountInput("");
       setSelectedIds(new Set());
-      dispatch(
-        fetchLeadsForReassign({
-          salesPersonId: fromPersonId,
-          page,
-          search: searchDebounce,
-          status: filterStatus,
-          source: filterSource,
-        })
-      );
+      dispatch(fetchLeadsForReassign(reassignFetchParams));
     } catch (err) {
       const detail =
         err?.detail ||
@@ -302,7 +280,7 @@ export default function LeadReassignClient() {
                 Transfer leads
               </CardTitle>
               <CardDescription>
-                Load leads from one counselor and transfer by manual selection or count input.
+                Browse leads from all counselors, filter by date or counselor, select with checkboxes, and transfer.
               </CardDescription>
             </div>
             <Link href="/leads" className="shrink-0">
@@ -315,16 +293,16 @@ export default function LeadReassignClient() {
 
           <div className="flex flex-wrap items-end gap-3 border-t pt-4">
             <div className="flex min-w-[200px] flex-col gap-1">
-              <label htmlFor="from-person" className="text-xs font-medium text-muted-foreground">
-                From counselor
+              <label htmlFor="filter-person" className="text-xs font-medium text-muted-foreground">
+                Counselor filter
               </label>
               <select
-                id="from-person"
-                value={fromPersonId}
-                onChange={(e) => setFromPersonId(e.target.value)}
+                id="filter-person"
+                value={filterPersonId}
+                onChange={(e) => setFilterPersonId(e.target.value)}
                 className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
               >
-                <option value="">Select counselor…</option>
+                <option value="">All counselors</option>
                 {fromPersonOptions.map((p) => (
                   <option key={p.id} value={String(p.id)}>
                     {p.name}
@@ -335,6 +313,32 @@ export default function LeadReassignClient() {
                 ))}
               </select>
             </div>
+            <div className="flex min-w-[150px] flex-col gap-1">
+              <label htmlFor="filter-date-from" className="text-xs font-medium text-muted-foreground">
+                From date
+              </label>
+              <Input
+                id="filter-date-from"
+                type="date"
+                value={filterDateFrom}
+                onChange={(e) => setFilterDateFrom(e.target.value)}
+                className="h-9"
+                aria-label="Filter leads created from date"
+              />
+            </div>
+            <div className="flex min-w-[150px] flex-col gap-1">
+              <label htmlFor="filter-date-to" className="text-xs font-medium text-muted-foreground">
+                To date
+              </label>
+              <Input
+                id="filter-date-to"
+                type="date"
+                value={filterDateTo}
+                onChange={(e) => setFilterDateTo(e.target.value)}
+                className="h-9"
+                aria-label="Filter leads created to date"
+              />
+            </div>
             <div className="relative min-w-[200px] max-w-sm flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -343,7 +347,6 @@ export default function LeadReassignClient() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by name, mobile, or email..."
                 className="h-9 pl-9"
-                disabled={!fromPersonId}
                 aria-label="Search leads by name"
               />
             </div>
@@ -355,7 +358,6 @@ export default function LeadReassignClient() {
                 id="filter-status"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                disabled={!fromPersonId}
                 className={cn(FILTER_SELECT_CLASS, "min-w-[140px]")}
                 aria-label="Filter by status"
               >
@@ -374,7 +376,6 @@ export default function LeadReassignClient() {
                 id="filter-source"
                 value={filterSource}
                 onChange={(e) => setFilterSource(e.target.value)}
-                disabled={!fromPersonId}
                 className={cn(FILTER_SELECT_CLASS, "min-w-[160px]")}
                 aria-label="Filter by inquiry source"
               >
@@ -389,7 +390,7 @@ export default function LeadReassignClient() {
               type="button"
               variant="secondary"
               className="h-9"
-              disabled={!fromPersonId || leadsLoading}
+              disabled={leadsLoading}
               onClick={loadLeads}
             >
               {leadsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -463,25 +464,38 @@ export default function LeadReassignClient() {
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : !fromPersonId ? (
-            <p className="py-6 text-center text-muted-foreground">
-              Select the counselor who currently owns the leads (usually a counselor, not your manager login).
-            </p>
           ) : totalCount === 0 ? (
             <div className="py-6 text-center text-muted-foreground">
               <p>
-                No leads assigned to {fromPersonName || "this counselor"}
+                No leads found
+                {filterPersonId ? ` for ${filterPersonName || "this counselor"}` : ""}
+                {filterDateFrom || filterDateTo ? " in the selected date range" : ""}
                 {filterStatus || filterSource ? " matching the selected filters" : ""}.
-              </p>
-              <p className="mt-2 text-xs">
-                On the main Leads page, filter by counselor to confirm who owns leads, then select that person here.
               </p>
             </div>
           ) : (
             <div className="w-full min-w-0 overflow-x-auto">
               <p className="mb-3 text-sm text-muted-foreground">
-                {totalCount} lead{totalCount === 1 ? "" : "s"} for{" "}
-                <span className="font-medium text-foreground">{fromPersonName}</span>
+                {totalCount} lead{totalCount === 1 ? "" : "s"}
+                {filterPersonId ? (
+                  <>
+                    {" "}
+                    for <span className="font-medium text-foreground">{filterPersonName}</span>
+                  </>
+                ) : (
+                  " across all counselors"
+                )}
+                {filterDateFrom || filterDateTo ? (
+                  <>
+                    {" "}
+                    · Created{" "}
+                    {filterDateFrom && filterDateTo
+                      ? `${filterDateFrom} to ${filterDateTo}`
+                      : filterDateFrom
+                        ? `from ${filterDateFrom}`
+                        : `until ${filterDateTo}`}
+                  </>
+                ) : null}
                 {totalPages > 1 ? ` · Page ${currentPage} of ${totalPages}` : ""}
               </p>
               <Table className="min-w-[900px] text-[11px]">
@@ -498,6 +512,7 @@ export default function LeadReassignClient() {
                     <TableHead className={cn("min-w-[120px]", LEAD_TABLE_HEAD)}>Name</TableHead>
                     <TableHead className={cn("min-w-[180px]", LEAD_TABLE_HEAD)}>Phone / Email</TableHead>
                     <TableHead className={cn("min-w-[100px]", LEAD_TABLE_HEAD)}>Counselor</TableHead>
+                    <TableHead className={cn("min-w-[100px]", LEAD_TABLE_HEAD)}>Created</TableHead>
                     <TableHead className={cn("min-w-[90px]", LEAD_TABLE_HEAD)}>Status</TableHead>
                     <TableHead className={cn("min-w-[120px]", LEAD_TABLE_HEAD)}>Next follow-up</TableHead>
                     <TableHead className={cn("min-w-[130px]", LEAD_TABLE_HEAD)}>Last activity / Count</TableHead>
@@ -551,6 +566,9 @@ export default function LeadReassignClient() {
                         >
                           {getSalesPersonName(lead)}
                         </span>
+                      </TableCell>
+                      <TableCell className={cn("text-muted-foreground", LEAD_TABLE_CELL)}>
+                        <span className="whitespace-nowrap">{formatDateTime(lead.created_at)}</span>
                       </TableCell>
                       <TableCell className={LEAD_TABLE_CELL}>
                         <span
