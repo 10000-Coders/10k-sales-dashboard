@@ -54,26 +54,36 @@ export const bulkCreateLeads = createAsyncThunk(
 export const fetchLeadsForReassign = createAsyncThunk(
   "leads/fetchLeadsForReassign",
   async (
-    { salesPersonId, page = 1, pageSize = REASSIGN_PAGE_SIZE, search = "", status = "", source = "" },
+    {
+      salesPersonId = "",
+      page = 1,
+      pageSize = REASSIGN_PAGE_SIZE,
+      search = "",
+      status = "",
+      source = "",
+      createdAfter = "",
+      createdBefore = "",
+    },
     { getState, rejectWithValue }
   ) => {
-    if (!salesPersonId) {
-      return rejectWithValue({ detail: "Select a counselor to load leads." });
-    }
     const headers = getHeadersFromState(getState());
 
     try {
       const params = new URLSearchParams({
-        sales_person: String(salesPersonId),
         page: String(page),
         page_size: String(pageSize),
       });
+      if (salesPersonId) params.set("sales_person", String(salesPersonId));
       const searchTrimmed = String(search || "").trim();
       if (searchTrimmed) params.set("search", searchTrimmed);
       const statusTrimmed = String(status || "").trim();
       if (statusTrimmed) params.set("status", statusTrimmed);
       const sourceTrimmed = String(source || "").trim();
       if (sourceTrimmed) params.set("source", sourceTrimmed);
+      const createdAfterTrimmed = String(createdAfter || "").trim();
+      if (createdAfterTrimmed) params.set("created_after", createdAfterTrimmed);
+      const createdBeforeTrimmed = String(createdBefore || "").trim();
+      if (createdBeforeTrimmed) params.set("created_before", createdBeforeTrimmed);
       const { data } = await axios.get(`/leads/?${params.toString()}`, { headers });
       const list = data?.results ?? (Array.isArray(data) ? data : []);
 
@@ -98,22 +108,28 @@ export const fetchLeadsForReassign = createAsyncThunk(
   }
 );
 
-/** Move selected (or all) leads from one counselor to another. */
+/** Move selected leads to another counselor (from_sales_person optional when lead_ids provided). */
 export const bulkReassignLeads = createAsyncThunk(
   "leads/bulkReassignLeads",
   async ({ fromSalesPerson, toSalesPerson, leadIds }, { getState, rejectWithValue }) => {
-    if (!fromSalesPerson || !toSalesPerson) {
-      return rejectWithValue({ detail: "Source and target counselors are required." });
+    if (!toSalesPerson) {
+      return rejectWithValue({ detail: "Target counselor is required." });
     }
-    if (String(fromSalesPerson) === String(toSalesPerson)) {
+    const hasLeadIds = Array.isArray(leadIds) && leadIds.length > 0;
+    if (!fromSalesPerson && !hasLeadIds) {
+      return rejectWithValue({ detail: "Select leads to transfer or choose a source counselor." });
+    }
+    if (fromSalesPerson && String(fromSalesPerson) === String(toSalesPerson)) {
       return rejectWithValue({ detail: "Target counselor must be different from the source." });
     }
 
     const payload = {
-      from_sales_person: Number(fromSalesPerson),
       to_sales_person: Number(toSalesPerson),
     };
-    if (Array.isArray(leadIds) && leadIds.length > 0) {
+    if (fromSalesPerson) {
+      payload.from_sales_person = Number(fromSalesPerson);
+    }
+    if (hasLeadIds) {
       payload.lead_ids = leadIds.map((id) => Number(id));
     }
 

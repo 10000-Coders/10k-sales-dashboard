@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Loader2, Phone, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getLeadCourseLabel } from "@/constants/leadCourse";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
 import { useFollowUp } from "@/context/FollowUpProvider";
 
@@ -42,16 +43,6 @@ function canSeeAllStudents(role) {
   return role === "manager" || role === "super_admin";
 }
 
-const COURSE_LABELS = {
-  python_fullstack: "Python Fullstack",
-  java_fullstack: "Java Fullstack",
-  mern: "MERN",
-  data_science: "Data Science",
-  devops: "DevOps",
-  data_analytics: "Data Analytics",
-  cybersecurity: "Cyber security",
-};
-
 function formatDate(d) {
   if (!d) return "—";
   const dt = new Date(d);
@@ -60,8 +51,7 @@ function formatDate(d) {
 
 function formatCourseLabel(course) {
   if (!course) return "—";
-  if (COURSE_LABELS[course]) return COURSE_LABELS[course];
-  return String(course)
+  return getLeadCourseLabel(course) || String(course)
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
