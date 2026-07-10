@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { normalizeMobile } from "@/lib/studentFormValidations";
+import { getPaymentOfferedTypeOptions } from "@/lib/enrollmentFormConstants";
 import {
   buildStudentDetailsPatch,
   studentDetailsFromStudent,
@@ -22,6 +23,7 @@ export default function StudentDetailsEditForm({
   editing,
   onEditingChange,
   onUpdated,
+  userEmail = "",
 }) {
   const [form, setForm] = useState(() => studentDetailsFromStudent(student));
   const [fieldErrors, setFieldErrors] = useState({});
@@ -39,6 +41,10 @@ export default function StudentDetailsEditForm({
     [form, student]
   );
 
+  const paymentOfferedTypeOptions = getPaymentOfferedTypeOptions(userEmail);
+  const commentRequired =
+    !!form.payment_offered_type && form.payment_offered_type !== "single_payment";
+
   if (!editing) return null;
 
   const clearError = (key) => {
@@ -47,7 +53,7 @@ export default function StudentDetailsEditForm({
 
   const handleSave = async (e) => {
     e.preventDefault();
-    const clientErrors = validateStudentDetailsUpdate(form);
+    const clientErrors = validateStudentDetailsUpdate(form, student);
     if (Object.keys(clientErrors).length) {
       setFieldErrors(clientErrors);
       setError("Fix the highlighted fields before saving.");
@@ -161,7 +167,42 @@ export default function StudentDetailsEditForm({
           />
           {fieldErrors.student_password && <p className="text-sm text-destructive">{fieldErrors.student_password}</p>}
         </div>
-        <div className="grid gap-1 sm:col-span-2">
+        <div className="grid gap-1">
+          <Label htmlFor="edit-payment-offered-type">
+            Payment offered type <span className="text-destructive">*</span>
+          </Label>
+          <select
+            id="edit-payment-offered-type"
+            disabled={saving}
+            className={`w-full rounded-md border bg-background px-3 py-2 ${
+              fieldErrors.payment_offered_type ? "border-destructive" : "border-input"
+            }`}
+            value={form.payment_offered_type || ""}
+            onChange={(e) => {
+              const nextType = e.target.value;
+              setForm((f) => ({
+                ...f,
+                payment_offered_type: nextType,
+                payment_offered_comment:
+                  nextType === "single_payment" ? "" : f.payment_offered_comment,
+              }));
+              clearError("payment_offered_type");
+              if (nextType === "single_payment") {
+                clearError("payment_offered_comment");
+              }
+            }}
+          >
+            {paymentOfferedTypeOptions.map((o) => (
+              <option key={o.value || "none"} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          {fieldErrors.payment_offered_type && (
+            <p className="text-sm text-destructive">{fieldErrors.payment_offered_type}</p>
+          )}
+        </div>
+        <div className="grid gap-1">
           <Label htmlFor="edit-payment-offered">Payment offered (₹)</Label>
           <Input
             id="edit-payment-offered"
@@ -174,9 +215,40 @@ export default function StudentDetailsEditForm({
               setForm((f) => ({ ...f, payment_offered: e.target.value }));
               clearError("payment_offered");
             }}
-            className={`max-w-xs ${fieldErrors.payment_offered ? "border-destructive" : ""}`}
+            className={fieldErrors.payment_offered ? "border-destructive" : ""}
           />
           {fieldErrors.payment_offered && <p className="text-sm text-destructive">{fieldErrors.payment_offered}</p>}
+        </div>
+        <div className="grid gap-1 sm:col-span-2">
+          <Label htmlFor="edit-payment-offered-comment">
+            Payment offered comment
+            {commentRequired && <span className="text-destructive"> *</span>}
+          </Label>
+          <textarea
+            id="edit-payment-offered-comment"
+            value={form.payment_offered_comment || ""}
+            disabled={
+              saving ||
+              !form.payment_offered_type ||
+              form.payment_offered_type === "single_payment"
+            }
+            onChange={(e) => {
+              setForm((f) => ({ ...f, payment_offered_comment: e.target.value }));
+              clearError("payment_offered_comment");
+            }}
+            placeholder={
+              commentRequired
+                ? "Required — explain installments / family issue / mentor approval"
+                : "Optional for single payment"
+            }
+            rows={3}
+            className={`w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 ${
+              fieldErrors.payment_offered_comment ? "border-destructive" : "border-input"
+            }`}
+          />
+          {fieldErrors.payment_offered_comment && (
+            <p className="text-sm text-destructive">{fieldErrors.payment_offered_comment}</p>
+          )}
         </div>
       </div>
       <div className="flex flex-wrap gap-3">

@@ -1,4 +1,5 @@
 import { normalizeMobile } from "@/lib/studentFormValidations";
+import { getPaymentOfferedMinimum } from "@/lib/enrollmentFormConstants";
 
 export function studentDetailsFromStudent(student) {
   return {
@@ -10,10 +11,12 @@ export function studentDetailsFromStudent(student) {
       student?.payment_offered != null && student?.payment_offered !== ""
         ? String(student.payment_offered)
         : "",
+    payment_offered_type: student?.payment_offered_type || "",
+    payment_offered_comment: student?.payment_offered_comment || "",
   };
 }
 
-export function validateStudentDetailsUpdate(form) {
+export function validateStudentDetailsUpdate(form, student = null) {
   const errors = {};
   const name = (form.student_name || "").trim();
   if (!name) errors.student_name = "Student name is required.";
@@ -29,12 +32,28 @@ export function validateStudentDetailsUpdate(form) {
   if (!mobile) errors.student_mobile = "Mobile is required.";
   else if (mobile.length !== 10) errors.student_mobile = "Mobile must be 10 digits.";
 
+  const paymentOfferedType = (form.payment_offered_type || "").trim();
   const offeredRaw = (form.payment_offered ?? "").toString().trim();
   if (offeredRaw) {
     const num = Number(offeredRaw);
     if (Number.isNaN(num) || num < 0) {
       errors.payment_offered = "Payment offered cannot be negative.";
+    } else {
+      const course = student?.course || "";
+      const minimum = getPaymentOfferedMinimum(course, paymentOfferedType);
+      if (minimum != null && num < minimum) {
+        errors.payment_offered = `Minimum payment offered is ₹${minimum.toLocaleString("en-IN")} for this course and payment type.`;
+      }
     }
+  }
+
+  if (!paymentOfferedType) {
+    errors.payment_offered_type = "Payment offered type is required.";
+  } else if (
+    paymentOfferedType !== "single_payment" &&
+    !(form.payment_offered_comment || "").trim()
+  ) {
+    errors.payment_offered_comment = "Comment is required for this payment offered type.";
   }
 
   return errors;
@@ -69,6 +88,18 @@ export function buildStudentDetailsPatch(form, student) {
   const prevNormalized = prevOffered === "" ? "" : String(Number(prevOffered));
   if (nextOffered !== prevNormalized) {
     payload.payment_offered = offeredRaw === "" ? null : nextOffered;
+  }
+
+  const nextType = (form.payment_offered_type || "").trim();
+  const prevType = (baseline.payment_offered_type || "").trim();
+  if (nextType !== prevType) {
+    payload.payment_offered_type = nextType;
+  }
+
+  const nextComment = (form.payment_offered_comment || "").trim();
+  const prevComment = (baseline.payment_offered_comment || "").trim();
+  if (nextComment !== prevComment) {
+    payload.payment_offered_comment = nextComment;
   }
 
   return payload;

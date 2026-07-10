@@ -19,7 +19,13 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { ImageDropzone } from "@/components/ImageDropzone";
 import { validateMarks, normalizeMobile } from "@/lib/studentFormValidations";
 import { validateEnrollmentForm, canGenerateEnrollmentQr } from "@/lib/validateEnrollmentForm";
-import { INITIAL_ENROLLMENT_FORM, COURSE_OPTIONS, COURSE_VALUES } from "@/lib/enrollmentFormConstants";
+import {
+  INITIAL_ENROLLMENT_FORM,
+  COURSE_OPTIONS,
+  COURSE_VALUES,
+  getPaymentOfferedTypeOptions,
+  getPaymentOfferedMinimum,
+} from "@/lib/enrollmentFormConstants";
 import StudentEnrollmentFields from "@/components/enrollment/StudentEnrollmentFields";
 import EnrollmentQrModal from "@/components/enrollment/EnrollmentQrModal";
 import { isProofScreenshotRequired, isTransactionIdRequired, paymentReceiversForMode } from "@/lib/paymentValidation";
@@ -174,12 +180,27 @@ export default function NewStudentPage() {
   const handleGenerateQr = async () => {
     if (!canGenerateEnrollmentQr(form)) return;
     setQrError(null);
+
+    const course = (form.course || "").trim();
+    const paymentType = (form.payment_offered_type || "").trim();
+    const offeredNum = Number(form.payment_offered);
+    const minimum = getPaymentOfferedMinimum(course, paymentType);
+    if (minimum != null && !Number.isNaN(offeredNum) && offeredNum < minimum) {
+      const msg = `Minimum payment offered is ₹${minimum.toLocaleString("en-IN")} for this course and payment type.`;
+      setFieldErrors((prev) => ({ ...prev, payment_offered: msg }));
+      setQrError(msg);
+      document.getElementById("field-payment_offered")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
     setQrGenerating(true);
     try {
       const payload = {
         course: form.course,
         sales_batch: Number(form.sales_batch),
         payment_offered: Number(form.payment_offered),
+        payment_offered_type: (form.payment_offered_type || "").trim(),
+        payment_offered_comment: (form.payment_offered_comment || "").trim(),
       };
       if (leadIdParam) payload.lead = Number(leadIdParam);
       if (referralIdParam) payload.referral = Number(referralIdParam);
@@ -188,7 +209,24 @@ export default function NewStudentPage() {
       setQrExpiresAt(data.expires_at);
       setQrModalOpen(true);
     } catch (err) {
-      const detail = err.response?.data?.detail || err.response?.data?.sales_batch?.[0];
+      const data = err.response?.data;
+      let detail = data?.detail || data?.sales_batch?.[0];
+      if (!detail && data && typeof data === "object") {
+        for (const val of Object.values(data)) {
+          const msg = Array.isArray(val) ? val[0] : val;
+          if (typeof msg === "string" && msg) {
+            detail = msg;
+            break;
+          }
+        }
+      }
+      if (data?.payment_offered) {
+        const msg = Array.isArray(data.payment_offered) ? data.payment_offered[0] : data.payment_offered;
+        if (typeof msg === "string") {
+          setFieldErrors((prev) => ({ ...prev, payment_offered: msg }));
+          detail = msg;
+        }
+      }
       setQrError(detail || "Failed to generate QR link.");
     } finally {
       setQrGenerating(false);
@@ -313,6 +351,8 @@ export default function NewStudentPage() {
         course: (form.course || "").trim(),
         sales_batch: Number(form.sales_batch),
         payment_offered: form.payment_offered ? Number(form.payment_offered) : null,
+        payment_offered_type: (form.payment_offered_type || "").trim(),
+        payment_offered_comment: (form.payment_offered_comment || "").trim(),
       };
 
       const { data: student } = await axios.post("/students/", studentPayload, { headers });
@@ -350,16 +390,29 @@ export default function NewStudentPage() {
     } catch (err) {
       const data = err.response?.data;
       let hasFieldErrors = false;
+      let firstFieldMsg = null;
+      let firstFieldKey = null;
       if (data && typeof data === "object" && !Array.isArray(data)) {
         const apiErrors = {};
         for (const [key, val] of Object.entries(data)) {
           if (key === "detail") continue;
           const msg = Array.isArray(val) ? val[0] : val;
-          if (msg && typeof msg === "string") apiErrors[key] = msg;
+          if (msg && typeof msg === "string") {
+            apiErrors[key] = msg;
+            if (!firstFieldMsg) {
+              firstFieldMsg = msg;
+              firstFieldKey = key;
+            }
+          }
         }
         if (Object.keys(apiErrors).length > 0) {
           hasFieldErrors = true;
           setFieldErrors((prev) => ({ ...prev, ...apiErrors }));
+          if (firstFieldKey && typeof document !== "undefined") {
+            document
+              .getElementById(`field-${firstFieldKey}`)
+              ?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
         }
       }
       const msg = data
@@ -368,6 +421,7 @@ export default function NewStudentPage() {
               ? data
               : data.detail ||
                 (Array.isArray(data.non_field_errors) ? data.non_field_errors[0] : null) ||
+                firstFieldMsg ||
                 (hasFieldErrors ? "Please fix the errors below." : null)
           )
         : "Failed to create student.";
@@ -464,6 +518,7 @@ export default function NewStudentPage() {
               salesBatchesError={salesBatchesError}
               availableSalesBatches={availableSalesBatches}
               selectedSalesBatch={selectedSalesBatch}
+              userEmail={user?.email}
             />
           </CardContent>
         </Card>
@@ -676,7 +731,11 @@ export default function NewStudentPage() {
               <div><span className="text-muted-foreground">Mobile:</span> <span className="font-medium">{form.student_mobile || "—"}</span></div>
               <div><span className="text-muted-foreground">Course:</span> <span className="font-medium">{COURSE_OPTIONS.find((c) => c.value === form.course)?.label || form.course || "—"}</span></div>
               <div><span className="text-muted-foreground">Sales Batch:</span> <span className="font-medium">{selectedSalesBatch?.name || "—"}</span></div>
+              <div><span className="text-muted-foreground">Payment offered type:</span> <span className="font-medium">{getPaymentOfferedTypeOptions(form.payment_offered_type) || "—"}</span></div>
               <div><span className="text-muted-foreground">Offered Amount:</span> <span className="font-medium">{form.payment_offered ? `₹ ${Number(form.payment_offered).toLocaleString()}` : "—"}</span></div>
+              {form.payment_offered_comment?.trim() && (
+                <div className="sm:col-span-2"><span className="text-muted-foreground">Payment comment:</span> <span className="font-medium">{form.payment_offered_comment.trim()}</span></div>
+              )}
               <div><span className="text-muted-foreground">Initial Payment:</span> <span className="font-medium">{initialPayment.amount ? `₹ ${Number(initialPayment.amount).toLocaleString()}` : "—"}</span></div>
               <div><span className="text-muted-foreground">Next payment follow-up:</span> <span className="font-medium">{initialPayment.next_payment_follow_up_at || "—"}</span></div>
               <div><span className="text-muted-foreground">Payment Mode:</span> <span className="font-medium">{PAYMENT_MODE_OPTIONS.find((m) => m.value === initialPayment.payment_mode)?.label || initialPayment.payment_mode || "—"}</span></div>

@@ -38,6 +38,8 @@ function EnrollFormContent() {
         courseLabel: inviteMeta.course_label,
         salesBatchName: inviteMeta.sales_batch_name,
         paymentOffered: inviteMeta.payment_offered,
+        paymentOfferedType: inviteMeta.payment_offered_type,
+        paymentOfferedComment: inviteMeta.payment_offered_comment,
       }
     : null;
 
@@ -57,6 +59,8 @@ function EnrollFormContent() {
         course: data.course || "",
         sales_batch: data.sales_batch ? String(data.sales_batch) : "",
         payment_offered: data.payment_offered != null ? String(data.payment_offered) : "",
+        payment_offered_type: data.payment_offered_type || "",
+        payment_offered_comment: data.payment_offered_comment || "",
         student_name: (data.lead_name || f.student_name).replace(/[0-9]/g, "").trim() || f.student_name,
         student_email: data.lead_email || f.student_email,
         student_mobile: data.lead_mobile ? normalizeMobile(String(data.lead_mobile)) : f.student_mobile,
@@ -93,7 +97,10 @@ function EnrollFormContent() {
       return;
     }
 
-    const errors = validateEnrollmentForm(form, { requirePaymentOffered: false });
+    const errors = validateEnrollmentForm(form, {
+      requirePaymentOffered: false,
+      requirePaymentOfferedType: false,
+    });
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       return;
@@ -212,6 +219,7 @@ function EnrollFormContent() {
               setFieldErrors={setFieldErrors}
               lockCourseBatchOffered
               lockedDisplay={lockedDisplay}
+              showPaymentOfferedType={false}
               {...otp}
             />
           </CardContent>

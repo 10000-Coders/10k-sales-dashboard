@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import {
   MODE_OPTIONS,
   COURSE_OPTIONS,
+  getPaymentOfferedTypeOptions,
 } from "@/lib/enrollmentFormConstants";
 import { EDU_STATUS_OPTIONS } from "@/lib/validateEnrollmentForm";
 import { normalizeMobile } from "@/lib/studentFormValidations";
@@ -25,6 +26,8 @@ export default function StudentEnrollmentFields({
   salesBatchesError = null,
   availableSalesBatches = [],
   selectedSalesBatch = null,
+  userEmail = "",
+  showPaymentOfferedType = true,
   emailVerified = false,
   mobileVerified = false,
   emailOtpSent = false,
@@ -51,6 +54,15 @@ export default function StudentEnrollmentFields({
   const clearError = (key) => {
     if (fieldErrors[key]) setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
   };
+
+  const paymentTypeReadOnly = !showPaymentOfferedType;
+  const paymentOfferedType =
+    lockedDisplay?.paymentOfferedType || form.payment_offered_type || "";
+  const paymentOfferedComment =
+    lockedDisplay?.paymentOfferedComment || form.payment_offered_comment || "";
+  const paymentOfferedTypeOptions = getPaymentOfferedTypeOptions(userEmail);
+  const commentRequired =
+    !!paymentOfferedType && paymentOfferedType !== "single_payment";
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -349,6 +361,47 @@ export default function StudentEnrollmentFields({
         )}
       </div>
 
+      <div id="field-payment_offered_type">
+        <Label>
+          Payment offered type
+          {!paymentTypeReadOnly && <span className="text-destructive"> *</span>}
+        </Label>
+        {paymentTypeReadOnly ? (
+          <Input
+            value={getPaymentOfferedTypeOptions(paymentOfferedType) || "—"}
+            disabled
+            className="bg-muted"
+          />
+        ) : (
+          <select
+            className={`w-full rounded-md border bg-background px-3 py-2 ${
+              fieldErrors.payment_offered_type ? "border-destructive" : "border-input"
+            }`}
+            value={form.payment_offered_type || ""}
+            onChange={(e) => {
+              const nextType = e.target.value;
+              setForm((f) => ({
+                ...f,
+                payment_offered_type: nextType,
+                payment_offered_comment:
+                  nextType === "single_payment" ? "" : f.payment_offered_comment,
+              }));
+              clearError("payment_offered_type");
+              if (nextType === "single_payment") clearError("payment_offered_comment");
+            }}
+          >
+            {paymentOfferedTypeOptions.map((o) => (
+              <option key={o.value || "none"} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        )}
+        {fieldErrors.payment_offered_type && (
+          <p className="mt-1 text-sm text-destructive">{fieldErrors.payment_offered_type}</p>
+        )}
+      </div>
+
       <div id="field-payment_offered">
         <Label>Payment offered (₹) <span className="text-destructive">*</span></Label>
         {lockCourseBatchOffered ? (
@@ -380,6 +433,42 @@ export default function StudentEnrollmentFields({
           <p className="mt-1 text-sm text-destructive">{fieldErrors.payment_offered}</p>
         )}
       </div>
+
+      {(!paymentTypeReadOnly || paymentOfferedComment.trim()) && (
+        <div id="field-payment_offered_comment" className="sm:col-span-2">
+          <Label>
+            Payment offered comment
+            {!paymentTypeReadOnly && commentRequired && (
+              <span className="text-destructive"> *</span>
+            )}
+          </Label>
+          <textarea
+            value={paymentTypeReadOnly ? paymentOfferedComment.trim() : form.payment_offered_comment || ""}
+            onChange={(e) => {
+              if (paymentTypeReadOnly) return;
+              setForm((f) => ({ ...f, payment_offered_comment: e.target.value }));
+              clearError("payment_offered_comment");
+            }}
+            placeholder={
+              commentRequired
+                ? "Required — explain installments / family issue / mentor approval"
+                : "Optional for single payment"
+            }
+            rows={3}
+            disabled={
+              paymentTypeReadOnly ||
+              !form.payment_offered_type ||
+              form.payment_offered_type === "single_payment"
+            }
+            className={`w-full rounded-md border px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 ${
+              paymentTypeReadOnly ? "border-input bg-muted" : "border-input bg-background"
+            } ${fieldErrors.payment_offered_comment ? "border-destructive" : ""}`}
+          />
+          {fieldErrors.payment_offered_comment && (
+            <p className="mt-1 text-sm text-destructive">{fieldErrors.payment_offered_comment}</p>
+          )}
+        </div>
+      )}
 
       <div id="field-guardian_number_1">
         <Label>Guardian 1 number <span className="text-destructive">*</span></Label>

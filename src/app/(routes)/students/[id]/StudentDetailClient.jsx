@@ -32,6 +32,7 @@ import { isProofScreenshotRequired, isTransactionIdRequired, paymentReceiversFor
 import { useSalesBatchDropdown } from "@/hooks/useSalesData";
 import StudentDetailsEditForm from "@/components/students/StudentDetailsEditForm";
 import { COURSE_LABELS, LEAD_COURSE_VALUES } from "@/constants/leadCourse";
+import { getPaymentOfferedTypeOptions } from "@/lib/enrollmentFormConstants";
 
 const PAYMENT_MODE_OPTIONS = [
   { value: "upi", label: "UPI" },
@@ -784,6 +785,7 @@ export default function StudentDetailClient() {
               editing={detailsEditing}
               onEditingChange={setDetailsEditing}
               onUpdated={handleStudentDetailsUpdated}
+              userEmail={user?.email}
             />
           )}
 
@@ -814,6 +816,11 @@ export default function StudentDetailClient() {
           {!detailsEditing && student.course && (
             <p className="text-sm font-medium">Course: {COURSE_LABELS[student.course] ?? student.course}</p>
           )}
+          {!detailsEditing && student.payment_offered_type && (
+            <p className="text-sm text-muted-foreground">
+              Payment offered type: {getPaymentOfferedTypeOptions(student.payment_offered_type) || "—"}
+            </p>
+          )}
           {!detailsEditing && student.payment_offered != null && (
             <p className="text-sm text-muted-foreground">
               Offered amount: ₹ {Number(student.payment_offered).toLocaleString()}
@@ -825,6 +832,11 @@ export default function StudentDetailClient() {
                   </span>
                 </>
               )}
+            </p>
+          )}
+          {!detailsEditing && student.payment_offered_comment?.trim() && (
+            <p className="text-sm text-muted-foreground">
+              Payment comment: {student.payment_offered_comment.trim()}
             </p>
           )}
           {primaryFollowUpPayment && (

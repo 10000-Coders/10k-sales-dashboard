@@ -6,16 +6,20 @@ import {
   normalizeMobile,
   EDU_STATUS_OPTIONS,
 } from "@/lib/studentFormValidations";
-import { COURSE_VALUES, YEAR_MIN, YEAR_MAX } from "@/lib/enrollmentFormConstants";
+import {
+  COURSE_VALUES,
+  YEAR_MIN,
+  YEAR_MAX,
+  getPaymentOfferedMinimum,
+} from "@/lib/enrollmentFormConstants";
 
 export { EDU_STATUS_OPTIONS };
 
-/**
- * @param {object} form
- * @param {{ requirePaymentOffered?: boolean }} options
- */
 export function validateEnrollmentForm(form, options = {}) {
-  const { requirePaymentOffered = true } = options;
+  const {
+    requirePaymentOffered = true,
+    requirePaymentOfferedType = true,
+  } = options;
   const errors = {};
 
   const name = (form.student_name || "").trim();
@@ -124,6 +128,8 @@ export function validateEnrollmentForm(form, options = {}) {
   const referenceDetails = (form.reference_details || "").trim();
   if (!referenceDetails) errors.reference_details = "Reference details (how did you find us?) are required.";
 
+  const paymentOfferedType = (form.payment_offered_type || "").trim();
+
   if (requirePaymentOffered) {
     const paymentOffered = form.payment_offered;
     if (paymentOffered === "" || paymentOffered == null)
@@ -132,6 +138,23 @@ export function validateEnrollmentForm(form, options = {}) {
       const num = Number(paymentOffered);
       if (isNaN(num) || num < 0) errors.payment_offered = "Payment offered cannot be negative.";
       else if (num > 100001) errors.payment_offered = "Payment offered cannot exceed ₹100,001.";
+      else {
+        const minimum = getPaymentOfferedMinimum(course, paymentOfferedType);
+        if (minimum != null && num < minimum) {
+          errors.payment_offered = `Minimum payment offered is ₹${minimum.toLocaleString("en-IN")} for this course and payment type.`;
+        }
+      }
+    }
+  }
+
+  if (requirePaymentOfferedType) {
+    if (!paymentOfferedType) {
+      errors.payment_offered_type = "Payment offered type is required.";
+    } else if (
+      paymentOfferedType !== "single_payment" &&
+      !(form.payment_offered_comment || "").trim()
+    ) {
+      errors.payment_offered_comment = "Comment is required for this payment offered type.";
     }
   }
 
@@ -142,8 +165,13 @@ export function canGenerateEnrollmentQr(form) {
   const course = (form.course || "").trim();
   const batch = (form.sales_batch || "").trim();
   const offered = form.payment_offered;
+  const paymentType = (form.payment_offered_type || "").trim();
   if (!course || !COURSE_VALUES.has(course) || !batch) return false;
   if (offered === "" || offered == null) return false;
+  if (!paymentType) return false;
+  if (paymentType !== "single_payment" && !(form.payment_offered_comment || "").trim()) {
+    return false;
+  }
   const num = Number(offered);
   return !isNaN(num) && num >= 0 && num <= 100001;
 }
