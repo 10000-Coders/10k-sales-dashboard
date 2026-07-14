@@ -10,11 +10,11 @@ import {
   validateDemoClassForm,
   mapDemoClassApiErrors,
 } from "@/lib/validateDemoClassForm";
-import { useSalesPersons } from "@/hooks/useSalesData";
 import useToast from "@/hooks/useToast";
 import {
   validateDemoClassQr,
   fetchDemoTrainersDropdown,
+  fetchSalesPersonsDropdown,
   submitDemoStudentForm,
   clearDemoStudentSubmit,
 } from "@/redux/features/demoStudents/demoStudentsSlice";
@@ -62,12 +62,10 @@ function DemoClassFormInner() {
     qrValidateError,
     trainers,
     trainersLoading,
+    salesPersons,
+    salesPersonsLoading,
     submitLoading,
   } = useSelector((state) => state.demoStudents);
-
-  const { persons: salesPersons, loading: salesPersonsLoading } = useSalesPersons({
-    enabled: true,
-  });
 
   const [form, setForm] = useState(emptyForm);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -75,6 +73,7 @@ function DemoClassFormInner() {
   useEffect(() => {
     if (token) dispatch(validateDemoClassQr(token));
     dispatch(fetchDemoTrainersDropdown());
+    dispatch(fetchSalesPersonsDropdown());
   }, [dispatch, token]);
 
   const onChange = (next) => {

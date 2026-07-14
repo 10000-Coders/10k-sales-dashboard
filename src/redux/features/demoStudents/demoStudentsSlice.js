@@ -208,6 +208,19 @@ export const fetchDemoTrainersDropdown = createAsyncThunk(
   }
 );
 
+/** Active sales persons for public demo form dropdown (id + name only). */
+export const fetchSalesPersonsDropdown = createAsyncThunk(
+  "demoStudents/fetchSalesPersonsDropdown",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.get("/persons/dropdown/");
+      return Array.isArray(data) ? data : [];
+    } catch (err) {
+      return rejectWithValue(rejectPayload(err, "Failed to load sales persons."));
+    }
+  }
+);
+
 /** Full trainer list (manager/super_admin manage page). */
 export const fetchDemoTrainers = createAsyncThunk(
   "demoStudents/fetchDemoTrainers",
@@ -279,6 +292,9 @@ const initialState = {
 
   trainers: [],
   trainersLoading: false,
+
+  salesPersons: [],
+  salesPersonsLoading: false,
 
   trainersList: [],
   trainersListLoading: false,
@@ -479,6 +495,18 @@ const demoStudentsSlice = createSlice({
       .addCase(fetchDemoTrainersDropdown.rejected, (state) => {
         state.trainersLoading = false;
         state.trainers = [];
+      })
+
+      .addCase(fetchSalesPersonsDropdown.pending, (state) => {
+        state.salesPersonsLoading = true;
+      })
+      .addCase(fetchSalesPersonsDropdown.fulfilled, (state, action) => {
+        state.salesPersonsLoading = false;
+        state.salesPersons = action.payload;
+      })
+      .addCase(fetchSalesPersonsDropdown.rejected, (state) => {
+        state.salesPersonsLoading = false;
+        state.salesPersons = [];
       })
 
       .addCase(fetchDemoTrainers.pending, (state) => {
