@@ -10,6 +10,8 @@ import {
   Share2,
   ClipboardList,
   Trophy,
+  Presentation,
+  UserCog,
 } from "lucide-react";
 
 /** Nav + page title for /public-challenges (scholarship tests). */
@@ -24,6 +26,9 @@ export const routeObject = {
   "/students": "Students",
   "/payments": "Payments",
   "/demo-reviews": "Demo Reviews",
+  "/demo-students": "Demo Students",
+  "/demo-students/transfer": "Transfer Demo Students",
+  "/demo-trainers": "Demo Trainers",
   "/batches": "Batches",
   "/reports/date-account-summary": "Account Summary",
   "/public-challenges": SCHOLARSHIP_TEST_NAV_LABEL,
@@ -38,6 +43,8 @@ export const MenuItems = [
   { text: "Account Summary", icon: BarChart3, managerOnly: true },
   { text: "Referrals", textForCounselor: "Your referral leads", icon: Share2 },
   { text: "Demo Reviews", icon: ClipboardList },
+  { text: "Demo Students", icon: Presentation },
+  { text: "Demo Trainers", icon: UserCog, managerOrSuperAdminOnly: true },
   { text: SCHOLARSHIP_TEST_NAV_LABEL, icon: Trophy, adminManagerSuperAdminOnly: true },
   { text: "Sales persons", icon: Users, managerOnly: true },
   { text: "Activities", icon: Activity },

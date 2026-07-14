@@ -23,11 +23,13 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
   const isAdminOrManagerOrSuperAdmin =
     user?.role === "admin" || user?.role === "manager" || user?.role === "super_admin";
   const isManager = user?.role === "manager";
+  const isManagerOrSuperAdmin = user?.role === "manager" || user?.role === "super_admin";
 
   const visibleMenuItems = useMemo(
     () =>
       MenuItems.filter((item) => {
         if (item.managerOnly) return isManager;
+        if (item.managerOrSuperAdminOnly) return isManagerOrSuperAdmin;
         if (item.adminOrManagerOnly)
           return (
             isAdminOrManagerOrSuperAdmin ||
@@ -36,7 +38,7 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
         if (item.adminManagerSuperAdminOnly) return isAdminOrManagerOrSuperAdmin;
         return true;
       }),
-    [isManager, isAdminOrManagerOrSuperAdmin, user?.role]
+    [isManager, isManagerOrSuperAdmin, isAdminOrManagerOrSuperAdmin, user?.role]
   );
 
   useEffect(() => {
@@ -52,6 +54,10 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
       setActiveItem("Students");
     } else if (pathname?.startsWith("/payments")) {
       setActiveItem("Payments");
+    } else if (pathname?.startsWith("/demo-students")) {
+      setActiveItem("Demo Students");
+    } else if (pathname?.startsWith("/demo-trainers")) {
+      setActiveItem("Demo Trainers");
     } else {
       setActiveItem(routeObject[pathname] || "Dashboard");
     }
@@ -77,6 +83,10 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
       router.push("/payments");
     } else if (text === "Demo Reviews") {
       router.push("/demo-reviews");
+    } else if (text === "Demo Students") {
+      router.push("/demo-students");
+    } else if (text === "Demo Trainers") {
+      router.push("/demo-trainers");
     } else if (text === "Account Summary") {
       router.push("/reports/date-account-summary");
     } else {

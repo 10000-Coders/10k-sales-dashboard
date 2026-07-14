@@ -10,6 +10,14 @@ import {
 } from "@/lib/enrollmentFormConstants";
 import { EDU_STATUS_OPTIONS } from "@/lib/validateEnrollmentForm";
 import { normalizeMobile } from "@/lib/studentFormValidations";
+import {
+  canSelectMentorApprovedType,
+  getPaymentOfferedMinimum,
+  getPaymentOfferedTypeOptions,
+  isPaymentOfferedCommentRequired,
+  paymentOfferedTypeLabel,
+  PAYMENT_OFFERED_TYPES,
+} from "@/lib/paymentOffered";
 
 /**
  * Shared student enrollment fields (sales enroll + public QR form).
@@ -25,6 +33,7 @@ export default function StudentEnrollmentFields({
   salesBatchesError = null,
   availableSalesBatches = [],
   selectedSalesBatch = null,
+  userRole = null,
   emailVerified = false,
   mobileVerified = false,
   emailOtpSent = false,
@@ -51,6 +60,15 @@ export default function StudentEnrollmentFields({
   const clearError = (key) => {
     if (fieldErrors[key]) setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
   };
+
+  const typeOptions = getPaymentOfferedTypeOptions({
+    role: userRole,
+  });
+  const mentorTypeLocked =
+    form.payment_offered_type === PAYMENT_OFFERED_TYPES.mentor_approved &&
+    !canSelectMentorApprovedType(userRole);
+  const commentRequired = isPaymentOfferedCommentRequired(form.payment_offered_type);
+  const offeredMin = getPaymentOfferedMinimum(form.course, form.payment_offered_type);
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -288,6 +306,8 @@ export default function StudentEnrollmentFields({
             onChange={(e) => {
               setForm((f) => ({ ...f, course: e.target.value }));
               clearError("course");
+              clearError("payment_offered");
+              clearError("payment_offered_type");
             }}
           >
             {COURSE_OPTIONS.map((o) => (
@@ -349,6 +369,53 @@ export default function StudentEnrollmentFields({
         )}
       </div>
 
+      <div id="field-payment_offered_type">
+        <Label>
+          Payment offered type <span className="text-destructive">*</span>
+        </Label>
+        {lockCourseBatchOffered || mentorTypeLocked ? (
+          <Input
+            value={
+              lockedDisplay?.paymentOfferedTypeLabel ||
+              paymentOfferedTypeLabel(form.payment_offered_type)
+            }
+            disabled
+            className="bg-muted"
+          />
+        ) : (
+          <select
+            className={`w-full rounded-md border bg-background px-3 py-2 ${fieldErrors.payment_offered_type ? "border-destructive" : "border-input"}`}
+            value={form.payment_offered_type || ""}
+            onChange={(e) => {
+              const nextType = e.target.value;
+              setForm((f) => ({
+                ...f,
+                payment_offered_type: nextType,
+                payment_offered_comment:
+                  nextType === "single_payment" ? "" : f.payment_offered_comment,
+              }));
+              clearError("payment_offered_type");
+              clearError("payment_offered_comment");
+              clearError("payment_offered");
+            }}
+          >
+            {typeOptions.map((o) => (
+              <option key={o.value || "none"} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        )}
+        {mentorTypeLocked && !lockCourseBatchOffered && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Mentor approved can only be changed by a manager.
+          </p>
+        )}
+        {fieldErrors.payment_offered_type && (
+          <p className="mt-1 text-sm text-destructive">{fieldErrors.payment_offered_type}</p>
+        )}
+      </div>
+
       <div id="field-payment_offered">
         <Label>Payment offered (₹) <span className="text-destructive">*</span></Label>
         {lockCourseBatchOffered ? (
@@ -366,20 +433,63 @@ export default function StudentEnrollmentFields({
             type="number"
             step="0.01"
             max={100001}
-            min={0}
+            min={offeredMin ?? 0}
             value={form.payment_offered}
             onChange={(e) => {
               setForm((f) => ({ ...f, payment_offered: e.target.value }));
               clearError("payment_offered");
             }}
-            placeholder="Quoted amount"
+            placeholder={
+              offeredMin != null
+                ? `Min ₹${offeredMin.toLocaleString("en-IN")}`
+                : "Quoted amount"
+            }
             className={fieldErrors.payment_offered ? "border-destructive" : ""}
           />
+        )}
+        {!lockCourseBatchOffered && offeredMin != null && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Minimum for this course and type: ₹{offeredMin.toLocaleString("en-IN")}
+          </p>
         )}
         {fieldErrors.payment_offered && (
           <p className="mt-1 text-sm text-destructive">{fieldErrors.payment_offered}</p>
         )}
       </div>
+
+      {(lockCourseBatchOffered
+        ? Boolean(lockedDisplay?.paymentOfferedComment || form.payment_offered_comment)
+        : commentRequired || Boolean(form.payment_offered_comment)) && (
+        <div id="field-payment_offered_comment" className="sm:col-span-2">
+          <Label>
+            Payment offered comment
+            {commentRequired && !lockCourseBatchOffered ? (
+              <span className="text-destructive"> *</span>
+            ) : null}
+          </Label>
+          {lockCourseBatchOffered ? (
+            <Input
+              value={lockedDisplay?.paymentOfferedComment || form.payment_offered_comment || ""}
+              disabled
+              className="bg-muted"
+            />
+          ) : (
+            <textarea
+              rows={2}
+              value={form.payment_offered_comment || ""}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, payment_offered_comment: e.target.value }));
+                clearError("payment_offered_comment");
+              }}
+              placeholder="Reason for this payment type"
+              className={`w-full rounded-md border bg-background px-3 py-2 text-sm ${fieldErrors.payment_offered_comment ? "border-destructive" : "border-input"}`}
+            />
+          )}
+          {fieldErrors.payment_offered_comment && (
+            <p className="mt-1 text-sm text-destructive">{fieldErrors.payment_offered_comment}</p>
+          )}
+        </div>
+      )}
 
       <div id="field-guardian_number_1">
         <Label>Guardian 1 number <span className="text-destructive">*</span></Label>
