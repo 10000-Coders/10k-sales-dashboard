@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import withPrivateAuth from "@/components/withPrivateAuth";
 import axios from "@/axios";
 import { useSalesBatchDropdown, useSalesPersons } from "@/hooks/useSalesData";
 import { getRangeForPreset } from "@/lib/dateUtils";
+import { cn } from "@/lib/utils";
 
 import {
   Card,
@@ -24,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Download } from "lucide-react";
+import { Loader2, Download, ChevronDown } from "lucide-react";
 
 function downloadTextFile(filename, text, mime = "text/csv;charset=utf-8") {
   const blob = new Blob([text], { type: mime });
@@ -46,6 +47,105 @@ function formatINR(n) {
 
 /** Backend date-account-summary uses receiver_id -1 for cash payments without a receiver. */
 const CASH_BUCKET_ID = -1;
+
+const FILTER_SELECT_CLASS =
+  "rounded-md border border-input bg-background px-3 text-sm";
+
+function SalesBatchMultiSelect({ options, selected, onChange }) {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const displayLabel = useMemo(() => {
+    if (!selected.length) return "All";
+    if (selected.length === 1) {
+      return options.find((o) => o.id === selected[0])?.name ?? selected[0];
+    }
+    return `${selected.length} batches selected`;
+  }, [selected, options]);
+
+  const toggle = (id) => {
+    onChange(
+      selected.includes(id) ? selected.filter((v) => v !== id) : [...selected, id]
+    );
+  };
+
+  return (
+    <div className="relative min-w-[220px]" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "flex h-9 w-full items-center justify-between gap-2",
+          FILTER_SELECT_CLASS
+        )}
+        aria-label="Sales batch"
+        aria-expanded={open}
+      >
+        <span className="truncate text-left">{displayLabel}</span>
+        <ChevronDown
+          className={cn("h-4 w-4 shrink-0 text-muted-foreground", open && "rotate-180")}
+        />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[240px] rounded-md border border-input bg-white shadow-md dark:bg-slate-900">
+          <ul className="max-h-[240px] overflow-auto py-1">
+            <li>
+              <button
+                type="button"
+                className={cn(
+                  "w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800",
+                  selected.length === 0 && "bg-slate-100 font-medium dark:bg-slate-800"
+                )}
+                onClick={() => onChange([])}
+              >
+                All
+              </button>
+            </li>
+            {options.map((b) => {
+              const checked = selected.includes(b.id);
+              return (
+                <li key={b.id}>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800",
+                      checked && "bg-slate-100 font-medium dark:bg-slate-800"
+                    )}
+                    onClick={() => toggle(b.id)}
+                  >
+                    <span
+                      className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px]",
+                        checked
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input"
+                      )}
+                      aria-hidden
+                    >
+                      {checked ? "✓" : ""}
+                    </span>
+                    <span className="truncate">{b.name}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function accountKey(id) {
   if (id === null || id === undefined) return "__unassigned__";
@@ -76,7 +176,7 @@ function DateAccountSummaryPage() {
   const [dateFrom, setDateFrom] = useState(initialRange.from);
   const [dateTo, setDateTo] = useState(initialRange.to);
   const [status, setStatus] = useState("verified");
-  const [salesBatchId, setSalesBatchId] = useState("");
+  const [salesBatchIds, setSalesBatchIds] = useState([]);
   const [salesPersonId, setSalesPersonId] = useState("");
   const [receiverId, setReceiverId] = useState("");
 
@@ -120,7 +220,7 @@ function DateAccountSummaryPage() {
       if (from) params.set("date_from", from);
       if (to) params.set("date_to", to);
       if (status) params.set("status", status);
-      if (salesBatchId) params.set("sales_batch", salesBatchId);
+      if (salesBatchIds.length) params.set("sales_batch", salesBatchIds.join(","));
       if (salesPersonId) params.set("sales_person", salesPersonId);
       if (receiverId) params.set("receiver", receiverId);
 
@@ -136,7 +236,7 @@ function DateAccountSummaryPage() {
     } finally {
       setLoading(false);
     }
-  }, [canView, dateFrom, dateTo, status, salesBatchId, salesPersonId, receiverId, getHeaders]);
+  }, [canView, dateFrom, dateTo, status, salesBatchIds, salesPersonId, receiverId, getHeaders]);
 
   const grid = useMemo(() => {
     const accounts = summary.accounts || [];
@@ -354,16 +454,11 @@ function DateAccountSummaryPage() {
             </div>
             <div>
               <label className="text-sm font-medium">Sales batch</label>
-              <select
-                value={salesBatchId}
-                onChange={(e) => setSalesBatchId(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm min-w-[220px]"
-              >
-                <option value="">All</option>
-                {salesBatchOptions.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
+              <SalesBatchMultiSelect
+                options={salesBatchOptions}
+                selected={salesBatchIds}
+                onChange={setSalesBatchIds}
+              />
             </div>
             <div>
               <label className="text-sm font-medium">Sales person</label>
@@ -462,4 +557,3 @@ function DateAccountSummaryPage() {
 }
 
 export default withPrivateAuth(DateAccountSummaryPage);
-

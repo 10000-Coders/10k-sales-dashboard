@@ -6,6 +6,7 @@ import leadsReducer from "./features/leads/leadsSlice";
 import referralFormReducer from "./features/referralForm/referralFormSlice";
 import publicChallengeReducer from "./features/publicChallenges/publicChallengeSlice";
 import mcqQuestionReducer from "./features/mcqQuestions/mcqQuestionSlice";
+import demoStudentsReducer from "./features/demoStudents/demoStudentsSlice";
 
 const rootReducer = combineReducers({
   userAuth: userAuthReducer,
@@ -14,6 +15,7 @@ const rootReducer = combineReducers({
   referralForm: referralFormReducer,
   publicChallenges: publicChallengeReducer,
   mcqQuestions: mcqQuestionReducer,
+  demoStudents: demoStudentsReducer,
 });
 
 export default rootReducer;

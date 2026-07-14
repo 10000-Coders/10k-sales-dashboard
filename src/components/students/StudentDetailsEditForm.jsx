@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSelector } from "react-redux";
 import axios from "@/axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,14 @@ import {
   studentDetailsHasChanges,
   validateStudentDetailsUpdate,
 } from "@/lib/validateStudentDetailsUpdate";
+import {
+  canSelectMentorApprovedType,
+  getPaymentOfferedMinimum,
+  getPaymentOfferedTypeOptions,
+  isPaymentOfferedCommentRequired,
+  paymentOfferedTypeLabel,
+  PAYMENT_OFFERED_TYPES,
+} from "@/lib/paymentOffered";
 
 export default function StudentDetailsEditForm({
   studentId,
@@ -23,6 +32,7 @@ export default function StudentDetailsEditForm({
   onEditingChange,
   onUpdated,
 }) {
+  const user = useSelector((state) => state.userAuth?.user);
   const [form, setForm] = useState(() => studentDetailsFromStudent(student));
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState(null);
@@ -38,6 +48,15 @@ export default function StudentDetailsEditForm({
     () => studentDetailsHasChanges(form, student),
     [form, student]
   );
+
+  const typeOptions = getPaymentOfferedTypeOptions({
+    role: user?.role,
+  });
+  const mentorTypeLocked =
+    form.payment_offered_type === PAYMENT_OFFERED_TYPES.mentor_approved &&
+    !canSelectMentorApprovedType(user?.role);
+  const commentRequired = isPaymentOfferedCommentRequired(form.payment_offered_type);
+  const offeredMin = getPaymentOfferedMinimum(form.course || student?.course, form.payment_offered_type);
 
   if (!editing) return null;
 
@@ -161,12 +180,59 @@ export default function StudentDetailsEditForm({
           />
           {fieldErrors.student_password && <p className="text-sm text-destructive">{fieldErrors.student_password}</p>}
         </div>
-        <div className="grid gap-1 sm:col-span-2">
+        <div className="grid gap-1">
+          <Label htmlFor="edit-payment-offered-type">
+            Payment offered type <span className="text-destructive">*</span>
+          </Label>
+          {mentorTypeLocked ? (
+            <Input
+              id="edit-payment-offered-type"
+              value={paymentOfferedTypeLabel(form.payment_offered_type)}
+              disabled
+              className="bg-muted"
+            />
+          ) : (
+            <select
+              id="edit-payment-offered-type"
+              disabled={saving}
+              value={form.payment_offered_type || ""}
+              onChange={(e) => {
+                const nextType = e.target.value;
+                setForm((f) => ({
+                  ...f,
+                  payment_offered_type: nextType,
+                  payment_offered_comment:
+                    nextType === "single_payment" ? "" : f.payment_offered_comment,
+                }));
+                clearError("payment_offered_type");
+                clearError("payment_offered_comment");
+                clearError("payment_offered");
+              }}
+              className={`w-full rounded-md border bg-background px-3 py-2 ${fieldErrors.payment_offered_type ? "border-destructive" : "border-input"}`}
+            >
+              {typeOptions.map((o) => (
+                <option key={o.value || "none"} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          )}
+          {mentorTypeLocked && (
+            <p className="text-xs text-muted-foreground">
+              Mentor approved can only be changed by a manager.
+            </p>
+          )}
+          {fieldErrors.payment_offered_type && (
+            <p className="text-sm text-destructive">{fieldErrors.payment_offered_type}</p>
+          )}
+        </div>
+        <div className="grid gap-1">
           <Label htmlFor="edit-payment-offered">Payment offered (₹)</Label>
           <Input
             id="edit-payment-offered"
             type="number"
-            min={0}
+            min={offeredMin ?? 0}
+            max={100001}
             step="0.01"
             value={form.payment_offered}
             disabled={saving}
@@ -174,10 +240,43 @@ export default function StudentDetailsEditForm({
               setForm((f) => ({ ...f, payment_offered: e.target.value }));
               clearError("payment_offered");
             }}
+            placeholder={
+              offeredMin != null
+                ? `Min ₹${offeredMin.toLocaleString("en-IN")}`
+                : "Quoted amount"
+            }
             className={`max-w-xs ${fieldErrors.payment_offered ? "border-destructive" : ""}`}
           />
+          {offeredMin != null && (
+            <p className="text-xs text-muted-foreground">
+              Minimum: ₹{offeredMin.toLocaleString("en-IN")}
+            </p>
+          )}
           {fieldErrors.payment_offered && <p className="text-sm text-destructive">{fieldErrors.payment_offered}</p>}
         </div>
+        {(commentRequired || Boolean(form.payment_offered_comment)) && (
+          <div className="grid gap-1 sm:col-span-2">
+            <Label htmlFor="edit-payment-offered-comment">
+              Payment offered comment
+              {commentRequired ? <span className="text-destructive"> *</span> : null}
+            </Label>
+            <textarea
+              id="edit-payment-offered-comment"
+              rows={2}
+              disabled={saving}
+              value={form.payment_offered_comment || ""}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, payment_offered_comment: e.target.value }));
+                clearError("payment_offered_comment");
+              }}
+              placeholder="Reason for this payment type"
+              className={`w-full rounded-md border bg-background px-3 py-2 text-sm ${fieldErrors.payment_offered_comment ? "border-destructive" : "border-input"}`}
+            />
+            {fieldErrors.payment_offered_comment && (
+              <p className="text-sm text-destructive">{fieldErrors.payment_offered_comment}</p>
+            )}
+          </div>
+        )}
       </div>
       <div className="flex flex-wrap gap-3">
         <Button type="submit" disabled={saving || !hasChanges}>
