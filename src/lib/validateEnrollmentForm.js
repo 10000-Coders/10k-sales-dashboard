@@ -7,6 +7,10 @@ import {
   EDU_STATUS_OPTIONS,
 } from "@/lib/studentFormValidations";
 import { COURSE_VALUES, YEAR_MIN, YEAR_MAX } from "@/lib/enrollmentFormConstants";
+import {
+  canGenerateEnrollmentQrWithPayment,
+  validatePaymentOfferedFields,
+} from "@/lib/paymentOffered";
 
 export { EDU_STATUS_OPTIONS };
 
@@ -125,14 +129,7 @@ export function validateEnrollmentForm(form, options = {}) {
   if (!referenceDetails) errors.reference_details = "Reference details (how did you find us?) are required.";
 
   if (requirePaymentOffered) {
-    const paymentOffered = form.payment_offered;
-    if (paymentOffered === "" || paymentOffered == null)
-      errors.payment_offered = "Payment offered is required.";
-    else {
-      const num = Number(paymentOffered);
-      if (isNaN(num) || num < 0) errors.payment_offered = "Payment offered cannot be negative.";
-      else if (num > 100001) errors.payment_offered = "Payment offered cannot exceed ₹100,001.";
-    }
+    Object.assign(errors, validatePaymentOfferedFields(form, { requireFields: true }));
   }
 
   return errors;
@@ -140,10 +137,6 @@ export function validateEnrollmentForm(form, options = {}) {
 
 export function canGenerateEnrollmentQr(form) {
   const course = (form.course || "").trim();
-  const batch = (form.sales_batch || "").trim();
-  const offered = form.payment_offered;
-  if (!course || !COURSE_VALUES.has(course) || !batch) return false;
-  if (offered === "" || offered == null) return false;
-  const num = Number(offered);
-  return !isNaN(num) && num >= 0 && num <= 100001;
+  if (!course || !COURSE_VALUES.has(course)) return false;
+  return canGenerateEnrollmentQrWithPayment(form);
 }

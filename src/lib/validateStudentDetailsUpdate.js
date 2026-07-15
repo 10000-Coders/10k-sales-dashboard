@@ -1,4 +1,5 @@
 import { normalizeMobile } from "@/lib/studentFormValidations";
+import { validatePaymentOfferedFields } from "@/lib/paymentOffered";
 
 export function studentDetailsFromStudent(student) {
   return {
@@ -6,10 +7,13 @@ export function studentDetailsFromStudent(student) {
     student_email: student?.student_email || "",
     student_mobile: student?.student_mobile || "",
     student_password: student?.password || "",
+    course: student?.course || "",
     payment_offered:
       student?.payment_offered != null && student?.payment_offered !== ""
         ? String(student.payment_offered)
         : "",
+    payment_offered_type: student?.payment_offered_type || "",
+    payment_offered_comment: student?.payment_offered_comment || "",
   };
 }
 
@@ -30,11 +34,23 @@ export function validateStudentDetailsUpdate(form) {
   else if (mobile.length !== 10) errors.student_mobile = "Mobile must be 10 digits.";
 
   const offeredRaw = (form.payment_offered ?? "").toString().trim();
-  if (offeredRaw) {
-    const num = Number(offeredRaw);
-    if (Number.isNaN(num) || num < 0) {
-      errors.payment_offered = "Payment offered cannot be negative.";
-    }
+  const type = (form.payment_offered_type || "").trim();
+  const comment = (form.payment_offered_comment || "").trim();
+  const hasPaymentEdit = Boolean(offeredRaw || type || comment);
+
+  if (hasPaymentEdit) {
+    Object.assign(
+      errors,
+      validatePaymentOfferedFields(
+        {
+          course: form.course,
+          payment_offered: form.payment_offered,
+          payment_offered_type: form.payment_offered_type,
+          payment_offered_comment: form.payment_offered_comment,
+        },
+        { requireFields: true }
+      )
+    );
   }
 
   return errors;
@@ -67,8 +83,20 @@ export function buildStudentDetailsPatch(form, student) {
       : "";
   const nextOffered = offeredRaw === "" ? "" : String(Number(offeredRaw));
   const prevNormalized = prevOffered === "" ? "" : String(Number(prevOffered));
-  if (nextOffered !== prevNormalized) {
+  const offeredChanged = nextOffered !== prevNormalized;
+
+  const nextType = (form.payment_offered_type || "").trim();
+  const prevType = (baseline.payment_offered_type || "").trim();
+  const typeChanged = nextType !== prevType;
+
+  const nextComment = (form.payment_offered_comment || "").trim();
+  const prevComment = (baseline.payment_offered_comment || "").trim();
+  const commentChanged = nextComment !== prevComment;
+
+  if (offeredChanged || typeChanged || commentChanged) {
     payload.payment_offered = offeredRaw === "" ? null : nextOffered;
+    payload.payment_offered_type = nextType;
+    payload.payment_offered_comment = nextComment;
   }
 
   return payload;

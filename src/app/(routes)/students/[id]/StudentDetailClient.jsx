@@ -32,6 +32,7 @@ import { isProofScreenshotRequired, isTransactionIdRequired, paymentReceiversFor
 import { useSalesBatchDropdown } from "@/hooks/useSalesData";
 import StudentDetailsEditForm from "@/components/students/StudentDetailsEditForm";
 import { COURSE_LABELS, LEAD_COURSE_VALUES } from "@/constants/leadCourse";
+import { paymentOfferedTypeLabel } from "@/lib/paymentOffered";
 
 const PAYMENT_MODE_OPTIONS = [
   { value: "upi", label: "UPI" },
@@ -817,6 +818,9 @@ export default function StudentDetailClient() {
           {!detailsEditing && student.payment_offered != null && (
             <p className="text-sm text-muted-foreground">
               Offered amount: ₹ {Number(student.payment_offered).toLocaleString()}
+              {student.payment_offered_type ? (
+                <> · Type: {paymentOfferedTypeLabel(student.payment_offered_type)}</>
+              ) : null}
               {pendingAmount != null && (
                 <>
                   {" "}
@@ -825,6 +829,11 @@ export default function StudentDetailClient() {
                   </span>
                 </>
               )}
+            </p>
+          )}
+          {!detailsEditing && student.payment_offered_comment?.trim() && (
+            <p className="text-sm text-muted-foreground">
+              Offered comment: {student.payment_offered_comment.trim()}
             </p>
           )}
           {primaryFollowUpPayment && (

@@ -40,4 +40,6 @@ export const INITIAL_ENROLLMENT_FORM = {
   course: "",
   sales_batch: "",
   payment_offered: "",
+  payment_offered_type: "",
+  payment_offered_comment: "",
 };

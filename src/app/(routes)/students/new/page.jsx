@@ -23,6 +23,7 @@ import { INITIAL_ENROLLMENT_FORM, COURSE_OPTIONS, COURSE_VALUES } from "@/lib/en
 import StudentEnrollmentFields from "@/components/enrollment/StudentEnrollmentFields";
 import EnrollmentQrModal from "@/components/enrollment/EnrollmentQrModal";
 import { isProofScreenshotRequired, isTransactionIdRequired, paymentReceiversForMode } from "@/lib/paymentValidation";
+import { paymentOfferedTypeLabel } from "@/lib/paymentOffered";
 import { QrCode } from "lucide-react";
 
 /** API payload from date (YYYY-MM-DD) or datetime-local */
@@ -180,6 +181,8 @@ export default function NewStudentPage() {
         course: form.course,
         sales_batch: Number(form.sales_batch),
         payment_offered: Number(form.payment_offered),
+        payment_offered_type: form.payment_offered_type,
+        payment_offered_comment: (form.payment_offered_comment || "").trim(),
       };
       if (leadIdParam) payload.lead = Number(leadIdParam);
       if (referralIdParam) payload.referral = Number(referralIdParam);
@@ -188,7 +191,19 @@ export default function NewStudentPage() {
       setQrExpiresAt(data.expires_at);
       setQrModalOpen(true);
     } catch (err) {
-      const detail = err.response?.data?.detail || err.response?.data?.sales_batch?.[0];
+      const data = err.response?.data;
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        const apiErrors = {};
+        for (const [key, val] of Object.entries(data)) {
+          if (key === "detail") continue;
+          const msg = Array.isArray(val) ? val[0] : val;
+          if (msg && typeof msg === "string") apiErrors[key] = msg;
+        }
+        if (Object.keys(apiErrors).length > 0) {
+          setFieldErrors((prev) => ({ ...prev, ...apiErrors }));
+        }
+      }
+      const detail = data?.detail || data?.sales_batch?.[0];
       setQrError(detail || "Failed to generate QR link.");
     } finally {
       setQrGenerating(false);
@@ -313,6 +328,8 @@ export default function NewStudentPage() {
         course: (form.course || "").trim(),
         sales_batch: Number(form.sales_batch),
         payment_offered: form.payment_offered ? Number(form.payment_offered) : null,
+        payment_offered_type: form.payment_offered_type || "",
+        payment_offered_comment: (form.payment_offered_comment || "").trim(),
       };
 
       const { data: student } = await axios.post("/students/", studentPayload, { headers });
@@ -426,7 +443,7 @@ export default function NewStudentPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
-              QR is enabled when course, batch, and offered amount are filled.
+              QR is enabled when course, batch, offered amount, and payment type are filled.
             </p>
             <Button
               type="button"
@@ -464,6 +481,7 @@ export default function NewStudentPage() {
               salesBatchesError={salesBatchesError}
               availableSalesBatches={availableSalesBatches}
               selectedSalesBatch={selectedSalesBatch}
+              userRole={user?.role}
             />
           </CardContent>
         </Card>
@@ -677,6 +695,10 @@ export default function NewStudentPage() {
               <div><span className="text-muted-foreground">Course:</span> <span className="font-medium">{COURSE_OPTIONS.find((c) => c.value === form.course)?.label || form.course || "—"}</span></div>
               <div><span className="text-muted-foreground">Sales Batch:</span> <span className="font-medium">{selectedSalesBatch?.name || "—"}</span></div>
               <div><span className="text-muted-foreground">Offered Amount:</span> <span className="font-medium">{form.payment_offered ? `₹ ${Number(form.payment_offered).toLocaleString()}` : "—"}</span></div>
+              <div><span className="text-muted-foreground">Offered Type:</span> <span className="font-medium">{paymentOfferedTypeLabel(form.payment_offered_type)}</span></div>
+              {form.payment_offered_comment?.trim() && (
+                <div className="sm:col-span-2"><span className="text-muted-foreground">Offered Comment:</span> <span className="font-medium">{form.payment_offered_comment.trim()}</span></div>
+              )}
               <div><span className="text-muted-foreground">Initial Payment:</span> <span className="font-medium">{initialPayment.amount ? `₹ ${Number(initialPayment.amount).toLocaleString()}` : "—"}</span></div>
               <div><span className="text-muted-foreground">Next payment follow-up:</span> <span className="font-medium">{initialPayment.next_payment_follow_up_at || "—"}</span></div>
               <div><span className="text-muted-foreground">Payment Mode:</span> <span className="font-medium">{PAYMENT_MODE_OPTIONS.find((m) => m.value === initialPayment.payment_mode)?.label || initialPayment.payment_mode || "—"}</span></div>

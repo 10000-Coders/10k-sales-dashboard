@@ -1,3 +1,8 @@
+/** True for Manager and Super Admin (team filters / sales-person dropdowns). */
+export function isManagerOrSuperAdmin(role) {
+  return role === "manager" || role === "super_admin";
+}
+
 /** True only for Manager (team table + all stats). Super Admin sees own stats only. */
 export function isManager(role) {
   return role === "manager";
