@@ -76,6 +76,24 @@ export const fetchDemoStudentStats = createAsyncThunk(
   }
 );
 
+/** Full filtered list for Excel export (no pagination). */
+export const fetchDemoStudentsXlsheet = createAsyncThunk(
+  "demoStudents/fetchDemoStudentsXlsheet",
+  async ({ filters = {} } = {}, { getState, rejectWithValue }) => {
+    try {
+      const params = new URLSearchParams();
+      appendDemoStudentFilters(params, filters);
+      const qs = params.toString();
+      const { data } = await axios.get(`/demo-students/xlsheet/${qs ? `?${qs}` : ""}`, {
+        headers: getHeadersFromState(getState()),
+      });
+      return Array.isArray(data) ? data : [];
+    } catch (err) {
+      return rejectWithValue(rejectPayload(err, "Failed to export demo students."));
+    }
+  }
+);
+
 /** Single student with full feedback history (for feedback modal). */
 export const fetchDemoStudentDetail = createAsyncThunk(
   "demoStudents/fetchDemoStudentDetail",
@@ -308,6 +326,9 @@ const initialState = {
 
   statusUpdateLoading: false,
   statusUpdateError: null,
+
+  exportLoading: false,
+  exportError: null,
 };
 
 const demoStudentsSlice = createSlice({
@@ -327,6 +348,7 @@ const demoStudentsSlice = createSlice({
       state.statsError = null;
       state.qrError = null;
       state.qrValidateError = null;
+      state.exportError = null;
     },
     clearDemoTrainerSaveError(state) {
       state.trainerSaveError = null;
@@ -372,6 +394,18 @@ const demoStudentsSlice = createSlice({
         state.statsLoading = false;
         state.stats = null;
         state.statsError = action.payload?.detail || "Failed to load stats.";
+      })
+
+      .addCase(fetchDemoStudentsXlsheet.pending, (state) => {
+        state.exportLoading = true;
+        state.exportError = null;
+      })
+      .addCase(fetchDemoStudentsXlsheet.fulfilled, (state) => {
+        state.exportLoading = false;
+      })
+      .addCase(fetchDemoStudentsXlsheet.rejected, (state, action) => {
+        state.exportLoading = false;
+        state.exportError = action.payload?.detail || "Failed to export demo students.";
       })
 
       .addCase(fetchDemoStudentDetail.pending, (state) => {
