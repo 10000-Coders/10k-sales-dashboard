@@ -8,6 +8,7 @@ import { logout } from "@/redux/features/user/userAuth";
 import { clearLoginAt } from "@/lib/sessionExpiry";
 import { routeObject, MenuItems, SCHOLARSHIP_TEST_NAV_LABEL } from "@/shared/static/sidebarItems";
 import { cn } from "@/lib/utils";
+import { getLeadsListHref } from "@/lib/leadsFiltersUrl";
 
 export default function SideBar({ mobileOpen = false, onMobileClose }) {
   const [activeItem, setActiveItem] = useState("");
@@ -72,7 +73,7 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
     } else if (text === "Sales persons") {
       router.push("/sales-persons");
     } else if (text === "Leads") {
-      router.push("/leads");
+      router.push(getLeadsListHref());
     } else if (text === "Referrals") {
       router.push("/referrals");
     } else if (text === "Activities") {

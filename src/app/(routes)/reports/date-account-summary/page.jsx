@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useSelector } from "react-redux";
 import withPrivateAuth from "@/components/withPrivateAuth";
 import axios from "@/axios";
@@ -378,6 +379,19 @@ function DateAccountSummaryPage() {
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              <Link
+                href={`/reports/date-account-detail?${new URLSearchParams({
+                  ...(dateFrom ? { date_from: dateFrom } : {}),
+                  ...(dateTo ? { date_to: dateTo } : {}),
+                  ...(status ? { status } : {}),
+                  ...(salesBatchIds.length ? { sales_batch: salesBatchIds.join(",") } : {}),
+                  ...(salesPersonId ? { sales_person: salesPersonId } : {}),
+                  ...(receiverId ? { receiver: receiverId } : {}),
+                }).toString()}`}
+                className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                Report
+              </Link>
               <Button variant="outline" onClick={exportCsv} disabled={loading || grid.dates.length === 0}>
                 <Download className="h-4 w-4" />
                 Export CSV

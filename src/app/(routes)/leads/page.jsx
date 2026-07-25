@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux";
 import axios from "@/axios";
 import { useSalesPersons } from "@/hooks/useSalesData";
@@ -38,9 +38,23 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
 import { useFollowUp } from "@/context/FollowUpProvider";
+import { saveLeadsFiltersQuery } from "@/lib/leadsFiltersUrl";
 
 /** Only Manager sees all leads; Admin and Counselor see only their own. */
 import withPrivateAuth from "@/components/withPrivateAuth";
+
+function parseCsvParam(value) {
+  if (!value) return [];
+  return String(value)
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+function parsePageParam(value) {
+  const n = Number.parseInt(String(value || "1"), 10);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
 
 /** Only Manager sees all leads; Admin, Counselor and Super Admin see only their own. */
 function isManager(role) {
@@ -155,8 +169,9 @@ function LeadMultiSelectFilter({
   );
 }
 
-function LeadsPage() {
+function LeadsPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useSelector((state) => state.userAuth?.user);
   const isManagerRole = isManager(user?.role);
   const { persons, refetch: refetchPersons } = useSalesPersons({ enabled: isManagerRole });
@@ -166,20 +181,20 @@ function LeadsPage() {
   const [error, setError] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterSources, setFilterSources] = useState([]);
-  const [filterCourses, setFilterCourses] = useState([]);
-  const [filterIsRelated, setFilterIsRelated] = useState("");
-  const [filterPerson, setFilterPerson] = useState("");
-  const [filterDateFrom, setFilterDateFrom] = useState("");
-  const [filterDateTo, setFilterDateTo] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchDebounce, setSearchDebounce] = useState("");
+  const [filterStatus, setFilterStatus] = useState(() => searchParams.get("status") || "");
+  const [filterSources, setFilterSources] = useState(() => parseCsvParam(searchParams.get("source")));
+  const [filterCourses, setFilterCourses] = useState(() => parseCsvParam(searchParams.get("course")));
+  const [filterIsRelated, setFilterIsRelated] = useState(() => searchParams.get("is_related") || "");
+  const [filterPerson, setFilterPerson] = useState(() => searchParams.get("person") || "");
+  const [filterDateFrom, setFilterDateFrom] = useState(() => searchParams.get("date_from") || "");
+  const [filterDateTo, setFilterDateTo] = useState(() => searchParams.get("date_to") || "");
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("q") || "");
+  const [searchDebounce, setSearchDebounce] = useState(() => searchParams.get("q") || "");
   const [counselorDropdownOpen, setCounselorDropdownOpen] = useState(false);
   const [sourceDropdownOpen, setSourceDropdownOpen] = useState(false);
   const [courseDropdownOpen, setCourseDropdownOpen] = useState(false);
   const [counselorSearch, setCounselorSearch] = useState("");
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => parsePageParam(searchParams.get("page")));
   const [pagination, setPagination] = useState({
     count: 0,
     page: 1,
@@ -189,6 +204,8 @@ function LeadsPage() {
   const counselorDropdownRef = useRef(null);
   const sourceDropdownRef = useRef(null);
   const courseDropdownRef = useRef(null);
+  const skipPageResetRef = useRef(true);
+  const skipUrlSyncRef = useRef(true);
 
   const selectedPerson = persons.find((p) => String(p.id) === filterPerson);
 
@@ -317,14 +334,70 @@ function LeadsPage() {
     return h;
   }, [user?.id, user?.role]);
 
+  const clearFilters = useCallback(() => {
+    setFilterStatus("");
+    setFilterSources([]);
+    setFilterCourses([]);
+    setFilterIsRelated("");
+    setFilterPerson("");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+    setSearchQuery("");
+    setSearchDebounce("");
+    setCounselorSearch("");
+    setCounselorDropdownOpen(false);
+    setSourceDropdownOpen(false);
+    setCourseDropdownOpen(false);
+    setPage(1);
+    setError(null);
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounce(searchQuery), 3000);
     return () => clearTimeout(t);
   }, [searchQuery]);
 
   useEffect(() => {
+    if (skipPageResetRef.current) {
+      skipPageResetRef.current = false;
+      return;
+    }
     setPage(1);
   }, [filterStatus, filterSources, filterCourses, filterIsRelated, filterPerson, filterDateFrom, filterDateTo, searchDebounce]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filterStatus) params.set("status", filterStatus);
+    if (filterSources.length) params.set("source", filterSources.join(","));
+    if (filterCourses.length) params.set("course", filterCourses.join(","));
+    if (filterIsRelated) params.set("is_related", filterIsRelated);
+    if (filterPerson) params.set("person", filterPerson);
+    if (filterDateFrom) params.set("date_from", filterDateFrom);
+    if (filterDateTo) params.set("date_to", filterDateTo);
+    if (searchDebounce.trim()) params.set("q", searchDebounce.trim());
+    if (page > 1) params.set("page", String(page));
+    const qs = params.toString();
+
+    if (skipUrlSyncRef.current) {
+      skipUrlSyncRef.current = false;
+      // Keep sidebar restore working when landing via Back (URL already has filters).
+      if (qs) saveLeadsFiltersQuery(qs);
+      return;
+    }
+    saveLeadsFiltersQuery(qs);
+    router.replace(qs ? `/leads?${qs}` : "/leads", { scroll: false });
+  }, [
+    filterStatus,
+    filterSources,
+    filterCourses,
+    filterIsRelated,
+    filterPerson,
+    filterDateFrom,
+    filterDateTo,
+    searchDebounce,
+    page,
+    router,
+  ]);
 
   useEffect(() => {
     fetchLeads();
@@ -547,6 +620,14 @@ function LeadsPage() {
               className={FILTER_SELECT_CLASS}
               title="Created to date"
             />
+            <Button
+              type="button"
+              onClick={clearFilters}
+              disabled={loading}
+              className="h-9 bg-[#FF8000] text-white hover:bg-[#e67300] focus-visible:ring-[#FF8000]/40"
+            >
+              Clear Filter
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -752,6 +833,20 @@ function LeadsPage() {
         onSuccess={() => { fetchLeads(true); if (isManagerRole) refetchPersons(); }}
       />
     </div>
+  );
+}
+
+function LeadsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-1 items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <LeadsPageInner />
+    </Suspense>
   );
 }
 
