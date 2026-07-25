@@ -31,6 +31,7 @@ export const routeObject = {
   "/demo-trainers": "Demo Trainers",
   "/batches": "Batches",
   "/reports/date-account-summary": "Account Summary",
+  "/reports/date-account-detail": "Account Deposit Report",
   "/public-challenges": SCHOLARSHIP_TEST_NAV_LABEL,
 };
 

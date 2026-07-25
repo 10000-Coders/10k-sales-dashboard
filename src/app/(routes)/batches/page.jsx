@@ -159,6 +159,7 @@ function BatchesPage() {
         try {
           const params = new URLSearchParams();
           params.set("sales_batch", key);
+          params.set("list_view", "batch");
           params.set("page", "1");
           params.set("page_size", "200");
           const { data } = await axios.get(`/students/?${params.toString()}`, { headers: getHeaders() });
@@ -195,7 +196,7 @@ function BatchesPage() {
         .filter((s) => s?.id != null)
         .map((s) => {
           const verified = Number(s.total_paid ?? 0);
-          const pending = Number(s.pending_amount ?? 0);
+          const pending = Number(s.amount_due ?? 0);
           return [s.id, { verified, pending }];
         });
       const mapped = Object.fromEntries(entries);
@@ -688,7 +689,7 @@ function BatchesPage() {
                       <TableHead>Mobile</TableHead>
                       <TableHead>Offered</TableHead>
                       <TableHead>Verified Paid</TableHead>
-                      <TableHead>Pending Verification</TableHead>
+                      <TableHead>Amount Due</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
