@@ -24,6 +24,7 @@ import {
   LEAD_STATUS_OPTIONS,
   LEAD_CALL_OUTCOME_OPTIONS,
   getLeadStatusSelectClass,
+  statusRequiresFollowUp,
 } from "@/constants/leadStatus";
 
 function getActivityIcon(type) {
@@ -74,6 +75,7 @@ export default function LeadDetailClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [statusSaving, setStatusSaving] = useState(false);
+  const [statusError, setStatusError] = useState(null);
   const [activityForm, setActivityForm] = useState({
     activity_type: "call",
     outcome: "",
@@ -121,10 +123,18 @@ export default function LeadDetailClient() {
   const handleStatusChange = async (newStatus) => {
     if (!lead) return;
     if (lead.status === "enrolled") return;
+    setStatusError(null);
+    if (statusRequiresFollowUp(newStatus) && !lead.next_follow_up_at) {
+      setStatusError("This status needs a next follow-up date — log an activity below with a follow-up date.");
+      return;
+    }
     setStatusSaving(true);
     try {
       await axios.patch(`/leads/${lead.id}/`, { status: newStatus });
       setLead((prev) => (prev ? { ...prev, status: newStatus } : null));
+    } catch (err) {
+      const data = err.response?.data;
+      setStatusError(data?.next_follow_up_at?.[0] || data?.detail || "Failed to update status.");
     } finally {
       setStatusSaving(false);
     }
@@ -140,6 +150,10 @@ export default function LeadDetailClient() {
     }
     if (!activityForm.outcome) {
       setActivityError("Select an outcome before logging the activity.");
+      return;
+    }
+    if (statusRequiresFollowUp(activityForm.outcome) && !activityForm.next_follow_up_at) {
+      setActivityError("Next follow-up date is required for this outcome.");
       return;
     }
     setActivitySubmitting(true);
@@ -164,7 +178,8 @@ export default function LeadDetailClient() {
         });
       }
     } catch (err) {
-      setActivityError(err.response?.data?.detail || "Failed to log activity.");
+      const data = err.response?.data;
+      setActivityError(data?.next_follow_up_at?.[0] || data?.detail || "Failed to log activity.");
     } finally {
       setActivitySubmitting(false);
     }
@@ -181,7 +196,7 @@ export default function LeadDetailClient() {
   if (error || !lead) {
     return (
       <div className="flex flex-1 flex-col gap-4 p-8">
-        <Button variant="ghost" onClick={() => router.push("/leads")}>
+        <Button variant="ghost" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" /> Back to leads
         </Button>
         <p className="text-destructive">{error || "Lead not found."}</p>
@@ -191,7 +206,7 @@ export default function LeadDetailClient() {
 
   return (
     <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
-      <Button variant="ghost" className="w-fit" onClick={() => router.push("/leads")}>
+      <Button variant="ghost" className="w-fit" onClick={() => router.back()}>
         <ArrowLeft className="h-4 w-4" /> Back to leads
       </Button>
 
@@ -235,6 +250,7 @@ export default function LeadDetailClient() {
                 )}
                 {statusSaving && <Loader2 className="h-4 w-4 animate-spin" />}
               </div>
+              {statusError && <p className="w-full text-xs text-destructive">{statusError}</p>}
               {lead.status !== "enrolled" && (
                 <Button
                   onClick={() =>
@@ -325,7 +341,13 @@ export default function LeadDetailClient() {
                 </select>
               </div>
               <div className="grid gap-1 min-w-0">
-                <Label className="text-xs text-muted-foreground">Next follow-up (optional)</Label>
+                <Label className="text-xs text-muted-foreground">
+                  {statusRequiresFollowUp(activityForm.outcome) ? (
+                    <>Next follow-up <span className="text-destructive">*</span></>
+                  ) : (
+                    "Next follow-up (optional)"
+                  )}
+                </Label>
                 <Input
                   type="datetime-local"
                   value={activityForm.next_follow_up_at}

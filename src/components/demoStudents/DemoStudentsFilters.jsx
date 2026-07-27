@@ -19,9 +19,9 @@ function validateDateRange(fromDate, toDate) {
   const from = new Date(`${fromDate}T00:00:00`);
   const to = new Date(`${toDate}T00:00:00`);
   const maxTo = new Date(from);
-  maxTo.setMonth(maxTo.getMonth() + 1);
+  maxTo.setDate(maxTo.getDate() + 7);
   if (to > maxTo) {
-    return "Date range cannot be greater than one month.";
+    return "Date range cannot be greater than one week.";
   }
   return null;
 }

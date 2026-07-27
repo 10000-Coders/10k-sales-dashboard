@@ -498,7 +498,11 @@ export default function StudentDetailClient() {
   
   const isFullyPaid = offeredAmount != null && committedAmount >= offeredAmount;
   const canManageCourseBatch = user?.role === "manager" || user?.role === "super_admin";
-  const canEditDetails = user?.email?.toLowerCase() === "varshini10kcoders@gmail.com";
+  const canEditDetails = [
+    "varshini10kcoders@gmail.com",
+    "sridhar10kcoders@gmail.com",
+    "subbareddyarikatla8@gmail.com",
+  ].includes(user?.email?.toLowerCase());
   const primaryFollowUpPayment = getPrimaryPaymentForFollowUp(payments);
 
   const handleLogStudentActivity = async (e) => {

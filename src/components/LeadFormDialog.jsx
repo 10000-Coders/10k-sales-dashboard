@@ -12,7 +12,7 @@ import { formSelectStyles, formSelectMenuPortalTarget } from "@/lib/reactSelectS
 import { Loader2, User, Phone, Mail, Share2, Calendar, Activity, X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { inquirySourceOptionsForValue } from "@/constants/leadInquirySource";
 import { LEAD_COURSE_VALUES, LEAD_RELATED_VALUES, normalizeLeadRelatedValue } from "@/constants/leadCourse";
-import { LEAD_STATUS_FORM_OPTIONS } from "@/constants/leadStatus";
+import { LEAD_STATUS_FORM_OPTIONS, statusRequiresFollowUp } from "@/constants/leadStatus";
 import { getAllStudents, getAllBatchNames } from "@/utils/referrialApis";
 
 const STATUS_OPTIONS = LEAD_STATUS_FORM_OPTIONS;
@@ -216,6 +216,8 @@ const validateForm = () => {
      const dt = new Date(form.next_follow_up_at);
      if (isNaN(dt.getTime())) nextErrors.next_follow_up_at = "Enter a valid date/time.";
      else if (dt.getTime() <= Date.now()) nextErrors.next_follow_up_at = "Next follow-up must be in the future.";
+   } else if (statusRequiresFollowUp(form.status)) {
+     nextErrors.next_follow_up_at = "Next follow-up date is required for this status.";
    }
   setErrors(nextErrors);
   return Object.keys(nextErrors).length === 0;
@@ -537,7 +539,10 @@ const validateForm = () => {
               </div>
 
               <div className="md:col-span-2 grid gap-2">
-                <Label htmlFor="next_follow_up_at" className="text-xs font-semibold text-gray-700 uppercase">Next Engagement Schedule</Label>
+                <Label htmlFor="next_follow_up_at" className="text-xs font-semibold text-gray-700 uppercase">
+                  Next Engagement Schedule
+                  {statusRequiresFollowUp(form.status) && <span className="ml-1 text-destructive">*</span>}
+                </Label>
                 <div className="relative">
                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input

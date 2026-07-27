@@ -16,6 +16,20 @@ export const LEAD_STATUS_OPTIONS = [
   { value: "other_language", label: "Other Language" },
 ];
 
+/** Statuses/outcomes that do NOT require next_follow_up_at — must match backend serializers. */
+export const FOLLOW_UP_EXEMPT_STATUSES = [
+  "new",
+  "enrolled",
+  "other_language",
+  "no_incoming",
+  "wrong_number",
+  "not_interested",
+];
+
+export function statusRequiresFollowUp(status) {
+  return Boolean(status) && !FOLLOW_UP_EXEMPT_STATUSES.includes(status);
+}
+
 export const LEAD_STATUS_FILTER_OPTIONS = [
   { value: "", label: "All statuses" },
   ...LEAD_STATUS_OPTIONS,
