@@ -20,6 +20,8 @@ export const LEAD_SOURCE_VALUES = [
   { value: "crm_referals", label: "CRM Referals" },
   { value: "pm_referals", label: "PM Referals" },
   { value: "triner_referals", label: "TRINER Referals" },
+  { value: "ai_calling_agent", label: "AI Calling Agent" },
+  { value: "workshop", label: "Workshop" },
 ];
 
 /** Leads list filter — includes all sources + unknown (empty source). */
