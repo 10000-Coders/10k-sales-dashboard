@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { getRangeForPreset, todayStr } from "@/lib/dateUtils";
 import { formatStatsPeriodLabel } from "@/lib/dashboardStats";
 import withPrivateAuth from "@/components/withPrivateAuth";
-import { isManager } from "@/lib/dashboardConstants";
+import { isManagerOrSuperAdmin } from "@/lib/dashboardConstants";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { PeriodPresets } from "@/components/dashboard/PeriodPresets";
 import { StatsCards } from "@/components/dashboard/StatsCards";
@@ -17,7 +17,7 @@ import { RoleResponsibilities } from "@/components/dashboard/RoleResponsibilitie
 
 function HomePage() {
   const user = useSelector((state) => state.userAuth?.user);
-  const isManagerRole = isManager(user?.role);
+  const isManagerRole = isManagerOrSuperAdmin(user?.role);
   const [preset, setPreset] = useState("today");
   const [fromDate, setFromDate] = useState(todayStr());
   const [toDate, setToDate] = useState(todayStr());

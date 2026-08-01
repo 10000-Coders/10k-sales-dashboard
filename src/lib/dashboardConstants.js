@@ -1,9 +1,9 @@
-/** True for Manager and Super Admin (team filters / sales-person dropdowns). */
+/** True for Manager and Super Admin (team filters / sales-person dropdowns / team stats). */
 export function isManagerOrSuperAdmin(role) {
   return role === "manager" || role === "super_admin";
 }
 
-/** True only for Manager (team table + all stats). Super Admin sees own stats only. */
+/** True only for Manager (manager-exclusive actions like payment verify / lead reassign). */
 export function isManager(role) {
   return role === "manager";
 }
@@ -41,8 +41,8 @@ export const ROLE_RESPONSIBILITIES = {
     "Review Activities by period and by person to keep the team on track.",
   ],
   super_admin: [
-    "View your own leads, students, activities, and payment stats (same scope as counselor/admin).",
-    "Use Dashboard and Activities to track your productivity; use Payments to view your students' payments.",
-    "Enroll students from your own leads only; Sales persons and Batches are managed by Manager.",
+    "Monitor team performance: leads, activities, and payments on Dashboard and Activities.",
+    "View lead source analytics for the whole team; filter by counselor when needed.",
+    "Manage sales persons and their roles; enroll students from your own leads; Batches are managed by Manager.",
   ],
 };
