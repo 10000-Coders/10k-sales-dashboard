@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { LEAD_STATUS_PREFERRED_ORDER } from "@/constants/leadStatus";
+import { isManagerOrSuperAdmin } from "@/lib/dashboardConstants";
 
 function formatStatusLabel(value) {
   return String(value || "")
@@ -40,7 +41,7 @@ function todayDateString() {
 function LeadSourceAnalyticsPage() {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.userAuth?.user);
-  const isManager = user?.role === "manager";
+  const isManager = isManagerOrSuperAdmin(user?.role);
   const { persons } = useSalesPersons({ enabled: isManager });
   const analytics = useSelector(selectLeadSourceAnalytics);
   const loading = useSelector(selectLeadSourceAnalyticsLoading);

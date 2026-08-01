@@ -26,16 +26,10 @@ import { ActivityCharts, TeamComparisonChart, ActivityTypeChart } from "@/compon
 import { Loader2, BarChart3, Calendar, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getRangeForPreset, todayStr } from "@/lib/dateUtils";
+import { isManagerOrSuperAdmin } from "@/lib/dashboardConstants";
 
-function isManagerOrAdmin(role) {
-  // Only Manager is treated as management for Activities (team view).
-  // Super Admin behaves like Admin/Counselor here: own stats only.
-  return role === "manager";
-}
-
-/** Only Manager can list sales persons and pick another person's activities. */
-function isManagerOnly(role) {
-  return role === "manager";
+function canViewTeamActivities(role) {
+  return isManagerOrSuperAdmin(role);
 }
 
 const PRESETS = [
@@ -58,8 +52,8 @@ const STATS_CACHE_MS = 5000;
 function ActivitiesPage() {
   const router = useRouter();
   const user = useSelector((state) => state.userAuth?.user);
-  const isManager = isManagerOrAdmin(user?.role);
-  const canFetchPersons = isManagerOnly(user?.role); // Only manager can list sales persons (API restricted)
+  const isManager = canViewTeamActivities(user?.role);
+  const canFetchPersons = canViewTeamActivities(user?.role);
   const { persons } = useSalesPersons({ enabled: canFetchPersons });
   const [preset, setPreset] = useState("this_month");
   const [fromDate, setFromDate] = useState(defaultRange.from);
@@ -148,7 +142,7 @@ function ActivitiesPage() {
             <CardTitle className="text-2xl">Activities & productivity</CardTitle>
           </div>
           <CardDescription>
-            Track leads created and activities (calls, WhatsApp) by date range. Managers can view any counselor or the whole team.
+            Track leads created and activities (calls, WhatsApp) by date range. Managers and Super Admins can view any counselor or the whole team.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
