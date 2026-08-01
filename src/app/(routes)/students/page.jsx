@@ -38,9 +38,9 @@ let studentsFetchCacheKey = null;
 const STUDENTS_CACHE_MS = 5000;
 const STUDENTS_PAGE_SIZE = 50;
 
-/** Manager and Super Admin see all students and can filter by person; Admin/Counselor see only their own. */
+/** Manager sees all students and can filter by person; Super Admin/Admin/Counselor see only their own. */
 function canSeeAllStudents(role) {
-  return role === "manager" || role === "super_admin";
+  return role === "manager";
 }
 
 function formatDate(d) {
