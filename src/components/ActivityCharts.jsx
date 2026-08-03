@@ -44,13 +44,19 @@ export function ActivityTypeChart({ data }) {
   );
 }
 
-/** Team: one bar per person (activities total or leads created) */
-export function TeamComparisonChart({ byPerson, metric = "activities_total", title }) {
+/** Team: one bar per person (activities total, leads created, or payment amounts) */
+export function TeamComparisonChart({
+  byPerson,
+  metric = "activities_total",
+  title,
+  valueFormatter,
+}) {
+  const formatValue = valueFormatter || ((v) => v);
   const chartData = (byPerson || []).map((p) => ({
     name: p.sales_person_name?.split(" ")[0] || "—",
     fullName: p.sales_person_name,
     role: p.role,
-    value: p[metric] ?? 0,
+    value: Number(p[metric] ?? 0),
   }));
 
   if (chartData.length === 0) {
@@ -60,17 +66,22 @@ export function TeamComparisonChart({ byPerson, metric = "activities_total", tit
   }
 
   return (
-    <ResponsiveContainer width="100%" height={300}>
+    <ResponsiveContainer width="100%" height={Math.max(300, chartData.length * 36)}>
       <BarChart
         data={chartData}
         layout="vertical"
         margin={{ top: 8, right: 24, left: 80, bottom: 8 }}
       >
         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
-        <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
+        <XAxis
+          type="number"
+          tick={{ fontSize: 12 }}
+          allowDecimals={false}
+          tickFormatter={(v) => formatValue(v)}
+        />
         <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={72} />
         <Tooltip
-          formatter={(value) => [value, title || metric]}
+          formatter={(value) => [formatValue(value), title || metric]}
           labelFormatter={(_, payload) => payload[0]?.payload?.fullName}
         />
         <Bar dataKey="value" name={title || "Count"} fill="hsl(24, 95%, 53%)" radius={[0, 4, 4, 0]} />
