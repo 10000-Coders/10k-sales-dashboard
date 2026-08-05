@@ -19,7 +19,7 @@ async function fetchStatsRange({ from, to, salesPersonId, headers }) {
 }
 
 /**
- * Fetches my stats and (for manager) team stats for the given period.
+ * Fetches my stats and (for manager/super_admin) team stats for the given period.
  * Calls the API on mount and whenever the period or user changes.
  */
 export function useDashboardStats({ fromDate, toDate, userId, userRole, isManager }) {

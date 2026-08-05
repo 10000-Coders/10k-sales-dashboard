@@ -47,6 +47,6 @@ export const MenuItems = [
   { text: "Demo Students", icon: Presentation },
   { text: "Demo Trainers", icon: UserCog, managerOrSuperAdminOnly: true },
   { text: SCHOLARSHIP_TEST_NAV_LABEL, icon: Trophy, adminManagerSuperAdminOnly: true },
-  { text: "Sales persons", icon: Users, managerOnly: true },
+  { text: "Sales persons", icon: Users, managerOrSuperAdminOnly: true },
   { text: "Activities", icon: Activity },
 ];

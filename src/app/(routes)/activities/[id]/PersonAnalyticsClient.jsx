@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ActivityTypeChart, ActivityTypePie } from "@/components/ActivityCharts";
+import { DownloadProductivityPdfButton } from "@/features/activities/DownloadProductivityPdfButton";
 import { Loader2, ArrowLeft, BarChart3, Calendar, Target, Phone, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -198,6 +199,13 @@ export default function PersonAnalyticsClient() {
               value={toDate}
               onChange={(e) => { setToDate(e.target.value); setPreset(""); }}
               className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            />
+            <DownloadProductivityPdfButton
+              from={fromDate}
+              to={toDate}
+              salesPersonId={id}
+              headers={getHeaders()}
+              disabled={loading || !stats}
             />
           </div>
           {stats && (stats.from_date || stats.to_date) && (

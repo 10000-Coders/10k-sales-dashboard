@@ -228,6 +228,7 @@ const validateForm = () => {
       name: (form.name || "").trim(),
       mobile: normalizeMobile(form.mobile),
       email: (form.email || "").trim(),
+      // Source dropdown is disabled on edit; still send existing value so PUT keeps it.
       source: (form.source || "").trim(),
       course: (form.course || "").trim(),
       is_related: normalizeLeadRelatedValue(form.is_related),
@@ -375,8 +376,11 @@ const validateForm = () => {
                     id="source"
                     value={form.source}
                     onChange={(e) => handleChange("source", e.target.value)}
+                    disabled={isEdit}
+                    title={isEdit ? "Inquiry source cannot be changed after the lead is created" : undefined}
                     className={cn(
                       "flex h-11 w-full rounded-md border bg-background pl-10 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                      isEdit && "cursor-not-allowed opacity-70",
                       errors.source ? "border-destructive" : "border-input"
                     )}
                   >
@@ -387,7 +391,11 @@ const validateForm = () => {
                     ))}
                   </select>
                 </div>
-                {errors.source && <p className="text-[10px] font-bold text-destructive uppercase">{errors.source}</p>}
+                {isEdit ? (
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase">Source cannot be changed when updating a lead</p>
+                ) : errors.source ? (
+                  <p className="text-[10px] font-bold text-destructive uppercase">{errors.source}</p>
+                ) : null}
               </div>
 
               <div className="grid gap-2">
