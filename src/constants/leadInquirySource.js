@@ -1,5 +1,6 @@
 /** Inquiry source values stored on Lead.source (API / DB). */
 export const LEAD_SOURCE_VALUES = [
+  { value: "Dashboard leads", label: "Dashboard leads"},
   { value: "website", label: "Website" },
   { value: "whatsapp", label: "WhatsApp" },
   { value: "call", label: "Call" },
@@ -22,6 +23,7 @@ export const LEAD_SOURCE_VALUES = [
   { value: "triner_referals", label: "TRINER Referals" },
   { value: "ai_calling_agent", label: "AI Calling Agent" },
   { value: "workshop", label: "Workshop" },
+  
 ];
 
 /** Leads list filter — includes all sources + unknown (empty source). */
