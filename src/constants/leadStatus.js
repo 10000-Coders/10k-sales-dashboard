@@ -14,6 +14,7 @@ export const LEAD_STATUS_OPTIONS = [
   { value: "no_incoming", label: "No Incoming" },
   { value: "out_of_service", label: "Out of Service" },
   { value: "other_language", label: "Other Language" },
+  { value: "demo_class", label: "Demo Class" },
 ];
 
 /** Statuses/outcomes that do NOT require next_follow_up_at — must match backend serializers. */
@@ -55,6 +56,7 @@ export const LEAD_CALL_OUTCOME_OPTIONS = [
   { value: "no_incoming", label: "No Incoming" },
   { value: "out_of_service", label: "Out of Service" },
   { value: "other_language", label: "Other Language" },
+  { value: "demo_class", label: "Demo Class" },
   { value: "other", label: "Other" },
 ];
 
@@ -73,6 +75,7 @@ export const LEAD_STATUS_PREFERRED_ORDER = [
   "no_incoming",
   "out_of_service",
   "other_language",
+  "demo_class",
 ];
 
 export const LEAD_STATUS_STYLES = {
@@ -90,6 +93,7 @@ export const LEAD_STATUS_STYLES = {
   no_incoming: "bg-orange-100 text-orange-800",
   out_of_service: "bg-orange-100 text-orange-800",
   other_language: "bg-violet-100 text-violet-800",
+  demo_class: "bg-indigo-100 text-indigo-800",
 };
 
 const LEAD_STATUS_SELECT_STYLES = {
@@ -106,6 +110,7 @@ const LEAD_STATUS_SELECT_STYLES = {
   no_incoming: "bg-orange-100 text-orange-800 border-orange-200",
   out_of_service: "bg-orange-100 text-orange-800 border-orange-200",
   other_language: "bg-violet-100 text-violet-800 border-violet-200",
+  demo_class: "bg-indigo-100 text-indigo-800 border-indigo-200",
 };
 
 export function getLeadStatusSelectClass(status) {
