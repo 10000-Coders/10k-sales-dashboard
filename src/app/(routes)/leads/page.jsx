@@ -295,13 +295,8 @@ function LeadsPageInner() {
         if (searchDebounce.trim()) params.set("search", searchDebounce.trim());
         if (isManagerRole && filterPerson) {
           params.set("sales_person", filterPerson);
-        } else if (!isManagerRole && user?.id) {
-          params.set("sales_person", user.id);
         }
-        const headers = {};
-        if (user?.id != null) headers["X-Sales-Person-Id"] = String(user.id);
-        if (user?.role) headers["X-Sales-Person-Role"] = user.role;
-        const { data } = await axios.get(`/leads/?${params.toString()}`, { headers });
+        const { data } = await axios.get(`/leads/?${params.toString()}`);
         const list = data?.results ?? (Array.isArray(data) ? data : []);
         const meta = {
           count: data?.count ?? list.length,
@@ -326,13 +321,6 @@ function LeadsPageInner() {
     })();
     await leadsFetchPromise;
   }, [filterStatus, filterSources, filterCourses, filterIsRelated, filterPerson, filterDateFrom, filterDateTo, searchDebounce, page, isManagerRole, user?.id, setUpcomingFollowUpsFromLeads]);
-
-  const getHeaders = useCallback(() => {
-    const h = {};
-    if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
-    if (user?.role) h["X-Sales-Person-Role"] = user.role;
-    return h;
-  }, [user?.id, user?.role]);
 
   const clearFilters = useCallback(() => {
     setFilterStatus("");

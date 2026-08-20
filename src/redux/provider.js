@@ -3,6 +3,7 @@ import { Provider } from "react-redux";
 import { store, persistor } from "./store";
 import { PersistGate } from "redux-persist/integration/react";
 import SpinnerLoader from "@/components/SpinnerLoader";
+import AuthTokenSync from "@/components/AuthTokenSync";
 
 /**
  * Wait for persisted auth to rehydrate before rendering the app.
@@ -20,6 +21,7 @@ export const Providers = ({ children }) => {
   return (
     <Provider store={store}>
       <PersistGate loading={<PersistLoading />} persistor={persistor}>
+        <AuthTokenSync />
         {children}
       </PersistGate>
     </Provider>

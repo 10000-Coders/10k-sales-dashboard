@@ -3,14 +3,10 @@
  * Used for student enrollment (and any flow that needs to verify email/mobile via OTP).
  */
 
-import { getDynamicHeader } from "@/interceptManager";
 import { mentorOtpBaseUrl } from "@/lib/apiConfig";
 
 function getOtpHeaders() {
-  const headers = { "Content-Type": "application/json" };
-  const { token } = getDynamicHeader();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  return headers;
+  return { "Content-Type": "application/json" };
 }
 
 /**

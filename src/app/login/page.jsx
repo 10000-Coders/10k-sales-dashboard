@@ -48,26 +48,63 @@ export default function LoginPage() {
     setQuote(SALES_QUOTES[Math.floor(Math.random() * SALES_QUOTES.length)]);
   }, []);
   const [otpSent, setOtpSent] = useState(false);
+  const [emptyAttempts, setEmptyAttempts] = useState(0);
   const dispatch = useDispatch();
   const { loginLoading } = useSelector((state) => state.userAuth);
   const { showSuccessToast, showErrorToast } = useToast();
   const router = useRouter();
 
+  const remainingLabel = (remaining) => {
+    if (remaining == null || remaining === "" || Number.isNaN(Number(remaining))) return "";
+    const n = Number(remaining);
+    if (n <= 0) return "0 chances remaining today.";
+    return n === 1 ? "1 chance remaining today." : `${n} chances remaining today.`;
+  };
+
+  const toastWithRemaining = (detail, remaining, fallback) => {
+    const base = detail || fallback;
+    const extra = remainingLabel(remaining);
+    return extra ? `${base} ${extra}` : base;
+  };
+
   const handleSendOtp = async (e) => {
     e?.preventDefault();
     const trimmed = email.trim().toLowerCase();
     if (!trimmed) {
+      const next = emptyAttempts + 1;
+      setEmptyAttempts(next);
       showErrorToast("Enter your email.", "top-right", "light");
+      return;
+    }
+    // Basic format check before calling the API
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+    if (!emailOk) {
+      showErrorToast("Enter a valid email address.", "top-right", "light");
       return;
     }
     setSendLoading(true);
     try {
-      const res = await axios.post("/login/otp/send/", { email: trimmed });
+      const res = await axios.post(
+        "/login/otp/send/",
+        { email: trimmed },
+        { withCredentials: true }
+      );
       setOtpSent(true);
-      showSuccessToast(res.data?.message || "OTP sent to your email.", "top-right", "light");
+      setEmptyAttempts(0);
+      showSuccessToast(res.data?.message || "OTP sent successfully.", "top-right", "light");
     } catch (err) {
+      const status = err.response?.status;
       const detail = err.response?.data?.detail;
-      showErrorToast(detail || "Could not send OTP.", "top-right", "light");
+      const remaining = err.response?.data?.remaining_attempts;
+      const showRemaining = remaining != null && (status === 429 || emptyAttempts >= 3);
+      const message = showRemaining
+        ? toastWithRemaining(
+            detail,
+            remaining,
+            status === 429 ? "Too many attempts. Try again tomorrow." : "Could not send OTP."
+          )
+        : detail || (status === 429 ? "Too many attempts. Try again tomorrow." : "Could not send OTP.");
+      showErrorToast(message, "top-right", "light");
     } finally {
       setSendLoading(false);
     }
@@ -85,11 +122,16 @@ export default function LoginPage() {
     }
     const res = await dispatch(login({ email, otp }));
     if (login.fulfilled.match(res)) {
-      setLoginAt(); // 7-day session
+      setLoginAt(); // 30-day client session window (matches refresh lifetime)
       showSuccessToast("Logged in successfully.", "top-right", "light");
       router.push("/");
     } else {
-      showErrorToast(res.payload?.detail || "Invalid OTP.", "top-right", "light");
+      const detail = res.payload?.detail;
+      const statusHint =
+        typeof detail === "string" && detail.toLowerCase().includes("too many")
+          ? detail
+          : detail || "Invalid email or OTP.";
+      showErrorToast(statusHint, "top-right", "light");
     }
   };
 
@@ -175,7 +217,6 @@ export default function LoginPage() {
                     id="email"
                     name="email"
                     type="email"
-                    required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="example@10000coders.in"
@@ -188,7 +229,7 @@ export default function LoginPage() {
                     type="button"
                     variant="outline"
                     className="h-11 shrink-0 border-2 border-[#FF8000] text-[#FF8000] hover:bg-[#FF8000] hover:text-white disabled:opacity-50"
-                    disabled={sendLoading || !email.trim()}
+                    disabled={sendLoading}
                     onClick={handleSendOtp}
                   >
                     {sendLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send OTP"}

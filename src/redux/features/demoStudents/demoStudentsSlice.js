@@ -3,14 +3,6 @@ import axios from "@/axios";
 
 export const DEMO_STUDENTS_PAGE_SIZE = 30;
 
-function getHeadersFromState(state) {
-  const user = state?.userAuth?.user;
-  const h = {};
-  if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
-  if (user?.role) h["X-Sales-Person-Role"] = user.role;
-  return h;
-}
-
 function rejectPayload(err, fallback) {
   const payload = err.response?.data;
   return typeof payload === "object" && payload !== null
@@ -41,16 +33,14 @@ function appendDemoStudentFilters(params, filters = {}) {
 /** Paginated list — same filters as stats. */
 export const fetchDemoStudents = createAsyncThunk(
   "demoStudents/fetchDemoStudents",
-  async ({ page = 1, pageSize = DEMO_STUDENTS_PAGE_SIZE, filters = {} } = {}, { getState, rejectWithValue }) => {
+  async ({ page = 1, pageSize = DEMO_STUDENTS_PAGE_SIZE, filters = {} } = {}, { rejectWithValue }) => {
     try {
       const params = new URLSearchParams({
         page: String(page),
         page_size: String(pageSize),
       });
       appendDemoStudentFilters(params, filters);
-      const { data } = await axios.get(`/demo-students/?${params}`, {
-        headers: getHeadersFromState(getState()),
-      });
+      const { data } = await axios.get(`/demo-students/?${params}`);
       return data;
     } catch (err) {
       return rejectWithValue(rejectPayload(err, "Failed to load demo students."));
@@ -61,14 +51,12 @@ export const fetchDemoStudents = createAsyncThunk(
 /** Stats aggregate — same filters as list. */
 export const fetchDemoStudentStats = createAsyncThunk(
   "demoStudents/fetchDemoStudentStats",
-  async ({ filters = {} } = {}, { getState, rejectWithValue }) => {
+  async ({ filters = {} } = {}, { rejectWithValue }) => {
     try {
       const params = new URLSearchParams();
       appendDemoStudentFilters(params, filters);
       const qs = params.toString();
-      const { data } = await axios.get(`/demo-students/stats/${qs ? `?${qs}` : ""}`, {
-        headers: getHeadersFromState(getState()),
-      });
+      const { data } = await axios.get(`/demo-students/stats/${qs ? `?${qs}` : ""}`);
       return data;
     } catch (err) {
       return rejectWithValue(rejectPayload(err, "Failed to load demo student stats."));
@@ -79,14 +67,12 @@ export const fetchDemoStudentStats = createAsyncThunk(
 /** Full filtered list for Excel export (no pagination). */
 export const fetchDemoStudentsXlsheet = createAsyncThunk(
   "demoStudents/fetchDemoStudentsXlsheet",
-  async ({ filters = {} } = {}, { getState, rejectWithValue }) => {
+  async ({ filters = {} } = {}, { rejectWithValue }) => {
     try {
       const params = new URLSearchParams();
       appendDemoStudentFilters(params, filters);
       const qs = params.toString();
-      const { data } = await axios.get(`/demo-students/xlsheet/${qs ? `?${qs}` : ""}`, {
-        headers: getHeadersFromState(getState()),
-      });
+      const { data } = await axios.get(`/demo-students/xlsheet/${qs ? `?${qs}` : ""}`);
       return Array.isArray(data) ? data : [];
     } catch (err) {
       return rejectWithValue(rejectPayload(err, "Failed to export demo students."));
@@ -97,11 +83,9 @@ export const fetchDemoStudentsXlsheet = createAsyncThunk(
 /** Single student with full feedback history (for feedback modal). */
 export const fetchDemoStudentDetail = createAsyncThunk(
   "demoStudents/fetchDemoStudentDetail",
-  async (id, { getState, rejectWithValue }) => {
+  async (id, { rejectWithValue }) => {
     try {
-      const { data } = await axios.get(`/demo-students/${id}/`, {
-        headers: getHeadersFromState(getState()),
-      });
+      const { data } = await axios.get(`/demo-students/${id}/`);
       return data;
     } catch (err) {
       return rejectWithValue(rejectPayload(err, "Failed to load student feedback."));
@@ -112,13 +96,9 @@ export const fetchDemoStudentDetail = createAsyncThunk(
 /** PATCH only student_status on a demo student. */
 export const updateDemoStudentStatus = createAsyncThunk(
   "demoStudents/updateDemoStudentStatus",
-  async ({ id, student_status }, { getState, rejectWithValue }) => {
+  async ({ id, student_status }, { rejectWithValue }) => {
     try {
-      const { data } = await axios.patch(
-        `/demo-students/${id}/`,
-        { student_status },
-        { headers: getHeadersFromState(getState()) }
-      );
+      const { data } = await axios.patch(`/demo-students/${id}/`, { student_status });
       return data;
     } catch (err) {
       return rejectWithValue(rejectPayload(err, "Failed to update student status."));
@@ -142,11 +122,9 @@ export const submitDemoStudentForm = createAsyncThunk(
 /** Manager/super_admin transfer. */
 export const bulkReassignDemoStudents = createAsyncThunk(
   "demoStudents/bulkReassignDemoStudents",
-  async (payload, { getState, rejectWithValue }) => {
+  async (payload, { rejectWithValue }) => {
     try {
-      const { data } = await axios.post("/demo-students/bulk_reassign/", payload, {
-        headers: getHeadersFromState(getState()),
-      });
+      const { data } = await axios.post("/demo-students/bulk_reassign/", payload);
       return data;
     } catch (err) {
       return rejectWithValue(rejectPayload(err, "Failed to reassign demo students."));
@@ -173,13 +151,11 @@ export const fetchDemoClassQr = createAsyncThunk(
  */
 export const generateDemoClassQr = createAsyncThunk(
   "demoStudents/generateDemoClassQr",
-  async (payload = {}, { getState, rejectWithValue }) => {
+  async (payload = {}, { rejectWithValue }) => {
     try {
       const body = {};
       if (payload.expires_in_days != null) body.expires_in_days = payload.expires_in_days;
-      const { data } = await axios.post("/demo-class-qr/", body, {
-        headers: getHeadersFromState(getState()),
-      });
+      const { data } = await axios.post("/demo-class-qr/", body);
       return data?.qr ?? null;
     } catch (err) {
       return rejectWithValue(rejectPayload(err, "Failed to generate QR."));
@@ -242,11 +218,9 @@ export const fetchSalesPersonsDropdown = createAsyncThunk(
 /** Full trainer list (manager/super_admin manage page). */
 export const fetchDemoTrainers = createAsyncThunk(
   "demoStudents/fetchDemoTrainers",
-  async (_, { getState, rejectWithValue }) => {
+  async (_, { rejectWithValue }) => {
     try {
-      const { data } = await axios.get("/demo-trainers/", {
-        headers: getHeadersFromState(getState()),
-      });
+      const { data } = await axios.get("/demo-trainers/");
       return Array.isArray(data) ? data : [];
     } catch (err) {
       return rejectWithValue(rejectPayload(err, "Failed to load demo trainers."));
@@ -256,11 +230,9 @@ export const fetchDemoTrainers = createAsyncThunk(
 
 export const createDemoTrainer = createAsyncThunk(
   "demoStudents/createDemoTrainer",
-  async (payload, { getState, rejectWithValue }) => {
+  async (payload, { rejectWithValue }) => {
     try {
-      const { data } = await axios.post("/demo-trainers/", payload, {
-        headers: getHeadersFromState(getState()),
-      });
+      const { data } = await axios.post("/demo-trainers/", payload);
       return data;
     } catch (err) {
       return rejectWithValue(rejectPayload(err, "Failed to create demo trainer."));
@@ -270,11 +242,9 @@ export const createDemoTrainer = createAsyncThunk(
 
 export const updateDemoTrainer = createAsyncThunk(
   "demoStudents/updateDemoTrainer",
-  async ({ id, ...payload }, { getState, rejectWithValue }) => {
+  async ({ id, ...payload }, { rejectWithValue }) => {
     try {
-      const { data } = await axios.put(`/demo-trainers/${id}/`, payload, {
-        headers: getHeadersFromState(getState()),
-      });
+      const { data } = await axios.put(`/demo-trainers/${id}/`, payload);
       return data;
     } catch (err) {
       return rejectWithValue(rejectPayload(err, "Failed to update demo trainer."));

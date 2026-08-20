@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import withPrivateAuth from "@/components/withPrivateAuth";
@@ -33,13 +33,6 @@ function SalesPersonsPage() {
   const { persons, loading, error, refetch: refetchPersons } = useSalesPersons({ enabled: isManager });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState(null);
-
-  const getHeaders = useCallback(() => {
-    const h = {};
-    if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
-    if (user?.role) h["X-Sales-Person-Role"] = user.role;
-    return h;
-  }, [user?.id, user?.role]);
 
   const openAdd = () => {
     setEditingPerson(null);
@@ -163,7 +156,6 @@ function SalesPersonsPage() {
         person={editingPerson}
         persons={persons}
         onSuccess={refetchPersons}
-        getHeaders={getHeaders}
       />
     </div>
   );

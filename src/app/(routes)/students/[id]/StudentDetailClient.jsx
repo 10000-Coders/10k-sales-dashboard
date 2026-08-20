@@ -271,17 +271,10 @@ export default function StudentDetailClient() {
     error: salesBatchesError,
   } = useSalesBatchDropdown({ course: editCourse });
 
-  const getHeaders = useCallback(() => {
-    const h = {};
-    if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
-    if (user?.role) h["X-Sales-Person-Role"] = user.role;
-    return h;
-  }, [user?.id, user?.role]);
-
   const fetchStudent = useCallback(async () => {
     if (!id) return;
     try {
-      const { data } = await axios.get(`/students/${id}/`, { headers: getHeaders() });
+      const { data } = await axios.get(`/students/${id}/`);
       setStudent(data);
       setEditCourse(data?.course || "");
       setEditSalesBatch(data?.sales_batch ? String(data.sales_batch) : "");
@@ -289,43 +282,42 @@ export default function StudentDetailClient() {
       setStudent(null);
       setError(err.response?.data?.detail || "Student not found.");
     }
-  }, [id, getHeaders]);
+  }, [id]);
 
   const fetchPayments = useCallback(async () => {
     if (!id) return;
     try {
-      const { data } = await axios.get(`/students/${id}/payments/`, { headers: getHeaders() });
+      const { data } = await axios.get(`/students/${id}/payments/`);
       setPayments(Array.isArray(data) ? data : []);
     } catch {
       setPayments([]);
     }
-  }, [id, getHeaders]);
+  }, [id]);
 
   const fetchActivityHistory = useCallback(async () => {
     if (!id) return;
     try {
-      const { data } = await axios.get(`/students/${id}/activity-history/`, { headers: getHeaders() });
+      const { data } = await axios.get(`/students/${id}/activity-history/`);
       setAllActivities(Array.isArray(data) ? data : []);
     } catch {
       setAllActivities([]);
     }
-  }, [id, getHeaders]);
+  }, [id]);
 
   const fetchPaymentReceivers = useCallback(async () => {
     try {
-      const { data } = await axios.get("/payment-receivers/", { headers: getHeaders() });
+      const { data } = await axios.get("/payment-receivers/");
       const list = data?.results ?? (Array.isArray(data) ? data : []);
       setPaymentReceivers(list);
     } catch {
       setPaymentReceivers([]);
     }
-  }, [getHeaders]);
+  }, []);
 
   useEffect(() => {
     if (!id || user?.id == null) return;
 
     const cacheKey = `${id}|${user.id}|${user.role}`;
-    const headers = getHeaders();
 
     const applyCacheToState = () => {
       const cached = studentDetailCache;
@@ -369,9 +361,9 @@ export default function StudentDetailClient() {
     studentDetailFetchPromise = (async () => {
       try {
         const [studentRes, paymentsRes, activitiesRes] = await Promise.all([
-          axios.get(`/students/${id}/`, { headers }),
-          axios.get(`/students/${id}/payments/`, { headers }),
-          axios.get(`/students/${id}/activity-history/`, { headers }),
+          axios.get(`/students/${id}/`),
+          axios.get(`/students/${id}/payments/`),
+          axios.get(`/students/${id}/activity-history/`),
         ]);
         const studentData = studentRes.data;
         const paymentsList = Array.isArray(paymentsRes.data) ? paymentsRes.data : [];
@@ -399,7 +391,7 @@ export default function StudentDetailClient() {
         studentDetailFetchCacheKey = null;
       }
     })();
-  }, [id, user?.id, user?.role, getHeaders]);
+  }, [id, user?.id, user?.role]);
 
   useEffect(() => {
     if (addPaymentOpen && PAYMENT_MODES_NEED_RECEIVER.includes(paymentForm.payment_mode)) {
@@ -434,8 +426,7 @@ export default function StudentDetailClient() {
     try {
       const { data } = await axios.patch(
         `/payments/${paymentId}/`,
-        { next_payment_follow_up_at: apiValue },
-        { headers: getHeaders() }
+        { next_payment_follow_up_at: apiValue }
       );
       invalidateStudentDetailCache();
       await Promise.all([fetchPayments(), fetchStudent(), fetchActivityHistory()]);
@@ -467,8 +458,7 @@ export default function StudentDetailClient() {
     try {
       await axios.patch(
         `/payments/${paymentId}/`,
-        { status, ...(notes ? { notes } : {}) },
-        { headers: getHeaders() }
+        { status, ...(notes ? { notes } : {}) }
       );
       invalidateStudentDetailCache();
       fetchPayments();
@@ -536,7 +526,7 @@ export default function StudentDetailClient() {
         notes: trimmedNotes,
         next_follow_up_at: followUpApi,
       };
-      await axios.post(`/students/${id}/activities/`, payload, { headers: getHeaders() });
+      await axios.post(`/students/${id}/activities/`, payload);
       setActivityForm({
         activity_type: "call",
         outcome: "",
@@ -590,7 +580,6 @@ export default function StudentDetailClient() {
     }
     setPaymentSubmitting(true);
     setPaymentError(null);
-    const headers = getHeaders();
     try {
       const formData = new FormData();
       formData.append("amount", Number(paymentForm.amount));
@@ -617,7 +606,7 @@ export default function StudentDetailClient() {
         formData.append("reference_image", paymentForm.reference_image);
       }
       formData.append("receipt_image", paymentForm.receipt_image);
-      await axios.post(`/students/${id}/payments/`, formData, { headers });
+      await axios.post(`/students/${id}/payments/`, formData);
       setPaymentForm({
         amount: "",
         payment_date: new Date().toISOString().slice(0, 10),
@@ -691,8 +680,7 @@ export default function StudentDetailClient() {
         {
           course: editCourse || null,
           sales_batch: editSalesBatch ? Number(editSalesBatch) : null,
-        },
-        { headers: getHeaders() }
+        }
       );
       toast.success("Sales batch / course updated.");
       invalidateStudentDetailCache();
@@ -785,7 +773,6 @@ export default function StudentDetailClient() {
             <StudentDetailsEditForm
               studentId={id}
               student={student}
-              getHeaders={getHeaders}
               editing={detailsEditing}
               onEditingChange={setDetailsEditing}
               onUpdated={handleStudentDetailsUpdated}

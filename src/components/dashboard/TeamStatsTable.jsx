@@ -19,7 +19,6 @@ const td = "px-2 py-1.5 text-xs tabular-nums";
 const ROLE_FILTER_OPTIONS = [
   { value: "all", label: "All roles" },
   { value: "counselor", label: "Counselor" },
-  { value: "admin", label: "Admin" },
   { value: "manager", label: "Manager" },
   { value: "super_admin", label: "Super admin" },
 ];

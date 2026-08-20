@@ -105,14 +105,20 @@ export default function PersonAnalyticsClient() {
   }, [user?.id, user?.role]);
 
   const fetchPerson = useCallback(async () => {
-    if (!id) return;
+    if (!id || !user) return;
+    const isManagement = user.role === "manager" || user.role === "super_admin";
+    // GET /persons/:id/ is manager/super_admin JWT only. Counselors use the session user.
+    if (!isManagement) {
+      if (String(id) === String(user.id)) setPerson(user);
+      return;
+    }
     try {
-      const { data } = await axios.get(`/persons/${id}/`, { headers: getHeaders() });
+      const { data } = await axios.get(`/persons/${id}/`);
       setPerson(data);
     } catch {
       setPerson(null);
     }
-  }, [id, getHeaders]);
+  }, [id, user]);
 
   const fetchStats = useCallback(async () => {
     if (!id || !fromDate || !toDate) return;

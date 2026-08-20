@@ -6,14 +6,6 @@ export const REASSIGN_PAGE_SIZE = 50;
 /** Must match backend sales.bulk_lead_utils.MAX_BULK_LEAD_COUNT */
 export const MAX_BULK_LEAD_IMPORT = 200;
 
-function getHeadersFromState(state) {
-  const user = state?.userAuth?.user;
-  const h = {};
-  if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
-  if (user?.role) h["X-Sales-Person-Role"] = user.role;
-  return h;
-}
-
 export const bulkCreateLeads = createAsyncThunk(
   "leads/bulkCreateLeads",
   async ({ leads }, { getState, rejectWithValue }) => {
@@ -32,12 +24,10 @@ export const bulkCreateLeads = createAsyncThunk(
     }
 
     try {
-      const headers = getHeadersFromState(state);
-      const { data } = await axios.post(
-        "/leads/bulk_create/",
-        { sales_person: salesPersonId, leads },
-        { headers }
-      );
+      const { data } = await axios.post("/leads/bulk_create/", {
+        sales_person: salesPersonId,
+        leads,
+      });
       return data;
     } catch (err) {
       const payload = err.response?.data;
@@ -64,10 +54,8 @@ export const fetchLeadsForReassign = createAsyncThunk(
       createdAfter = "",
       createdBefore = "",
     },
-    { getState, rejectWithValue }
+    { rejectWithValue }
   ) => {
-    const headers = getHeadersFromState(getState());
-
     try {
       const params = new URLSearchParams({
         page: String(page),
@@ -84,7 +72,7 @@ export const fetchLeadsForReassign = createAsyncThunk(
       if (createdAfterTrimmed) params.set("created_after", createdAfterTrimmed);
       const createdBeforeTrimmed = String(createdBefore || "").trim();
       if (createdBeforeTrimmed) params.set("created_before", createdBeforeTrimmed);
-      const { data } = await axios.get(`/leads/?${params.toString()}`, { headers });
+      const { data } = await axios.get(`/leads/?${params.toString()}`);
       const list = data?.results ?? (Array.isArray(data) ? data : []);
 
       return {
@@ -111,7 +99,7 @@ export const fetchLeadsForReassign = createAsyncThunk(
 /** Move selected leads to another counselor (from_sales_person optional when lead_ids provided). */
 export const bulkReassignLeads = createAsyncThunk(
   "leads/bulkReassignLeads",
-  async ({ fromSalesPerson, toSalesPerson, leadIds }, { getState, rejectWithValue }) => {
+  async ({ fromSalesPerson, toSalesPerson, leadIds }, { rejectWithValue }) => {
     if (!toSalesPerson) {
       return rejectWithValue({ detail: "Target counselor is required." });
     }
@@ -134,8 +122,7 @@ export const bulkReassignLeads = createAsyncThunk(
     }
 
     try {
-      const headers = getHeadersFromState(getState());
-      const { data } = await axios.post("/leads/bulk_reassign/", payload, { headers });
+      const { data } = await axios.post("/leads/bulk_reassign/", payload);
       return data;
     } catch (err) {
       const payload = err.response?.data;
@@ -150,19 +137,18 @@ export const bulkReassignLeads = createAsyncThunk(
 
 export const fetchLeadSourceAnalytics = createAsyncThunk(
   "leads/fetchLeadSourceAnalytics",
-  async ({ fromDate, toDate, salesPersonId }, { getState, rejectWithValue }) => {
+  async ({ fromDate, toDate, salesPersonId }, { rejectWithValue }) => {
     if (!fromDate || !toDate) {
       return rejectWithValue({ detail: "From date and to date are required." });
     }
 
     try {
-      const headers = getHeadersFromState(getState());
       const params = new URLSearchParams({
         from: String(fromDate),
         to: String(toDate),
       });
       if (salesPersonId) params.set("sales_person", String(salesPersonId));
-      const { data } = await axios.get(`/leads/analytics/simple/?${params.toString()}`, { headers });
+      const { data } = await axios.get(`/leads/analytics/simple/?${params.toString()}`);
       return data;
     } catch (err) {
       const payload = err.response?.data;
