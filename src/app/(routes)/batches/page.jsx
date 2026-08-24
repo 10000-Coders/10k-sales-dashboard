@@ -126,7 +126,7 @@ function BatchesPage() {
       setError(null);
       salesBatchesFetchPromise = (async () => {
         try {
-          const { data } = await axios.get("/sales-batches/", { headers: getHeaders() });
+          const { data } = await axios.get("/sales-batches/");
           const list = data?.results ?? (Array.isArray(data) ? data : []);
           salesBatchesCache.data = list;
           salesBatchesCache.at = Date.now();
@@ -143,7 +143,7 @@ function BatchesPage() {
     } finally {
       setLoading(false);
     }
-  }, [getHeaders]);
+  }, []);
 
   const fetchBatchStudents = useCallback(async (salesBatchId) => {
     if (!salesBatchId) return;
@@ -162,7 +162,7 @@ function BatchesPage() {
           params.set("list_view", "batch");
           params.set("page", "1");
           params.set("page_size", "200");
-          const { data } = await axios.get(`/students/?${params.toString()}`, { headers: getHeaders() });
+          const { data } = await axios.get(`/students/?${params.toString()}`);
           const list = data?.results ?? (Array.isArray(data) ? data : []);
           batchStudentsCache.set(key, { data: list, at: Date.now() });
           return list;
@@ -183,7 +183,7 @@ function BatchesPage() {
     } finally {
       setBatchStudentsLoading(false);
     }
-  }, [getHeaders]);
+  }, []);
 
   const fetchPaymentSummaries = useCallback((studentsList) => {
     if (!Array.isArray(studentsList) || studentsList.length === 0) {
@@ -306,9 +306,9 @@ function BatchesPage() {
         status: form.status || "active",
       };
       if (editingBatch?.id) {
-        await axios.patch(`/sales-batches/${editingBatch.id}/`, payload, { headers: getHeaders() });
+        await axios.patch(`/sales-batches/${editingBatch.id}/`, payload);
       } else {
-        await axios.post("/sales-batches/", payload, { headers: getHeaders() });
+        await axios.post("/sales-batches/", payload);
       }
       closeModal();
       clearSalesBatchesCache();
@@ -327,7 +327,7 @@ function BatchesPage() {
   const handleDelete = async (batchId) => {
     if (!confirm("Delete this sales batch?")) return;
     try {
-      await axios.delete(`/sales-batches/${batchId}/`, { headers: getHeaders() });
+      await axios.delete(`/sales-batches/${batchId}/`);
       clearSalesBatchesCache();
       fetchSalesBatches();
     } catch (err) {
@@ -370,8 +370,7 @@ function BatchesPage() {
     try {
       const { data } = await axios.post(
         `/sales-batches/${selectedSalesBatchId}/move-selected-to-batch/`,
-        { student_ids: selectedStudentIds, target_batch: targetBatch.trim() },
-        { headers: getHeaders() }
+        { student_ids: selectedStudentIds, target_batch: targetBatch.trim() }
       );
       const movedCount = Number(data?.moved_count ?? 0);
       const skippedCount = Array.isArray(data?.skipped) ? data.skipped.length : Number(data?.skipped ?? 0);

@@ -1,24 +1,13 @@
 import axios from "axios";
-import { getDynamicHeader } from "@/interceptManager";
 import { mentorBaseUrl } from "@/lib/apiConfig";
 
 /**
  * 10kCoders API client — public-challenges, mentor/problems, mentor/students, etc.
+ * Do not attach sales JWT — mentor/core APIs use their own auth.
  */
 const instance = axios.create({
   baseURL: mentorBaseUrl,
 });
-
-instance.interceptors.request.use(
-  (config) => {
-    const { token } = getDynamicHeader();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
 
 instance.interceptors.response.use(
   (response) => response,

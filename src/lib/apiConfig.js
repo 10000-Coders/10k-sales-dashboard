@@ -24,3 +24,11 @@ function resolveSalesBaseUrl() {
 }
 
 export const salesBaseUrl = resolveSalesBaseUrl();
+
+/** API root without `/sales` — e.g. http://localhost:8001/api */
+export const salesApiRoot = trimTrailingSlash(salesBaseUrl.replace(/\/sales\/?$/, "")) || "";
+
+/** SimpleJWT refresh (not under /sales) */
+export const tokenRefreshUrl = salesApiRoot
+  ? `${salesApiRoot}/token/refresh/`
+  : "/api/token/refresh/";

@@ -41,7 +41,6 @@ export default function ReferralAssignmentCard({
   persons,
   isManagerRole,
   isManagerOrSuper,
-  headers,
   onReferralChange,
   onError,
 }) {
@@ -75,7 +74,7 @@ export default function ReferralAssignmentCard({
 
     try {
       setAssignSaving(true);
-      const { data } = await axios.patch(`/referrals/${referral.id}/`, payload, { headers });
+      const { data } = await axios.patch(`/referrals/${referral.id}/`, payload);
       onError(null);
       onReferralChange(data);
     } catch (err) {

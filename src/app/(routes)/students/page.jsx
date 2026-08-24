@@ -106,13 +106,6 @@ function StudentsPage() {
     total_pages: 0,
   });
 
-  const getHeaders = useCallback(() => {
-    const h = {};
-    if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
-    if (user?.role) h["X-Sales-Person-Role"] = user.role;
-    return h;
-  }, [user?.id, user?.role]);
-
   const fetchStudents = useCallback(async (forceRefresh = false, pageOverride) => {
     const effectivePage = pageOverride ?? page;
     const cacheKey = `${searchDebounce}|${filterPerson}|${filterDateFrom}|${filterDateTo}|${filterSalesBatch}|${effectivePage}|${user?.id}`;
@@ -161,7 +154,7 @@ function StudentsPage() {
         if (filterDateFrom) params.set("created_after", filterDateFrom);
         if (filterDateTo) params.set("created_before", filterDateTo);
         if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
-        const { data } = await axios.get(`/students/?${params.toString()}`, { headers: getHeaders() });
+        const { data } = await axios.get(`/students/?${params.toString()}`);
         const list = data?.results ?? (Array.isArray(data) ? data : []);
         const meta = {
           count: data?.count ?? list.length,
@@ -184,7 +177,7 @@ function StudentsPage() {
       }
     })();
     await studentsFetchPromise;
-  }, [getHeaders, searchDebounce, canSeeAll, filterPerson, filterDateFrom, filterDateTo, filterSalesBatch, page, user?.id, setUpcomingFollowUpsFromStudents]);
+  }, [searchDebounce, canSeeAll, filterPerson, filterDateFrom, filterDateTo, filterSalesBatch, page, user?.id, setUpcomingFollowUpsFromStudents]);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounce(searchQuery), 3000);

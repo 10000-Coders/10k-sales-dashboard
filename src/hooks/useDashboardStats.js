@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "@/axios";
 import { normalizeStats } from "@/lib/dashboardStats";
+import { getSalesPersonHeaders } from "@/lib/salesAuthHeaders";
 
 function buildSalesHeaders(userId, userRole) {
-  const headers = {};
-  if (userId != null) headers["X-Sales-Person-Id"] = String(userId);
-  if (userRole) headers["X-Sales-Person-Role"] = userRole;
-  return headers;
+  return getSalesPersonHeaders({ id: userId, role: userRole });
 }
 
 async function fetchStatsRange({ from, to, salesPersonId, headers }) {

@@ -1,7 +1,7 @@
 "use client";
 
 import withPrivateAuth from "@/components/withPrivateAuth";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import axios from "@/axios";
@@ -39,21 +39,12 @@ function ReferralDetailClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const getHeaders = useCallback(() => {
-    const h = {};
-    if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
-    if (user?.role) h["X-Sales-Person-Role"] = user.role;
-    return h;
-  }, [user?.id, user?.role]);
-
-  const headers = useMemo(() => getHeaders(), [getHeaders]);
-
   const fetchReferral = useCallback(async () => {
     if (!id) return;
     try {
       setLoading(true);
       setError(null);
-      const { data } = await axios.get(`/referrals/${id}/`, { headers });
+      const { data } = await axios.get(`/referrals/${id}/`);
       setReferral(data);
     } catch (err) {
       setReferral(null);
@@ -61,7 +52,7 @@ function ReferralDetailClient() {
     } finally {
       setLoading(false);
     }
-  }, [headers, id]);
+  }, [id]);
 
   useEffect(() => {
     fetchReferral();
@@ -185,7 +176,6 @@ function ReferralDetailClient() {
         persons={persons}
         isManagerRole={isManagerRole}
         isManagerOrSuper={isManagerOrSuper}
-        headers={headers}
         onReferralChange={setReferral}
         onError={setError}
       />
@@ -194,7 +184,6 @@ function ReferralDetailClient() {
         referralId={r?.id}
         reward={r?.reward}
         isManagerRole={isManagerRole}
-        headers={headers}
         onRewardChange={(nextReward) => setReferral((prev) => (prev ? { ...prev, reward: nextReward } : prev))}
         onError={setError}
       />

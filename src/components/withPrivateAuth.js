@@ -6,22 +6,25 @@ import { usePathname, useRouter } from "next/navigation";
 import { RBAC_CONFIG, LOGIN_ROUTE, DEFAULT_REDIRECT, MANAGER_ONLY_PATHS } from "@/shared/static/rbacConfig";
 import { logout } from "@/redux/features/user/userAuth";
 import { isSessionExpired, clearLoginAt } from "@/lib/sessionExpiry";
+import { getAccessToken } from "@/lib/authTokens";
 
 export default function withPrivateAuth(Component) {
   return function ProtectedRoute(props) {
     const router = useRouter();
     const pathname = usePathname();
     const dispatch = useDispatch();
-    const { isLoggedIn, user } = useSelector((state) => state.userAuth);
+    const { isLoggedIn, user, access } = useSelector((state) => state.userAuth);
 
     useLayoutEffect(() => {
-      // 1. Authentication Check
-      if (!isLoggedIn || !user) {
+      const hasToken = Boolean(access || getAccessToken());
+
+      // 1. Authentication Check (user + JWT)
+      if (!isLoggedIn || !user || !hasToken) {
         router.push(LOGIN_ROUTE);
         return;
       }
 
-      // 2. Session expiry: 7 days — force re-login
+      // 2. Session expiry: 30 days — force re-login
       if (isSessionExpired()) {
         clearLoginAt();
         dispatch(logout());
@@ -50,10 +53,10 @@ export default function withPrivateAuth(Component) {
         console.warn(`Access denied for role: ${userRole} to path: ${pathname}`);
         router.push(DEFAULT_REDIRECT);
       }
-    }, [isLoggedIn, user, pathname, router, dispatch]);
+    }, [isLoggedIn, user, access, pathname, router, dispatch]);
 
-    // Show nothing while checking auth/loading
-    if (!isLoggedIn || !user) {
+    const hasToken = Boolean(access || getAccessToken());
+    if (!isLoggedIn || !user || !hasToken) {
       return null;
     }
 

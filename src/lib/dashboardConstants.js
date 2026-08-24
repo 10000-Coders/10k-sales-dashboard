@@ -27,12 +27,6 @@ export const ROLE_RESPONSIBILITIES = {
     "When a lead is ready, enroll them as a student (Enroll from lead) and add initial payment with proof.",
     "Keep track of your activities and payment stats here; ensure pending payments are followed up.",
   ],
-  admin: [
-    "Track your leads; log calls and WhatsApp and set next follow-up on each lead page.",
-    "Enroll qualified leads as students and add the first payment with proof (Manager will verify).",
-    "Add any follow-up payments for your students; upload proof so Manager can verify.",
-    "Monitor your lead pipeline and activity so no follow-up is missed.",
-  ],
   manager: [
     "Monitor team performance: leads, activities, and payments; support counselors as needed.",
     "Verify or reject student payments submitted by counselors (Payments).",

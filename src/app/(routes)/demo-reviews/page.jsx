@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useSelector } from "react-redux";
 import axios from "@/axios";
 import withPrivateAuth from "@/components/withPrivateAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +23,6 @@ function readValue(v) {
 }
 
 function DemoReviewsPage() {
-  const user = useSelector((state) => state.userAuth?.user);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -36,13 +34,6 @@ function DemoReviewsPage() {
   const [meta, setMeta] = useState({ total_count: 0, page: 1, page_size: 25, total_pages: 0 });
   const [selectedReview, setSelectedReview] = useState(null);
 
-  const getHeaders = useCallback(() => {
-    const h = {};
-    if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
-    if (user?.role) h["X-Sales-Person-Role"] = user.role;
-    return h;
-  }, [user?.id, user?.role]);
-
   const fetchReviews = useCallback(async () => {
     try {
       setLoading(true);
@@ -52,7 +43,7 @@ function DemoReviewsPage() {
       if (onlyMyReferrals) params.set("only_my_referrals", "1");
       params.set("page", String(page));
       params.set("page_size", String(pageSize));
-      const { data } = await axios.get(`/demo-reviews/?${params.toString()}`, { headers: getHeaders() });
+      const { data } = await axios.get(`/demo-reviews/?${params.toString()}`);
       setItems(Array.isArray(data?.items) ? data.items : []);
       setMeta(data?.metadata || { total_count: 0, page: 1, page_size: pageSize, total_pages: 0 });
     } catch (err) {
@@ -62,7 +53,7 @@ function DemoReviewsPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchDebounce, onlyMyReferrals, page, pageSize, getHeaders]);
+  }, [searchDebounce, onlyMyReferrals, page, pageSize]);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounce(searchQuery), 3000);

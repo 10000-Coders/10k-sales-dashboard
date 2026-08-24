@@ -80,7 +80,7 @@ export default function LeadReassignClient() {
     () =>
       persons.filter((p) => {
         const role = (p.role || "").toLowerCase();
-        return role === "counselor" || role === "admin" || role === "manager";
+        return role === "counselor" || role === "manager";
       }),
     [persons]
   );
