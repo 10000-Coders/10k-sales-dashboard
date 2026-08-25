@@ -16,6 +16,7 @@ import StudentEnrollmentFields from "@/components/enrollment/StudentEnrollmentFi
 import { INITIAL_ENROLLMENT_FORM } from "@/lib/enrollmentFormConstants";
 import { validateEnrollmentForm } from "@/lib/validateEnrollmentForm";
 import { validateMarks, normalizeMobile } from "@/lib/studentFormValidations";
+import { encryptStudentRecord } from "@/lib/studentPiiCrypto";
 import { useEnrollmentOtp } from "@/hooks/useEnrollmentOtp";
 import { paymentOfferedTypeLabel } from "@/lib/paymentOffered";
 
@@ -106,7 +107,7 @@ function EnrollFormContent() {
 
     setSubmitting(true);
     try {
-      const payload = {
+      const payload = await encryptStudentRecord({
         student_name: form.student_name.trim(),
         student_email: form.student_email.trim().toLowerCase(),
         student_mobile: normalizeMobile(form.student_mobile) || "",
@@ -124,10 +125,10 @@ function EnrollFormContent() {
         student_degree: form.student_degree?.trim() || "",
         total_percentage: validateMarks(form.total_percentage) || form.total_percentage?.trim() || "",
         education_status: form.education_status || "Pursuing",
-        year_of_passing: form.year_of_passing ? Number(form.year_of_passing) : null,
+        year_of_passing: form.year_of_passing ? String(form.year_of_passing) : "",
         mode_of_classes: form.mode_of_classes || "Offline",
         reference_details: form.reference_details?.trim() || "",
-      };
+      });
       await axios.post(`/enrollment-invites/${token}/submit/`, payload);
       setSuccess(true);
     } catch (err) {
@@ -146,7 +147,7 @@ function EnrollFormContent() {
       setSubmitError(
         typeof data === "string"
           ? data
-          : data?.detail || data?.message || "Failed to submit enrollment. Please try again."
+          : data?.detail || data?.message || err.message || "Failed to submit enrollment. Please try again."
       );
     } finally {
       setSubmitting(false);

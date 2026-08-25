@@ -5,6 +5,7 @@ import { useSelector } from "react-redux";
 import baseAxios from "axios";
 import axios from "@/axios";
 import { toast } from "react-toastify";
+import { decryptStudentPii } from "@/lib/studentPiiCrypto";
 
 const FollowUpContext = createContext(null);
 
@@ -49,21 +50,24 @@ function toLeadFollowUpItem(lead) {
   };
 }
 
-function toStudentFollowUpItem(student) {
+async function toStudentFollowUpItem(student) {
   return {
     type: "student",
     id: student.id,
     name: student.student_name,
-    mobile: student.student_mobile,
+    mobile: await decryptStudentPii(student.student_mobile),
     followUpAt: student.next_payment_follow_up_at,
     href: `/students/${student.id}`,
   };
 }
 
-function buildFollowUpItems(leads, students) {
+async function buildFollowUpItems(leads, students) {
+  const studentItems = await Promise.all(
+    filterFollowUpStudents(students).map(toStudentFollowUpItem)
+  );
   return [
     ...filterFollowUpLeads(leads).map(toLeadFollowUpItem),
-    ...filterFollowUpStudents(students).map(toStudentFollowUpItem),
+    ...studentItems,
   ];
 }
 
@@ -116,6 +120,7 @@ export const FollowUpProvider = ({ children }) => {
   const leadsDataRef = useRef([]);
   const studentsDataRef = useRef([]);
   const itemsRef = useRef([]);
+  const followUpMergeGenRef = useRef(0);
   const audioCtxRef = useRef(null);
   const swRegistrationRef = useRef(null);
   const scheduledTimersRef = useRef(new Map());
@@ -328,10 +333,13 @@ export const FollowUpProvider = ({ children }) => {
 
   const mergeAndApply = useCallback(
     (leads, students) => {
-      const items = buildFollowUpItems(leads, students);
-      setUpcomingFollowUps(items);
-      itemsRef.current = items;
-      scheduleFollowUpTimers(items);
+      const gen = ++followUpMergeGenRef.current;
+      buildFollowUpItems(leads, students).then((items) => {
+        if (gen !== followUpMergeGenRef.current) return;
+        setUpcomingFollowUps(items);
+        itemsRef.current = items;
+        scheduleFollowUpTimers(items);
+      });
     },
     [scheduleFollowUpTimers]
   );

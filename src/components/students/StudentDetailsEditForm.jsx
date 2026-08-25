@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import axios from "@/axios";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { normalizeMobile } from "@/lib/studentFormValidations";
 import {
   buildStudentDetailsPatch,
   studentDetailsFromStudent,
+  studentDetailsFromStudentDecrypted,
   studentDetailsHasChanges,
   validateStudentDetailsUpdate,
 } from "@/lib/validateStudentDetailsUpdate";
@@ -36,17 +37,43 @@ export default function StudentDetailsEditForm({
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [formReady, setFormReady] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
-    setForm(studentDetailsFromStudent(student));
+    let cancelled = false;
+    setFormReady(false);
     setFieldErrors({});
     setError(null);
+    (async () => {
+      const next = await studentDetailsFromStudentDecrypted(student);
+      if (!cancelled) {
+        setForm(next);
+        setFormReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [student]);
 
-  const hasChanges = useMemo(
-    () => studentDetailsHasChanges(form, student),
-    [form, student]
-  );
+  useEffect(() => {
+    if (!formReady) {
+      setHasChanges(false);
+      return;
+    }
+    let cancelled = false;
+    studentDetailsHasChanges(form, student)
+      .then((changed) => {
+        if (!cancelled) setHasChanges(changed);
+      })
+      .catch(() => {
+        if (!cancelled) setHasChanges(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [form, student, formReady]);
 
   const typeOptions = getPaymentOfferedTypeOptions({
     role: user?.role,
@@ -72,7 +99,13 @@ export default function StudentDetailsEditForm({
       return;
     }
 
-    const payload = buildStudentDetailsPatch(form, student);
+    let payload;
+    try {
+      payload = await buildStudentDetailsPatch(form, student);
+    } catch (err) {
+      setError(err?.message || "Failed to encrypt student details.");
+      return;
+    }
     if (!Object.keys(payload).length) {
       toast.info("No changes to save.");
       return;
@@ -283,7 +316,7 @@ export default function StudentDetailsEditForm({
           type="button"
           variant="outline"
           disabled={saving || !hasChanges}
-          onClick={() => setForm(studentDetailsFromStudent(student))}
+          onClick={async () => setForm(await studentDetailsFromStudentDecrypted(student))}
         >
           Reset
         </Button>

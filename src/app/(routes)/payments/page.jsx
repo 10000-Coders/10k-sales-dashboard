@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Check, X, ImageIcon, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COURSE_LABELS } from "@/constants/leadCourse";
+import EncryptedPaymentImage from "@/components/EncryptedPaymentImage";
 
 function formatDate(d) {
   if (!d) return "—";
@@ -36,13 +37,6 @@ function formatDateTime(d) {
   if (!d) return "—";
   const dt = new Date(d);
   return isNaN(dt.getTime()) ? "—" : dt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
-}
-
-function getMediaUrl(path) {
-  if (!path) return null;
-  if (path.startsWith("http")) return path;
-  const base = process.env.NEXT_PUBLIC_baseUrl || "";
-  return `${base}/media/${path.replace(/^\//, "")}`;
 }
 
 function canViewPayments(role) {
@@ -1092,8 +1086,9 @@ function PaymentsPage() {
                           display: "inline-block",
                         }}
                       >
-                        <img
-                          src={getMediaUrl(selectedImageField === "reference_image" ? selectedPayment.reference_image : selectedPayment.receipt_image)}
+                        <EncryptedPaymentImage
+                          paymentId={selectedPayment.id}
+                          field={selectedImageField}
                           alt={selectedImageField === "reference_image" ? "Payment proof screenshot" : "Payment receipt image"}
                           className="max-w-full w-full h-full object-contain"
                           style={{ maxHeight: "360px" }}

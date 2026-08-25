@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "@/axios";
 import { logout } from "@/redux/features/user/userAuth";
+import { canonicalLeadMobile, encryptStudentPii, piiLookupHash, applyLeadPiiSearchParams } from "@/lib/studentPiiCrypto";
 
 export const REASSIGN_PAGE_SIZE = 50;
 /** Must match backend sales.bulk_lead_utils.MAX_BULK_LEAD_COUNT */
@@ -24,9 +25,22 @@ export const bulkCreateLeads = createAsyncThunk(
     }
 
     try {
+      const encryptedLeads = await Promise.all(
+        leads.map(async (lead) => {
+          const digits = canonicalLeadMobile(lead.mobile);
+          const email = String(lead.email || "").trim().toLowerCase();
+          return {
+            ...lead,
+            mobile: await encryptStudentPii(digits || lead.mobile),
+            email: await encryptStudentPii(email),
+            mobile_hash: await piiLookupHash(digits),
+            email_hash: email ? await piiLookupHash(email) : "",
+          };
+        })
+      );
       const { data } = await axios.post("/leads/bulk_create/", {
         sales_person: salesPersonId,
-        leads,
+        leads: encryptedLeads,
       });
       return data;
     } catch (err) {
@@ -63,7 +77,7 @@ export const fetchLeadsForReassign = createAsyncThunk(
       });
       if (salesPersonId) params.set("sales_person", String(salesPersonId));
       const searchTrimmed = String(search || "").trim();
-      if (searchTrimmed) params.set("search", searchTrimmed);
+      if (searchTrimmed) await applyLeadPiiSearchParams(params, searchTrimmed);
       const statusTrimmed = String(status || "").trim();
       if (statusTrimmed) params.set("status", statusTrimmed);
       const sourceTrimmed = String(source || "").trim();

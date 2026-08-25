@@ -14,6 +14,7 @@ import { inquirySourceOptionsForValue } from "@/constants/leadInquirySource";
 import { LEAD_COURSE_VALUES, LEAD_RELATED_VALUES, normalizeLeadRelatedValue } from "@/constants/leadCourse";
 import { LEAD_STATUS_FORM_OPTIONS, statusRequiresFollowUp } from "@/constants/leadStatus";
 import { getAllStudents, getAllBatchNames } from "@/utils/referrialApis";
+import { encryptStudentPii, piiLookupHash } from "@/lib/studentPiiCrypto";
 
 const STATUS_OPTIONS = LEAD_STATUS_FORM_OPTIONS;
 
@@ -223,11 +224,15 @@ const validateForm = () => {
   return Object.keys(nextErrors).length === 0;
 };
 
-  const getPayload = () => {
+  const getPayload = async () => {
+    const digits = normalizeMobile(form.mobile);
+    const email = (form.email || "").trim().toLowerCase();
     const payload = {
       name: (form.name || "").trim(),
-      mobile: normalizeMobile(form.mobile),
-      email: (form.email || "").trim(),
+      mobile: await encryptStudentPii(digits),
+      email: await encryptStudentPii(email),
+      mobile_hash: await piiLookupHash(digits),
+      email_hash: email ? await piiLookupHash(email) : "",
       // Source dropdown is disabled on edit; still send existing value so PUT keeps it.
       source: (form.source || "").trim(),
       course: (form.course || "").trim(),
@@ -259,7 +264,7 @@ const validateForm = () => {
     setSubmitting(true);
     setErrors({});
     try {
-      const payload = getPayload();
+      const payload = await getPayload();
       if (isEdit) {
         await axios.put(`/leads/${lead.id}/`, payload);
       } else {

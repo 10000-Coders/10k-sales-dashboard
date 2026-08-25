@@ -2,6 +2,7 @@ import axios from "axios";
 import { getAccessToken, setTokens, clearTokens } from "@/lib/authTokens";
 import { notifyAuthFailed, notifyTokensUpdated } from "@/lib/authBridge";
 import { salesBaseUrl, tokenRefreshUrl } from "@/lib/apiConfig";
+import { decryptApiPayload } from "@/lib/studentPiiCrypto";
 
 const instance = axios.create({
   baseURL: salesBaseUrl,
@@ -38,7 +39,13 @@ async function refreshAccessToken() {
 }
 
 instance.interceptors.response.use(
-  (response) => response,
+  async (response) => {
+    const type = response?.config?.responseType;
+    if (response?.data && (!type || type === "json")) {
+      response.data = await decryptApiPayload(response.data);
+    }
+    return response;
+  },
   async (error) => {
     const original = error.config;
     const status = error.response?.status;

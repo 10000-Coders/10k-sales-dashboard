@@ -1,12 +1,17 @@
 import { normalizeMobile } from "@/lib/studentFormValidations";
 import { validatePaymentOfferedFields } from "@/lib/paymentOffered";
+import { decryptStudentPii, encryptStudentPii, isClientEncrypted } from "@/lib/studentPiiCrypto";
 
 export function studentDetailsFromStudent(student) {
+  const email = student?.student_email || "";
+  const mobile = student?.student_mobile || "";
+  const name = student?.student_name || "";
+  const password = student?.password || "";
   return {
-    student_name: student?.student_name || "",
-    student_email: student?.student_email || "",
-    student_mobile: student?.student_mobile || "",
-    student_password: student?.password || "",
+    student_name: isClientEncrypted(name) ? "" : name,
+    student_email: isClientEncrypted(email) ? "" : email,
+    student_mobile: isClientEncrypted(mobile) ? "" : mobile,
+    student_password: isClientEncrypted(password) ? "" : password,
     course: student?.course || "",
     payment_offered:
       student?.payment_offered != null && student?.payment_offered !== ""
@@ -14,6 +19,17 @@ export function studentDetailsFromStudent(student) {
         : "",
     payment_offered_type: student?.payment_offered_type || "",
     payment_offered_comment: student?.payment_offered_comment || "",
+  };
+}
+
+export async function studentDetailsFromStudentDecrypted(student) {
+  const base = studentDetailsFromStudent(student);
+  return {
+    ...base,
+    student_name: await decryptStudentPii(student?.student_name || ""),
+    student_email: await decryptStudentPii(student?.student_email || ""),
+    student_mobile: await decryptStudentPii(student?.student_mobile || ""),
+    student_password: await decryptStudentPii(student?.password || ""),
   };
 }
 
@@ -57,23 +73,27 @@ export function validateStudentDetailsUpdate(form) {
 }
 
 /** PATCH payload — only fields that changed from the loaded student record. */
-export function buildStudentDetailsPatch(form, student) {
-  const baseline = studentDetailsFromStudent(student);
+export async function buildStudentDetailsPatch(form, student) {
+  const baseline = await studentDetailsFromStudentDecrypted(student);
   const payload = {};
 
   const name = (form.student_name || "").trim();
-  if (name !== baseline.student_name.trim()) payload.student_name = name;
+  if (name !== baseline.student_name.trim()) {
+    payload.student_name = await encryptStudentPii(name);
+  }
 
   const email = (form.student_email || "").trim().toLowerCase();
-  if (email !== baseline.student_email.trim().toLowerCase()) payload.student_email = email;
+  if (email !== baseline.student_email.trim().toLowerCase()) {
+    payload.student_email = await encryptStudentPii(email);
+  }
 
   const mobile = (form.student_mobile || "").trim();
   if (normalizeMobile(mobile) !== normalizeMobile(baseline.student_mobile)) {
-    payload.student_mobile = mobile;
+    payload.student_mobile = await encryptStudentPii(normalizeMobile(mobile) || mobile);
   }
 
   if ((form.student_password ?? "") !== baseline.student_password) {
-    payload.student_password = form.student_password ?? "";
+    payload.student_password = await encryptStudentPii(form.student_password ?? "");
   }
 
   const offeredRaw = (form.payment_offered ?? "").toString().trim();
@@ -102,6 +122,7 @@ export function buildStudentDetailsPatch(form, student) {
   return payload;
 }
 
-export function studentDetailsHasChanges(form, student) {
-  return Object.keys(buildStudentDetailsPatch(form, student)).length > 0;
+export async function studentDetailsHasChanges(form, student) {
+  const payload = await buildStudentDetailsPatch(form, student);
+  return Object.keys(payload).length > 0;
 }

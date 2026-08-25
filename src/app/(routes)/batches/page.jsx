@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import useToast from "@/hooks/useToast";
 import Select from "react-select";
 import { COURSE_LABELS, LEAD_COURSE_VALUES } from "@/constants/leadCourse";
+import DecryptedPii from "@/components/DecryptedPii";
 
 const COURSE_OPTIONS = LEAD_COURSE_VALUES;
 
@@ -374,16 +375,27 @@ function BatchesPage() {
       );
       const movedCount = Number(data?.moved_count ?? 0);
       const skippedCount = Array.isArray(data?.skipped) ? data.skipped.length : Number(data?.skipped ?? 0);
-      showSuccessToast(`Moved ${movedCount} student(s). Skipped ${skippedCount}.`);
-      setMoveModalOpen(false);
-      setTargetBatch("");
-      setSelectedStudentIds([]);
+      const moveErrors = Array.isArray(data?.errors) ? data.errors.filter((item) => item?.reason) : [];
+      if (moveErrors.length) {
+        const msg = moveErrors.map((item) => item.reason).join(" ");
+        setMoveError(msg);
+        showErrorToast(msg);
+      } else {
+        showSuccessToast(`Moved ${movedCount} student(s). Skipped ${skippedCount}.`);
+        setMoveModalOpen(false);
+        setTargetBatch("");
+        setSelectedStudentIds([]);
+      }
       clearSalesBatchesCache();
       clearBatchStudentsCache(selectedSalesBatchId);
       await Promise.all([fetchBatchStudents(selectedSalesBatchId), fetchSalesBatches()]);
     } catch (err) {
       const data = err.response?.data;
+      const errorReasons = Array.isArray(data?.errors)
+        ? data.errors.map((item) => item?.reason).filter(Boolean)
+        : [];
       const msg =
+        errorReasons.join(" ") ||
         data?.detail ||
         (Array.isArray(data?.non_field_errors) ? data.non_field_errors[0] : null) ||
         (typeof data === "string" ? data : null) ||
@@ -710,7 +722,7 @@ function BatchesPage() {
                         <TableCell className="font-medium">{s.student_name ?? "—"}</TableCell>
                         <TableCell>{s.sales_person_name ?? "—"}</TableCell>
                         <TableCell>{COURSE_LABELS[s.course] ?? s.course ?? "—"}</TableCell>
-                        <TableCell>{s.student_mobile ?? "—"}</TableCell>
+                        <TableCell><DecryptedPii value={s.student_mobile} /></TableCell>
                         <TableCell>
                           {s.payment_offered != null ? `₹ ${Number(s.payment_offered).toLocaleString()}` : "—"}
                         </TableCell>

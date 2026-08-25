@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { getLeadCourseLabel } from "@/constants/leadCourse";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
 import { useFollowUp } from "@/context/FollowUpProvider";
+import DecryptedPii from "@/components/DecryptedPii";
 
 /** Manager and Super Admin see all students; Admin/Counselor see only their own. */
 import withPrivateAuth from "@/components/withPrivateAuth";
@@ -311,7 +312,7 @@ function StudentsPage() {
                         {s.college_name || "—"}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        <span className="flex items-center gap-1"><Phone className="h-3 w-3 shrink-0" /> {s.student_mobile}</span>
+                        <span className="flex items-center gap-1"><Phone className="h-3 w-3 shrink-0" /> <DecryptedPii value={s.student_mobile} /></span>
                       </TableCell>
                       {canSeeAll && (
                         <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">

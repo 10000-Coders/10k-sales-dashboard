@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { ImageDropzone } from "@/components/ImageDropzone";
 import { validateMarks, normalizeMobile } from "@/lib/studentFormValidations";
+import { appendEncryptedPaymentImage, encryptStudentRecord } from "@/lib/studentPiiCrypto";
 import { validateEnrollmentForm, canGenerateEnrollmentQr } from "@/lib/validateEnrollmentForm";
 import { INITIAL_ENROLLMENT_FORM, COURSE_OPTIONS, COURSE_VALUES } from "@/lib/enrollmentFormConstants";
 import StudentEnrollmentFields from "@/components/enrollment/StudentEnrollmentFields";
@@ -300,7 +301,7 @@ export default function NewStudentPage() {
     setSaving(true);
 
     try {
-      const studentPayload = {
+      const studentPayload = await encryptStudentRecord({
         ...(leadIdParam ? { lead: Number(leadIdParam) } : {}),
         ...(referralIdParam ? { referral: Number(referralIdParam) } : {}),
         student_name: form.student_name.trim(),
@@ -320,7 +321,7 @@ export default function NewStudentPage() {
         student_degree: form.student_degree?.trim() || "",
         total_percentage: validateMarks(form.total_percentage) || form.total_percentage?.trim() || "",
         education_status: form.education_status || "Pursuing",
-        year_of_passing: form.year_of_passing ? Number(form.year_of_passing) : null,
+        year_of_passing: form.year_of_passing ? String(form.year_of_passing) : "",
         mode_of_classes: form.mode_of_classes || "Offline",
         reference_details: form.reference_details?.trim() || "",
         course: (form.course || "").trim(),
@@ -328,7 +329,7 @@ export default function NewStudentPage() {
         payment_offered: form.payment_offered ? Number(form.payment_offered) : null,
         payment_offered_type: form.payment_offered_type || "",
         payment_offered_comment: (form.payment_offered_comment || "").trim(),
-      };
+      });
 
       const { data: student } = await axios.post("/students/", studentPayload);
       const studentId = student?.id ?? student?.pk;
@@ -350,10 +351,8 @@ export default function NewStudentPage() {
         const reference = (initialPayment.reference || "").trim();
         if (reference) formData.append("reference", reference);
         formData.append("notes", initialPayment.notes || "");
-        if (initialPayment.reference_image) {
-          formData.append("reference_image", initialPayment.reference_image);
-        }
-        formData.append("receipt_image", initialPayment.receipt_image);
+        await appendEncryptedPaymentImage(formData, "reference_image", initialPayment.reference_image);
+        await appendEncryptedPaymentImage(formData, "receipt_image", initialPayment.receipt_image);
         await axios.post(`/students/${studentId}/payments/`, formData);
       }
 
@@ -385,7 +384,7 @@ export default function NewStudentPage() {
                 (Array.isArray(data.non_field_errors) ? data.non_field_errors[0] : null) ||
                 (hasFieldErrors ? "Please fix the errors below." : null)
           )
-        : "Failed to create student.";
+        : err.message || "Failed to create student.";
       if (msg) setError(msg);
     } finally {
       setSaving(false);

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux";
 import axios from "@/axios";
+import { applyLeadPiiSearchParams } from "@/lib/studentPiiCrypto";
 import { useSalesPersons } from "@/hooks/useSalesData";
 import {
   Card,
@@ -292,7 +293,7 @@ function LeadsPageInner() {
         if (filterIsRelated) params.set("is_related", filterIsRelated);
         if (filterDateFrom) params.set("created_after", filterDateFrom);
         if (filterDateTo) params.set("created_before", filterDateTo);
-        if (searchDebounce.trim()) params.set("search", searchDebounce.trim());
+        if (searchDebounce.trim()) await applyLeadPiiSearchParams(params, searchDebounce);
         if (isManagerRole && filterPerson) {
           params.set("sales_person", filterPerson);
         }

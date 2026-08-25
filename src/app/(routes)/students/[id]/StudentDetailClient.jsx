@@ -31,6 +31,9 @@ import { useFollowUp } from "@/context/FollowUpProvider";
 import { isProofScreenshotRequired, isTransactionIdRequired, paymentReceiversForMode } from "@/lib/paymentValidation";
 import { useSalesBatchDropdown } from "@/hooks/useSalesData";
 import StudentDetailsEditForm from "@/components/students/StudentDetailsEditForm";
+import DecryptedPii from "@/components/DecryptedPii";
+import EncryptedPaymentImage from "@/components/EncryptedPaymentImage";
+import { appendEncryptedPaymentImage } from "@/lib/studentPiiCrypto";
 import { COURSE_LABELS, LEAD_COURSE_VALUES } from "@/constants/leadCourse";
 import { paymentOfferedTypeLabel } from "@/lib/paymentOffered";
 
@@ -258,12 +261,6 @@ export default function StudentDetailClient() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [detailsEditing, setDetailsEditing] = useState(false);
 
-  const getMediaUrl = (path) => {
-    if (!path) return null;
-    if (path.startsWith("http")) return path;
-    const base = process.env.NEXT_PUBLIC_baseUrl || "";
-    return `${base}/media/${path.replace(/^\//, "")}`;
-  };
   const canVerify = canVerifyPayments(user?.role);
   const {
     salesBatchDropdown: salesBatches,
@@ -602,10 +599,8 @@ export default function StudentDetailClient() {
       const reference = (paymentForm.reference || "").trim();
       if (reference) formData.append("reference", reference);
       formData.append("notes", paymentForm.notes || "");
-      if (paymentForm.reference_image) {
-        formData.append("reference_image", paymentForm.reference_image);
-      }
-      formData.append("receipt_image", paymentForm.receipt_image);
+      await appendEncryptedPaymentImage(formData, "reference_image", paymentForm.reference_image);
+      await appendEncryptedPaymentImage(formData, "receipt_image", paymentForm.receipt_image);
       await axios.post(`/students/${id}/payments/`, formData);
       setPaymentForm({
         amount: "",
@@ -783,11 +778,11 @@ export default function StudentDetailClient() {
           <div className="flex flex-wrap gap-6">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Phone className="h-4 w-4" />
-              <span>{student.student_mobile || "—"}</span>
+              <span><DecryptedPii value={student.student_mobile} /></span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Mail className="h-4 w-4" />
-              <span>{student.student_email || "—"}</span>
+              <span><DecryptedPii value={student.student_email} /></span>
             </div>
             {student.password && (
               <div className="flex items-center gap-2 text-muted-foreground">
@@ -1673,12 +1668,12 @@ export default function StudentDetailClient() {
                       className="min-h-[240px] flex-1 overflow-auto rounded-lg border bg-muted/20 p-3"
                       style={{ maxHeight: "min(420px, 50vh)" }}
                     >
-                      <img
-                        src={getMediaUrl(selectedImageField === "reference_image" ? selectedPayment.reference_image : selectedPayment.receipt_image)}
+                      <EncryptedPaymentImage
+                        paymentId={selectedPayment.id}
+                        field={selectedImageField}
                         alt={selectedImageField === "reference_image" ? "Payment proof screenshot" : "Payment receipt image"}
                         className="max-w-full transition-transform duration-200"
                         style={{ transform: `scale(${modalZoom})`, transformOrigin: "top left" }}
-                        draggable={false}
                       />
                     </div>
                   ) : (

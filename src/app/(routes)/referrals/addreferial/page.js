@@ -17,6 +17,7 @@ import SpinnerLoader from '@/components/SpinnerLoader';
 import { getAllStudentsFromBackend } from '@/redux/features/referralForm/referralFormSlice';
 import StudentReferralModal from '@/components/referrals/StudentReferralModal';
 import { getAllBatchNames } from '@/utils/referrialApis';
+import DecryptedPii from '@/components/DecryptedPii';
 
 const initialFilterState = {
   searchInput: '',
@@ -510,7 +511,7 @@ const AllStudentsPage = () => {
                           </td>
 
                           <td className="px-3 py-3 text-sm text-gray-600">
-                            {student.student_email || '-'}
+                            <DecryptedPii value={student.student_email} fallback="-" />
                           </td>
 
                           <td className="px-3 py-3 text-sm text-gray-600">
