@@ -99,9 +99,13 @@ export const fetchLeadsForReassign = createAsyncThunk(
 /** Move selected leads to another counselor (from_sales_person optional when lead_ids provided). */
 export const bulkReassignLeads = createAsyncThunk(
   "leads/bulkReassignLeads",
-  async ({ fromSalesPerson, toSalesPerson, leadIds }, { rejectWithValue }) => {
+  async ({ fromSalesPerson, toSalesPerson, leadIds, reason }, { rejectWithValue }) => {
     if (!toSalesPerson) {
       return rejectWithValue({ detail: "Target counselor is required." });
+    }
+    const transferReason = (reason || "").trim();
+    if (!transferReason) {
+      return rejectWithValue({ detail: "Transfer reason is required." });
     }
     const hasLeadIds = Array.isArray(leadIds) && leadIds.length > 0;
     if (!fromSalesPerson && !hasLeadIds) {
@@ -113,6 +117,7 @@ export const bulkReassignLeads = createAsyncThunk(
 
     const payload = {
       to_sales_person: Number(toSalesPerson),
+      reason: transferReason,
     };
     if (fromSalesPerson) {
       payload.from_sales_person = Number(fromSalesPerson);

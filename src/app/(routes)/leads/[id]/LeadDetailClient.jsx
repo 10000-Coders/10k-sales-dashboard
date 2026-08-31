@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ArrowLeft, Phone, Mail, User, Calendar, Activity, MessageCircle, Circle, Clock, UserPlus } from "lucide-react";
+import { Loader2, ArrowLeft, Phone, Mail, User, Calendar, Activity, MessageCircle, Circle, Clock, UserPlus, ArrowRightLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
 import { useFollowUp } from "@/context/FollowUpProvider";
@@ -204,6 +204,13 @@ export default function LeadDetailClient() {
     );
   }
 
+  const rawHistory = lead.transferred_reason;
+  const transferHistory = Array.isArray(rawHistory)
+    ? rawHistory.filter((entry) => entry && typeof entry === "object")
+    : rawHistory && typeof rawHistory === "object"
+      ? [rawHistory]
+      : [];
+
   return (
     <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <Button variant="ghost" className="w-fit" onClick={() => router.back()}>
@@ -302,6 +309,38 @@ export default function LeadDetailClient() {
           </div>
         </CardContent>
       </Card>
+
+      {transferHistory.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ArrowRightLeft className="h-5 w-5" />
+                Transfer history
+              </CardTitle>
+              <CardDescription>
+                {transferHistory.length === 1
+                  ? "This lead has been transferred once."
+                  : `This lead has been transferred ${transferHistory.length} times.`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ol className="space-y-3">
+                {transferHistory.map((entry, index) => (
+                  <li key={`${entry.transferred_at || "transfer"}-${index}`} className="rounded-md border p-3 text-sm">
+                    <p className="font-medium">
+                      {(entry.from_sales_person_name || "Unassigned") + " → " + (entry.to_sales_person_name || "—")}
+                    </p>
+                    <p className="mt-1 text-muted-foreground">{entry.reason || "No reason recorded."}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatDateTime(entry.transferred_at)}
+                      {entry.transferred_by_name ? ` · by ${entry.transferred_by_name}` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </CardContent>
+          </Card>
+      )}
 
       <Card>
         <CardHeader>
