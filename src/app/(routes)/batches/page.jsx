@@ -35,6 +35,24 @@ function canManageSalesBatches(role) {
   return role === "manager" || role === "super_admin";
 }
 
+function formatMoveStudentsError(data, fallback = "Failed to move selected students.") {
+  const lines = (Array.isArray(data?.errors) ? data.errors : [])
+    .map((item) => {
+      const reason = String(item?.reason ?? "").trim();
+      if (!reason) return "";
+      const who = item.email || (item.student_id != null ? `Student ${item.student_id}` : "");
+      return who ? `${who}: ${reason}` : reason;
+    })
+    .filter(Boolean);
+  if (lines.length) return lines.join("\n");
+  if (typeof data?.detail === "string" && data.detail.trim()) return data.detail;
+  if (Array.isArray(data?.non_field_errors) && data.non_field_errors[0]) {
+    return String(data.non_field_errors[0]);
+  }
+  if (typeof data === "string" && data.trim()) return data;
+  return fallback;
+}
+
 /** Module-level cache + in-flight dedup for /sales-batches/ (avoids 2x call from Strict Mode) */
 const SALES_BATCHES_CACHE_MS = 2 * 60 * 1000; // 2 min
 const salesBatchesCache = { data: null, at: 0 };
@@ -374,20 +392,24 @@ function BatchesPage() {
       );
       const movedCount = Number(data?.moved_count ?? 0);
       const skippedCount = Array.isArray(data?.skipped) ? data.skipped.length : Number(data?.skipped ?? 0);
+      const partialError = Array.isArray(data?.errors) && data.errors.length
+        ? formatMoveStudentsError(data)
+        : null;
       showSuccessToast(`Moved ${movedCount} student(s). Skipped ${skippedCount}.`);
-      setMoveModalOpen(false);
-      setTargetBatch("");
-      setSelectedStudentIds([]);
+      if (partialError) {
+        setMoveError(partialError);
+        showErrorToast(partialError);
+      } else {
+        setMoveModalOpen(false);
+        setTargetBatch("");
+        setSelectedStudentIds([]);
+      }
       clearSalesBatchesCache();
       clearBatchStudentsCache(selectedSalesBatchId);
       await Promise.all([fetchBatchStudents(selectedSalesBatchId), fetchSalesBatches()]);
     } catch (err) {
       const data = err.response?.data;
-      const msg =
-        data?.detail ||
-        (Array.isArray(data?.non_field_errors) ? data.non_field_errors[0] : null) ||
-        (typeof data === "string" ? data : null) ||
-        "Failed to move selected students.";
+      const msg = formatMoveStudentsError(data);
       setMoveError(msg);
       showErrorToast(msg);
     } finally {
@@ -757,7 +779,7 @@ function BatchesPage() {
               Move Selected to Actual Batch
             </h2>
             {moveError && (
-              <p className="mb-3 text-sm text-destructive">{moveError}</p>
+              <p className="mb-3 whitespace-pre-line text-sm text-destructive">{moveError}</p>
             )}
             <form onSubmit={handleMoveSelectedStudents} className="space-y-3">
               <div>
