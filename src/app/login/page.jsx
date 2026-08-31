@@ -48,7 +48,7 @@ export default function LoginPage() {
     setQuote(SALES_QUOTES[Math.floor(Math.random() * SALES_QUOTES.length)]);
   }, []);
   const [otpSent, setOtpSent] = useState(false);
-  const [emptyAttempts, setEmptyAttempts] = useState(0);
+  const [remainingAttempts, setRemainingAttempts] = useState(null);
   const dispatch = useDispatch();
   const { loginLoading } = useSelector((state) => state.userAuth);
   const { showSuccessToast, showErrorToast } = useToast();
@@ -71,8 +71,6 @@ export default function LoginPage() {
     e?.preventDefault();
     const trimmed = email.trim().toLowerCase();
     if (!trimmed) {
-      const next = emptyAttempts + 1;
-      setEmptyAttempts(next);
       showErrorToast("Enter your email.", "top-right", "light");
       return;
     }
@@ -90,20 +88,18 @@ export default function LoginPage() {
         { withCredentials: true }
       );
       setOtpSent(true);
-      setEmptyAttempts(0);
+      setRemainingAttempts(null);
       showSuccessToast(res.data?.message || "OTP sent successfully.", "top-right", "light");
     } catch (err) {
       const status = err.response?.status;
       const detail = err.response?.data?.detail;
       const remaining = err.response?.data?.remaining_attempts;
-      const showRemaining = remaining != null && (status === 429 || emptyAttempts >= 3);
-      const message = showRemaining
-        ? toastWithRemaining(
-            detail,
-            remaining,
-            status === 429 ? "Too many attempts. Try again tomorrow." : "Could not send OTP."
-          )
-        : detail || (status === 429 ? "Too many attempts. Try again tomorrow." : "Could not send OTP.");
+      setRemainingAttempts(remaining != null && remaining !== "" ? Number(remaining) : null);
+      const message = toastWithRemaining(
+        detail,
+        remaining,
+        status === 429 ? "Too many attempts. Try again tomorrow." : "Could not send OTP."
+      );
       showErrorToast(message, "top-right", "light");
     } finally {
       setSendLoading(false);
@@ -218,7 +214,10 @@ export default function LoginPage() {
                     name="email"
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setRemainingAttempts(null);
+                    }}
                     placeholder="example@10000coders.in"
                     className="h-11 border-2 border-[#FF8000] bg-background pl-10 focus-visible:border-[#FF8000] focus-visible:ring-2 outline-none focus-visible:ring-[#FF8000]/30"
                     disabled={otpSent}
@@ -236,6 +235,9 @@ export default function LoginPage() {
                   </Button>
                 )}
               </div>
+              {remainingAttempts != null && !Number.isNaN(remainingAttempts) && (
+                <p className="text-sm text-destructive">{remainingLabel(remainingAttempts)}</p>
+              )}
             </div>
 
             {otpSent && (
