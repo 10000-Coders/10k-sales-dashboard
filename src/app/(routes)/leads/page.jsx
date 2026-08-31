@@ -39,6 +39,8 @@ import { cn } from "@/lib/utils";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
 import { useFollowUp } from "@/context/FollowUpProvider";
 import { saveLeadsFiltersQuery } from "@/lib/leadsFiltersUrl";
+import * as XLSX from "xlsx";
+import useToast from "@/hooks/useToast";
 
 /** Only Manager sees all leads; Admin and Counselor see only their own. */
 import withPrivateAuth from "@/components/withPrivateAuth";
@@ -176,8 +178,10 @@ function LeadsPageInner() {
   const isManagerRole = isManager(user?.role);
   const { persons, refetch: refetchPersons } = useSalesPersons({ enabled: isManagerRole });
   const { setUpcomingFollowUpsFromLeads } = useFollowUp();
+  const { showSuccessToast, showErrorToast } = useToast();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [downloadLoading, setDownloadLoading] = useState(false);
   const [error, setError] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
@@ -410,12 +414,57 @@ function LeadsPageInner() {
   const goToDetail = (lead) => {
     router.push(`/leads/${lead.id}`);
   };
+  const headerRow=[
+    "Name",
+    "Phone",
+    "Email",
+    "Source",
+    "Course",
+    "Status",
+  ]
+  const handleExcelsheetDownload = async () => {
+    if (downloadLoading) return;
+    setDownloadLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filterStatus) params.set("status", filterStatus);
+      if (filterSources.length) params.set("source", filterSources.join(","));
+      if (filterCourses.length) params.set("course", filterCourses.join(","));
+      if (filterIsRelated) params.set("is_related", filterIsRelated);
+      if (filterDateFrom) params.set("created_after", filterDateFrom);
+      if (filterDateTo) params.set("created_before", filterDateTo);
+      if (searchDebounce.trim()) params.set("search", searchDebounce.trim());
+      if (isManagerRole && filterPerson) {
+        params.set("sales_person", filterPerson);
+      }
+      const qs = params.toString();
+      const { data } = await axios.get(`/leads/excel-sheet-download/${qs ? `?${qs}` : ""}`);
+      const rows = Array.isArray(data) ? data : data?.results ?? [];
+      const sheetRows = rows.map((lead) => ({
+        Name: lead.name || "",
+        Phone: lead.mobile || "",
+        Email: lead.email || "",
+        Source: getInquirySourceLabel(lead.source) || lead.source || "",
+        Course: getLeadCourseLabel(lead.course) || lead.course || "",
+        Status: lead.status || "",
+      }));
+      const excelSheetData = XLSX.utils.json_to_sheet(sheetRows, { header: headerRow });
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, excelSheetData, "Leads");
+      XLSX.writeFile(workbook, "leads.xlsx");
+      showSuccessToast("Excel sheet downloaded successfully", "top-right", "light");
+    } catch (error) {
+      showErrorToast(error.response?.data?.detail || "Failed to download excel sheet", "top-right", "light");
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
 
   return (
     <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <Card>
         <CardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <CardTitle className="text-2xl">{isManagerRole ? "All leads" : "My leads"}</CardTitle>
               <CardDescription>
@@ -424,11 +473,21 @@ function LeadsPageInner() {
                   : "Track your own leads. Filter by status, source, course and date."}
               </CardDescription>
             </div>
-            <Button onClick={openAdd}>
-              <UserPlus className="h-4 w-4" />
-              Add lead
-            </Button>
-            
+            <div className="flex shrink-0 flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleExcelsheetDownload}
+                disabled={downloadLoading}
+                className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-muted/50 disabled:opacity-50"
+              >
+                {downloadLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                excel sheet download
+              </button>
+              <Button onClick={openAdd}>
+                <UserPlus className="h-4 w-4" />
+                Add lead
+              </Button>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Link
@@ -454,6 +513,7 @@ function LeadsPageInner() {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
               Source analytics
             </Link>
+            
           </div>
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -638,14 +698,18 @@ function LeadsPageInner() {
                       <TableHead className={cn("min-w-[88px]", LEAD_TABLE_HEAD)}>Counselor</TableHead>
                     )}
                     <TableHead className={cn("min-w-[108px]", LEAD_TABLE_HEAD)}>Status / Related</TableHead>
-                    <TableHead className={cn("min-w-[108px]", LEAD_TABLE_HEAD)}>Course / Source</TableHead>
-                    <TableHead className={cn("min-w-[100px]", LEAD_TABLE_HEAD)}>Next follow-up</TableHead>
+                    <TableHead className={cn("w-[1%] min-w-[112px]", LEAD_TABLE_HEAD, "pr-1")}>Course / Source</TableHead>
+                    <TableHead className={cn("w-[1%] min-w-[56px]", LEAD_TABLE_HEAD, "pl-1 pr-2 text-center")}>Transfers</TableHead>
+                    <TableHead className={cn("min-w-[100px]", LEAD_TABLE_HEAD, "pr-2")}>Next follow-up</TableHead>
                     <TableHead className={cn("min-w-[108px]", LEAD_TABLE_HEAD)}>Last activity</TableHead>
                     <TableHead className={cn("w-10 text-right", LEAD_TABLE_HEAD)} />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {leads.map((lead) => (
+                  {leads.map((lead) => {
+                    const transferCount =
+                      lead.transfer_count > 0 ? lead.transfer_count : lead.is_transferred ? 1 : 0;
+                    return (
                     <TableRow
                       key={lead.id}
                       className="cursor-pointer hover:bg-muted/50 border-b border-border/50 last:border-0"
@@ -705,7 +769,7 @@ function LeadsPageInner() {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className={LEAD_TABLE_CELL}>
+                      <TableCell className={cn(LEAD_TABLE_CELL, "w-[1%] pr-1")}>
                         {(() => {
                           const courseValue = lead.enrolled_student_course || lead.course;
                           const courseLabel = courseValue ? getLeadCourseLabel(courseValue) : null;
@@ -714,7 +778,7 @@ function LeadsPageInner() {
                             return <span className="text-muted-foreground/60">—</span>;
                           }
                           return (
-                            <div className="flex max-w-[120px] flex-col gap-1 py-0.5">
+                            <div className="flex max-w-[120px] flex-col gap-0.5 py-0.5">
                               <span
                                 className={cn(
                                   "truncate",
@@ -734,7 +798,19 @@ function LeadsPageInner() {
                           );
                         })()}
                       </TableCell>
-                      <TableCell className={LEAD_TABLE_CELL}>
+                      <TableCell className={cn(LEAD_TABLE_CELL, "w-[1%] pl-1 pr-2text-center")}>
+                        {transferCount > 0 ? (
+                          <span
+                            className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-[10px] font-medium tabular-nums text-amber-800"
+                            title="Times transferred"
+                          >
+                            {transferCount}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/60">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className={cn(LEAD_TABLE_CELL, "pr-2")}>
                         {lead.next_follow_up_at ? (
                           <FollowUpTimer followUpAt={lead.next_follow_up_at} className="gap-0.5 text-[10px] [&_svg]:h-2.5 [&_svg]:w-2.5" />
                         ) : (
@@ -771,7 +847,8 @@ function LeadsPageInner() {
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

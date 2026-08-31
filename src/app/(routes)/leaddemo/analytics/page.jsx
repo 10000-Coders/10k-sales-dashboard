@@ -14,6 +14,7 @@ import {
 } from "@/redux/features/leads/leadsSlice";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import * as XLSX from "xlsx";
 import {
   Table,
   TableBody,
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { LEAD_STATUS_PREFERRED_ORDER } from "@/constants/leadStatus";
 import { isManagerOrSuperAdmin } from "@/lib/dashboardConstants";
+import useToast from "@/hooks/useToast";
 
 function formatStatusLabel(value) {
   return String(value || "")
@@ -50,6 +52,8 @@ function LeadSourceAnalyticsPage() {
   const [fromDate, setFromDate] = useState(todayDateString());
   const [toDate, setToDate] = useState(todayDateString());
   const [salesPerson, setSalesPerson] = useState("");
+  const [downloadLoading, setDownloadLoading] = useState(false);
+  const { showSuccessToast, showErrorToast } = useToast();
 
   const resolvedSalesPerson = useMemo(() => {
     if (isManager) return salesPerson || "";
@@ -77,6 +81,37 @@ function LeadSourceAnalyticsPage() {
     return [...orderedPreferred, ...remaining];
   }, [analytics?.source_wise]);
 
+  const handleExcelsheetDownload = () => {
+    if (downloadLoading) return;
+    const sourceWise = analytics?.source_wise;
+    if (!Array.isArray(sourceWise) || sourceWise.length === 0) {
+      showErrorToast("No analytics data to download.", "top-right", "light");
+      return;
+    }
+    setDownloadLoading(true);
+    try {
+      const sheetRows = sourceWise.map((item) => {
+        const row = {
+          Source: item.source || "unknown",
+          Total: item.total ?? 0,
+        };
+        statusColumns.forEach((status) => {
+          row[formatStatusLabel(status)] = item?.status_wise?.[status] ?? 0;
+        });
+        return row;
+      });
+      const excelSheetData = XLSX.utils.json_to_sheet(sheetRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, excelSheetData, "Lead source analytics");
+      XLSX.writeFile(workbook, "leads_source_analytics.xlsx");
+      showSuccessToast("Excel sheet downloaded successfully", "top-right", "light");
+    } catch (error) {
+      showErrorToast(error?.response?.data?.detail || "Failed to download excel sheet", "top-right", "light");
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
+
   const loadAnalytics = () => {
     dispatch(
       fetchLeadSourceAnalytics({
@@ -103,12 +138,23 @@ function LeadSourceAnalyticsPage() {
                 Source-wise lead count with status breakdown in table format.
               </CardDescription>
             </div>
-            <Link href="/leads">
-              <Button variant="outline" className="gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back to Leads
-              </Button>
-            </Link>
+            <div className="flex shrink-0 flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleExcelsheetDownload}
+                disabled={downloadLoading}
+                className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-muted/50 disabled:opacity-50"
+              >
+                {downloadLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Download Excel sheet
+              </button>
+              <Link href="/leads">
+                <Button variant="outline" className="gap-2">
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Leads
+                </Button>
+              </Link>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-end gap-3 pt-2">
