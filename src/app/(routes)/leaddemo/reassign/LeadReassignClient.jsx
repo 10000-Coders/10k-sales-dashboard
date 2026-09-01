@@ -80,7 +80,7 @@ export default function LeadReassignClient() {
     () =>
       persons.filter((p) => {
         const role = (p.role || "").toLowerCase();
-        return role === "counselor" || role === "admin" || role === "manager";
+        return role === "counselor" || role === "manager";
       }),
     [persons]
   );
@@ -102,6 +102,7 @@ export default function LeadReassignClient() {
   const [filterSource, setFilterSource] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
+  const [transferReason, setTransferReason] = useState("");
 
   const targetPersons = useMemo(() => persons, [persons]);
 
@@ -212,12 +213,18 @@ export default function LeadReassignClient() {
       toast.warn("Select at least one lead to transfer.");
       return;
     }
+    const reason = transferReason.trim();
+    if (!reason) {
+      toast.warn("Enter a transfer reason.");
+      return;
+    }
 
     try {
       const result = await dispatch(
         bulkReassignLeads({
           toSalesPerson: toPersonId,
           leadIds: Array.from(selectedIds),
+          reason,
         })
       ).unwrap();
 
@@ -235,9 +242,11 @@ export default function LeadReassignClient() {
 
       setTransferCountInput("");
       setSelectedIds(new Set());
+      setTransferReason("");
       dispatch(fetchLeadsForReassign(reassignFetchParams));
     } catch (err) {
       const detail =
+        (Array.isArray(err?.reason) ? err.reason[0] : err?.reason) ||
         err?.detail ||
         (typeof err === "string" ? err : null) ||
         "Failed to transfer leads.";
@@ -440,10 +449,24 @@ export default function LeadReassignClient() {
                   ))}
                 </select>
               </div>
+              <div className="flex min-w-[220px] flex-1 flex-col gap-1">
+                <label htmlFor="transfer-reason" className="text-xs font-medium text-muted-foreground">
+                  Transfer reason
+                </label>
+                <input
+                  id="transfer-reason"
+                  type="text"
+                  maxLength={500}
+                  value={transferReason}
+                  onChange={(e) => setTransferReason(e.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                  placeholder="Why are these leads moving?"
+                />
+              </div>
               <Button
                 type="button"
                 className="h-9"
-                disabled={!toPersonId || transferLoading || selectedIds.size === 0}
+                disabled={!toPersonId || transferLoading || selectedIds.size === 0 || !transferReason.trim()}
                 onClick={handleTransfer}
               >
                 {transferLoading ? (

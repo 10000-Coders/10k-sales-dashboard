@@ -5,7 +5,6 @@ import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { LogOut, Loader2 } from "lucide-react";
 import { logout } from "@/redux/features/user/userAuth";
-import { clearLoginAt } from "@/lib/sessionExpiry";
 import { routeObject, MenuItems, SCHOLARSHIP_TEST_NAV_LABEL } from "@/shared/static/sidebarItems";
 import { cn } from "@/lib/utils";
 import { getLeadsListHref } from "@/lib/leadsFiltersUrl";
@@ -21,8 +20,6 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
   
   const user = useSelector((state) => state.userAuth?.user);
   
-  const isAdminOrManagerOrSuperAdmin =
-    user?.role === "admin" || user?.role === "manager" || user?.role === "super_admin";
   const isManager = user?.role === "manager";
   const isManagerOrSuperAdmin = user?.role === "manager" || user?.role === "super_admin";
 
@@ -33,13 +30,13 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
         if (item.managerOrSuperAdminOnly) return isManagerOrSuperAdmin;
         if (item.adminOrManagerOnly)
           return (
-            isAdminOrManagerOrSuperAdmin ||
+            isManagerOrSuperAdmin ||
             (item.allowCounselor && user?.role === "counselor")
           );
-        if (item.adminManagerSuperAdminOnly) return isAdminOrManagerOrSuperAdmin;
+        if (item.adminManagerSuperAdminOnly) return isManagerOrSuperAdmin;
         return true;
       }),
-    [isManager, isManagerOrSuperAdmin, isAdminOrManagerOrSuperAdmin, user?.role]
+    [isManager, isManagerOrSuperAdmin, user?.role]
   );
 
   useEffect(() => {
@@ -100,9 +97,7 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
 
   const handleLogout = async () => {
     setLoggingOut(true);
-    clearLoginAt(); // clear 7-day session timestamp
-    await new Promise(resolve => setTimeout(resolve, 500));
-    dispatch(logout());
+    await dispatch(logout());
     router.replace("/login");
   };
 
@@ -135,8 +130,8 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
           <ul className="flex flex-col gap-0.5">
             {visibleMenuItems.map((item, idx) => {
               const IconComponent = item.icon;
-              const isCounselorOrAdmin = user?.role === "counselor" || user?.role === "admin";
-              const label = item.textForCounselor && isCounselorOrAdmin ? item.textForCounselor : item.text;
+              const isCounselor = user?.role === "counselor";
+              const label = item.textForCounselor && isCounselor ? item.textForCounselor : item.text;
               const active = activeItem === item.text;
               return (
                 <li key={idx}>

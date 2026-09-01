@@ -53,7 +53,6 @@ export default function ReferralRewardCard({
   referralId,
   reward,
   isManagerRole,
-  headers,
   onRewardChange,
   onError,
 }) {
@@ -125,7 +124,7 @@ export default function ReferralRewardCard({
     try {
       setRewardSaving(true);
       onError(null);
-      const { data } = await axios.patch(`/referrals/${referralId}/reward/`, payload, { headers });
+      const { data } = await axios.patch(`/referrals/${referralId}/reward/`, payload);
       onRewardChange(data);
       setRewardErrors({});
       setRewardProofFile(null);

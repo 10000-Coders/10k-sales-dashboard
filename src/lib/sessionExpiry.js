@@ -1,8 +1,8 @@
 /**
- * Session expiry: users must log in again after 7 days.
+ * Session expiry: users must log in again after 30 days (matches refresh JWT).
  */
 
-const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const LOGIN_AT_KEY = "sales_dashboard_login_at";
 
 export function setLoginAt() {
@@ -20,7 +20,7 @@ export function clearLoginAt() {
 }
 
 /**
- * Returns true if there is no stored login time or if 7 days have passed since login.
+ * Returns true if there is no stored login time or if 30 days have passed since login.
  */
 export function isSessionExpired() {
   if (typeof window === "undefined") return true;

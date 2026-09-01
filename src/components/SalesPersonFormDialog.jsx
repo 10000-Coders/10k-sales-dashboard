@@ -10,11 +10,10 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Loader2, User, Mail, Phone, Shield, Lock, Share2, X, CheckCircle2, AlertCircle } from "lucide-react";
 
-// Hierarchy: Manager > Super Admin > Admin > Counselor
+// Hierarchy: Manager > Super Admin > Counselor
 const ROLES = [
   { value: "manager", label: "Manager" },
   { value: "super_admin", label: "Super Admin" },
-  { value: "admin", label: "Admin" },
   { value: "counselor", label: "Counselor" },
 ];
 
@@ -81,7 +80,6 @@ export function SalesPersonFormDialog({
   person = null,
   persons = [],
   onSuccess,
-  getHeaders,
 }) {
   const isEdit = !!person;
   const [form, setForm] = useState(initialForm);
@@ -310,17 +308,21 @@ export function SalesPersonFormDialog({
     setSubmitting(true);
     try {
       const payload = getPayload();
-      const headers = typeof getHeaders === "function" ? getHeaders() : {};
       if (isEdit) {
-        await axios.put(`/persons/${person.id}/`, payload, { headers });
+        await axios.put(`/persons/${person.id}/`, payload);
       } else {
-        await axios.post("/persons/", payload, { headers });
+        await axios.post("/persons/", payload);
       }
       onSuccess?.();
       onClose();
     } catch (err) {
+      const status = err.response?.status;
       const data = err.response?.data;
-      if (data && typeof data === "object" && !data.detail) {
+      if (status === 401 || status === 403) {
+        setErrors({
+          submit: data?.detail || "You don't have permission to manage sales persons.",
+        });
+      } else if (data && typeof data === "object" && !data.detail) {
         const normalized = {};
         for (const [k, v] of Object.entries(data)) {
           normalized[k] = Array.isArray(v) ? v[0] : v;

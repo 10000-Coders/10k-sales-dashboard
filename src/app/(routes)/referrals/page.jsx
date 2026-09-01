@@ -135,13 +135,6 @@ function ReferralsPage() {
   const [statsData, setStatsData] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  const getHeaders = useCallback(() => {
-    const h = {};
-    if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
-    if (user?.role) h["X-Sales-Person-Role"] = user.role;
-    return h;
-  }, [user?.id, user?.role]);
-
   const fetchReferrals = useCallback(async () => {
     try {
       setLoading(true);
@@ -152,7 +145,7 @@ function ReferralsPage() {
       if (filterDateTo) params.set("created_before", filterDateTo);
       if (searchDebounce.trim()) params.set("search", searchDebounce.trim());
       if (isManagerRole && filterAssignedTo) params.set("assigned_to", filterAssignedTo);
-      const { data } = await axios.get(`/referrals/?${params.toString()}`, { headers: getHeaders() });
+      const { data } = await axios.get(`/referrals/?${params.toString()}`);
       const list = data?.results ?? (Array.isArray(data) ? data : []);
       setReferrals(list);
     } catch (err) {
@@ -161,7 +154,7 @@ function ReferralsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterStatus, filterDateFrom, filterDateTo, searchDebounce, filterAssignedTo, isManagerRole, getHeaders]);
+  }, [filterStatus, filterDateFrom, filterDateTo, searchDebounce, filterAssignedTo, isManagerRole]);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounce(searchQuery), 3000);
@@ -208,11 +201,10 @@ function ReferralsPage() {
     setBulkAssigning(true);
     setError(null);
     try {
-      await axios.post(
-        "/referrals/bulk_assign/",
-        { referral_ids: Array.from(selectedIds), assigned_to: idToAssign },
-        { headers: getHeaders() }
-      );
+      await axios.post("/referrals/bulk_assign/", {
+        referral_ids: Array.from(selectedIds),
+        assigned_to: idToAssign,
+      });
       setSelectedIds(new Set());
       setAssignToId("");
       await fetchReferrals();
@@ -221,21 +213,21 @@ function ReferralsPage() {
     } finally {
       setBulkAssigning(false);
     }
-  }, [selectedIds, assignToId, getHeaders, fetchReferrals]);
+  }, [selectedIds, assignToId, fetchReferrals]);
 
   const fetchDistributionStats = useCallback(async () => {
     if (!isManagerOrSuper) return;
     setStatsLoading(true);
     setStatsData(null);
     try {
-      const { data } = await axios.get(`/referrals/distribution_stats/?period=${statsPeriod}`, { headers: getHeaders() });
+      const { data } = await axios.get(`/referrals/distribution_stats/?period=${statsPeriod}`);
       setStatsData(data);
     } catch (err) {
       setStatsData({ error: err.response?.data?.detail || "Failed to load stats." });
     } finally {
       setStatsLoading(false);
     }
-  }, [isManagerOrSuper, statsPeriod, getHeaders]);
+  }, [isManagerOrSuper, statsPeriod]);
 
   useEffect(() => {
     if (statsModalOpen && isManagerOrSuper && statsPeriod) {

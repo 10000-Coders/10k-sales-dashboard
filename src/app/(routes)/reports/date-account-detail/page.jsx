@@ -236,18 +236,11 @@ function DateAccountDetailPage() {
   const [rows, setRows] = useState([]);
   const [totalAmount, setTotalAmount] = useState("0.00");
 
-  const getHeaders = useCallback(() => {
-    const h = {};
-    if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
-    if (user?.role) h["X-Sales-Person-Role"] = user.role;
-    return h;
-  }, [user?.id, user?.role]);
-
   const fetchReceivers = useCallback(async () => {
     if (!canView) return;
     try {
       setReceiverLoading(true);
-      const { data } = await axios.get("/payment-receivers/", { headers: getHeaders() });
+      const { data } = await axios.get("/payment-receivers/");
       const list = data?.results ?? (Array.isArray(data) ? data : []);
       setReceivers(list);
     } catch {
@@ -255,7 +248,7 @@ function DateAccountDetailPage() {
     } finally {
       setReceiverLoading(false);
     }
-  }, [canView, getHeaders]);
+  }, [canView]);
 
   useEffect(() => {
     fetchReceivers();
@@ -292,7 +285,7 @@ function DateAccountDetailPage() {
       if (paymentMode) params.set("payment_mode", paymentMode);
 
       const url = `/payments/date-account-detail/${params.toString() ? `?${params.toString()}` : ""}`;
-      const { data } = await axios.get(url, { headers: getHeaders() });
+      const { data } = await axios.get(url);
       setRows(Array.isArray(data?.rows) ? data.rows : []);
       setTotalAmount(data?.total_amount != null ? String(data.total_amount) : "0.00");
     } catch (err) {
@@ -306,7 +299,7 @@ function DateAccountDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [canView, dateFrom, dateTo, status, salesBatchIds, salesPersonId, receiverId, paymentMode, getHeaders]);
+  }, [canView, dateFrom, dateTo, status, salesBatchIds, salesPersonId, receiverId, paymentMode]);
 
   useEffect(() => {
     fetchDetail();

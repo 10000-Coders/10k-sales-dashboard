@@ -372,32 +372,25 @@ export const FollowUpProvider = ({ children }) => {
     [mergeAndApply]
   );
 
-  const getAuthHeaders = useCallback(() => {
-    const headers = {};
-    if (user?.id != null) headers["X-Sales-Person-Id"] = String(user.id);
-    if (user?.role) headers["X-Sales-Person-Role"] = user.role;
-    return headers;
-  }, [user?.id, user?.role]);
-
   const fetchFollowUpLeads = useCallback(async () => {
     if (!user?.id) return [];
     const params = new URLSearchParams();
     params.set("page", "1");
     params.set("page_size", "100");
     params.set("sales_person", String(user.id));
-    const { data } = await axios.get(`/leads/?${params.toString()}`, { headers: getAuthHeaders() });
+    const { data } = await axios.get(`/leads/?${params.toString()}`);
     const list = data?.results ?? (Array.isArray(data) ? data : []);
     return list.filter((l) => String(l.sales_person) === String(user.id));
-  }, [user?.id, getAuthHeaders]);
+  }, [user?.id]);
 
   const fetchFollowUpStudents = useCallback(async () => {
     if (!user?.id) return [];
     const params = new URLSearchParams();
     params.set("page", "1");
     params.set("page_size", "100");
-    const { data } = await axios.get(`/students/?${params.toString()}`, { headers: getAuthHeaders() });
+    const { data } = await axios.get(`/students/?${params.toString()}`);
     return data?.results ?? (Array.isArray(data) ? data : []);
-  }, [user?.id, getAuthHeaders]);
+  }, [user?.id]);
 
   const fetchAllFollowUps = useCallback(async () => {
     if (!user?.id) return;

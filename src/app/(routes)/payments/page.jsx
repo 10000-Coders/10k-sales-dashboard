@@ -46,7 +46,7 @@ function getMediaUrl(path) {
 }
 
 function canViewPayments(role) {
-  return role === "admin" || role === "manager" || role === "super_admin" || role === "counselor";
+  return role === "manager" || role === "super_admin" || role === "counselor";
 }
 
 const PAYMENT_MODE_LABELS = {
@@ -138,14 +138,6 @@ function PaymentsPage() {
   const superAdminNeedsBatch =
     userRole === "super_admin" && !filterSalesBatch && !mentorBatchDebounce;
 
-  const getHeaders = useCallback(() => {
-    const h = {};
-    if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
-    if (user?.role) h["X-Sales-Person-Role"] = user.role;
-    return h;
-  }, [user?.id, user?.role]);
-
-
   const fetchPayments = useCallback(async () => {
     if (!canView) return;
     if (superAdminNeedsBatch) {
@@ -172,7 +164,7 @@ function PaymentsPage() {
       promise = (async () => {
         try {
           const url = params.toString() ? `/payments/?${params.toString()}` : "/payments/";
-          const { data } = await axios.get(url, { headers: getHeaders() });
+          const { data } = await axios.get(url);
           const list = data?.results ?? (Array.isArray(data) ? data : []);
           paymentsCache.set(key, { data: list, at: Date.now() });
           return list;
@@ -203,7 +195,6 @@ function PaymentsPage() {
     filterDateRange,
     filterDateFrom,
     filterDateTo,
-    getHeaders,
   ]);
 
   const fetchBatchSummary = useCallback(async () => {
@@ -250,7 +241,7 @@ function PaymentsPage() {
 
     const doFetch = async () => {
       const url = `/payments/batch-summary/${summaryParams ? `?${summaryParams}` : ""}`;
-      const { data } = await axios.get(url, { headers: getHeaders() });
+      const { data } = await axios.get(url);
       const rows = Array.isArray(data) ? data : data?.results ?? [];
       paymentsCache.set(cacheKey, { data: rows, at: Date.now() });
       return rows;
@@ -282,7 +273,6 @@ function PaymentsPage() {
     filterDateRange,
     filterDateFrom,
     filterDateTo,
-    getHeaders,
   ]);
 
   useEffect(() => {
@@ -310,7 +300,7 @@ function PaymentsPage() {
     if (!promise) {
       promise = (async () => {
         try {
-          const { data } = await axios.get("/payment-receivers/", { headers: getHeaders() });
+          const { data } = await axios.get("/payment-receivers/");
           const list = data?.results ?? (Array.isArray(data) ? data : []);
           paymentsCache.set(key, { data: list, at: Date.now() });
           return list;
@@ -329,7 +319,7 @@ function PaymentsPage() {
     } finally {
       setReceiverLoading(false);
     }
-  }, [canManageReceivers, getHeaders]);
+  }, [canManageReceivers]);
 
   useEffect(() => {
     fetchReceivers();
@@ -418,9 +408,9 @@ function PaymentsPage() {
     setReceiverError(null);
     try {
       if (editingReceiver) {
-        await axios.patch(`/payment-receivers/${editingReceiver.id}/`, payload, { headers: getHeaders() });
+        await axios.patch(`/payment-receivers/${editingReceiver.id}/`, payload);
       } else {
-        await axios.post("/payment-receivers/", payload, { headers: getHeaders() });
+        await axios.post("/payment-receivers/", payload);
       }
       paymentsCache.delete(paymentsCacheKey("receivers", ""));
       paymentsFetchPromises.delete(paymentsCacheKey("receivers", ""));
@@ -446,7 +436,7 @@ function PaymentsPage() {
   const handleDeleteReceiver = async (id) => {
     if (!window.confirm("Are you sure you want to delete this bank account? This action cannot be undone.")) return;
     try {
-      await axios.delete(`/payment-receivers/${id}/`, { headers: getHeaders() });
+      await axios.delete(`/payment-receivers/${id}/`);
       setReceivers((prev) => prev.filter((r) => r.id !== id));
     } catch (err) {
       const d = err.response?.data;
@@ -474,8 +464,7 @@ function PaymentsPage() {
     try {
       const { data: updated } = await axios.patch(
         `/payments/${paymentId}/`,
-        { status, ...(notes ? { notes } : {}) },
-        { headers: getHeaders() }
+        { status, ...(notes ? { notes } : {}) }
       );
       
       // Update main payments list (include recalculated student_due_amount from API)
@@ -530,7 +519,7 @@ function PaymentsPage() {
       params.set("sales_batch", String(row.batch_key || row.batch_name || ""));
       clearPaymentsListAndSummaryCache();
       const url = `/payments/${params.toString() ? `?${params.toString()}` : ""}`;
-      const { data } = await axios.get(url, { headers: getHeaders() });
+      const { data } = await axios.get(url);
       const list = data?.results ?? (Array.isArray(data) ? data : []);
       setBatchPayments(list);
     } catch (err) {

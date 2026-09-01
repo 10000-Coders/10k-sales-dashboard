@@ -6,23 +6,20 @@ import { logout } from "@/redux/features/user/userAuth";
 const PERSONS_CACHE_MS = 5 * 60 * 1000; // 5 minutes
 const BATCHES_CACHE_MS = 5 * 60 * 1000; // 5 minutes
 
-function getHeadersFromState(state) {
-  const user = state?.userAuth?.user;
-  const h = {};
-  if (user?.id != null) h["X-Sales-Person-Id"] = String(user.id);
-  if (user?.role) h["X-Sales-Person-Role"] = user.role;
-  return h;
-}
-
 export const fetchSalesPersons = createAsyncThunk(
   "salesData/fetchSalesPersons",
-  async (_, { getState, rejectWithValue }) => {
+  async (_, { rejectWithValue }) => {
     try {
-      const state = getState();
-      const headers = getHeadersFromState(state);
-      const { data } = await axios.get("/persons/", { headers });
+      // JWT via axios interceptor. Manager / Super Admin only on the backend.
+      const { data } = await axios.get("/persons/");
       return data?.results ?? (Array.isArray(data) ? data : []);
     } catch (err) {
+      const status = err.response?.status;
+      if (status === 401 || status === 403) {
+        return rejectWithValue(
+          err.response?.data?.detail || "You don't have permission to view sales persons."
+        );
+      }
       return rejectWithValue(err.response?.data?.detail || "Failed to load sales persons.");
     }
   }
@@ -30,11 +27,9 @@ export const fetchSalesPersons = createAsyncThunk(
 
 export const fetchSalesBatches = createAsyncThunk(
   "salesData/fetchSalesBatches",
-  async (_, { getState, rejectWithValue }) => {
+  async (_, { rejectWithValue }) => {
     try {
-      const state = getState();
-      const headers = getHeadersFromState(state);
-      const { data } = await axios.get("/sales-batches/", { headers });
+      const { data } = await axios.get("/sales-batches/");
       return data?.results ?? (Array.isArray(data) ? data : []);
     } catch (err) {
       return rejectWithValue(err.response?.data?.detail || "Failed to load sales batches.");
@@ -45,12 +40,10 @@ export const fetchSalesBatches = createAsyncThunk(
 /** Slim list for dropdowns: GET /sales-batches/dropdown/ (id, name, course). Optional course filter. */
 export const fetchSalesBatchDropdown = createAsyncThunk(
   "salesData/fetchSalesBatchDropdown",
-  async (course, { getState, rejectWithValue }) => {
+  async (course, { rejectWithValue }) => {
     try {
-      const state = getState();
-      const headers = getHeadersFromState(state);
       const params = course ? { course } : undefined;
-      const { data } = await axios.get("/sales-batches/dropdown/", { headers, params });
+      const { data } = await axios.get("/sales-batches/dropdown/", { params });
       return {
         course: course || "",
         batches: Array.isArray(data) ? data : [],

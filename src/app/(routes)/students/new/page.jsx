@@ -96,10 +96,9 @@ export default function NewStudentPage() {
       router.replace("/students");
       return;
     }
-    const h = getHeaders();
     if (leadIdParam) {
       axios
-        .get(`/leads/${leadIdParam}/`, { headers: h })
+        .get(`/leads/${leadIdParam}/`)
         .then(({ data }) => {
           const mobile = data.mobile ? normalizeMobile(String(data.mobile)) : "";
           const leadCourse = (data.course || data.enrolled_student_course || "").trim();
@@ -117,7 +116,7 @@ export default function NewStudentPage() {
     }
     if (referralIdParam) {
       axios
-        .get(`/referrals/${referralIdParam}/`, { headers: h })
+        .get(`/referrals/${referralIdParam}/`)
         .then(({ data }) => {
           const mobile = data.referred_mobile ? normalizeMobile(String(data.referred_mobile)) : "";
           setForm((f) => ({
@@ -133,13 +132,13 @@ export default function NewStudentPage() {
         .catch(() => {})
         .finally(() => setLoadingLead(false));
     }
-  }, [leadIdParam, referralIdParam, getHeaders, router]);
+  }, [leadIdParam, referralIdParam, router]);
 
   const fetchPaymentReceivers = useCallback(async () => {
     try {
       setPaymentReceiversLoading(true);
       setPaymentReceiversError(null);
-      const { data } = await axios.get("/payment-receivers/", { headers: getHeaders() });
+      const { data } = await axios.get("/payment-receivers/");
       const list = data?.results ?? (Array.isArray(data) ? data : []);
       setPaymentReceivers(list);
     } catch (err) {
@@ -148,7 +147,7 @@ export default function NewStudentPage() {
     } finally {
       setPaymentReceiversLoading(false);
     }
-  }, [getHeaders]);
+  }, []);
 
   useEffect(() => {
     if (PAYMENT_MODES_NEED_RECEIVER.includes(initialPayment.payment_mode)) {
@@ -299,7 +298,6 @@ export default function NewStudentPage() {
   const submitEnrollment = async () => {
     if (!leadIdParam && !referralIdParam) return;
     setSaving(true);
-    const headers = getHeaders();
 
     try {
       const studentPayload = {
@@ -332,7 +330,7 @@ export default function NewStudentPage() {
         payment_offered_comment: (form.payment_offered_comment || "").trim(),
       };
 
-      const { data: student } = await axios.post("/students/", studentPayload, { headers });
+      const { data: student } = await axios.post("/students/", studentPayload);
       const studentId = student?.id ?? student?.pk;
 
       if (studentId != null) {
@@ -356,7 +354,7 @@ export default function NewStudentPage() {
           formData.append("reference_image", initialPayment.reference_image);
         }
         formData.append("receipt_image", initialPayment.receipt_image);
-        await axios.post(`/students/${studentId}/payments/`, formData, { headers });
+        await axios.post(`/students/${studentId}/payments/`, formData);
       }
 
       if (studentId != null) {

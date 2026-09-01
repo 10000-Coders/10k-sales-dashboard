@@ -27,7 +27,6 @@ import {
 export default function StudentDetailsEditForm({
   studentId,
   student,
-  getHeaders,
   editing,
   onEditingChange,
   onUpdated,
@@ -83,9 +82,7 @@ export default function StudentDetailsEditForm({
     setError(null);
     setFieldErrors({});
     try {
-      const { data } = await axios.patch(`/students/${studentId}/`, payload, {
-        headers: getHeaders(),
-      });
+      const { data } = await axios.patch(`/students/${studentId}/`, payload);
       toast.success("Student details updated.");
       onUpdated?.(data);
       onEditingChange(false);
