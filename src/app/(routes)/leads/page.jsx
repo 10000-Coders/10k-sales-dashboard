@@ -88,6 +88,8 @@ function formatDateTime(d) {
   return dt.toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+const ACTIVITY_TYPE_LABELS = { call: "Call", whatsapp: "WhatsApp" };
+
 const LEAD_TABLE_HEAD =
   "h-9 whitespace-nowrap !p-0 px-2 py-2 text-left align-middle text-[10px] font-medium uppercase tracking-wide text-muted-foreground";
 const LEAD_TABLE_CELL = "!p-0 px-2 py-2.5 align-middle text-[10px] leading-snug";
@@ -421,6 +423,13 @@ function LeadsPageInner() {
     "Source",
     "Course",
     "Status",
+    "Sales Person",
+    "Activity Count",
+    "Activity At",
+    "Activity Type",
+    "Outcome",
+    "Notes",
+    "Next Follow-up",
   ]
   const handleExcelsheetDownload = async () => {
     if (downloadLoading) return;
@@ -440,14 +449,28 @@ function LeadsPageInner() {
       const qs = params.toString();
       const { data } = await axios.get(`/leads/excel-sheet-download/${qs ? `?${qs}` : ""}`);
       const rows = Array.isArray(data) ? data : data?.results ?? [];
-      const sheetRows = rows.map((lead) => ({
-        Name: lead.name || "",
-        Phone: lead.mobile || "",
-        Email: lead.email || "",
-        Source: getInquirySourceLabel(lead.source) || lead.source || "",
-        Course: getLeadCourseLabel(lead.course) || lead.course || "",
-        Status: lead.status || "",
-      }));
+      const sheetRows = rows.flatMap((lead) => {
+        const leadColumns = {
+          Name: lead.name || "",
+          Phone: lead.mobile || "",
+          Email: lead.email || "",
+          Source: getInquirySourceLabel(lead.source) || lead.source || "",
+          Course: getLeadCourseLabel(lead.course) || lead.course || "",
+          Status: lead.status || "",
+          "Sales Person": lead.sales_person_name || "",
+        };
+        const activities = lead.activities ?? [];
+        leadColumns["Activity Count"] = lead.activities_count ?? activities.length;
+        if (!activities.length) return [leadColumns];
+        return activities.map((activity) => ({
+          ...leadColumns,
+          "Activity At": activity.activity_at ? formatDateTime(activity.activity_at) : "",
+          "Activity Type": ACTIVITY_TYPE_LABELS[activity.activity_type] || activity.activity_type || "",
+          Outcome: activity.outcome_label || activity.outcome || "",
+          Notes: activity.notes || "",
+          "Next Follow-up": activity.next_follow_up_at ? formatDateTime(activity.next_follow_up_at) : "",
+        }));
+      });
       const excelSheetData = XLSX.utils.json_to_sheet(sheetRows, { header: headerRow });
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, excelSheetData, "Leads");

@@ -14,6 +14,7 @@ export const LEAD_STATUS_OPTIONS = [
   { value: "no_incoming", label: "No Incoming" },
   { value: "out_of_service", label: "Out of Service" },
   { value: "other_language", label: "Other Language" },
+  { value: "other_sales_person", label: "Other Sales Person" },
   { value: "demo_class", label: "Demo Class" },
 ];
 
@@ -23,6 +24,7 @@ export const FOLLOW_UP_EXEMPT_STATUSES = [
   "enrolled",
   "already_joined",
   "other_language",
+  "other_sales_person",
   "no_incoming",
   "wrong_number",
   "not_interested",
@@ -57,6 +59,7 @@ export const LEAD_CALL_OUTCOME_OPTIONS = [
   { value: "no_incoming", label: "No Incoming" },
   { value: "out_of_service", label: "Out of Service" },
   { value: "other_language", label: "Other Language" },
+  { value: "other_sales_person", label: "Other Sales Person" },
   { value: "demo_class", label: "Demo Class" },
   { value: "other", label: "Other" },
 ];
@@ -76,6 +79,7 @@ export const LEAD_STATUS_PREFERRED_ORDER = [
   "no_incoming",
   "out_of_service",
   "other_language",
+  "other_sales_person",
   "demo_class",
 ];
 
@@ -94,6 +98,7 @@ export const LEAD_STATUS_STYLES = {
   no_incoming: "bg-orange-100 text-orange-800",
   out_of_service: "bg-orange-100 text-orange-800",
   other_language: "bg-violet-100 text-violet-800",
+  other_sales_person: "bg-gray-100 text-gray-700",
   demo_class: "bg-indigo-100 text-indigo-800",
 };
 
@@ -111,6 +116,7 @@ const LEAD_STATUS_SELECT_STYLES = {
   no_incoming: "bg-orange-100 text-orange-800 border-orange-200",
   out_of_service: "bg-orange-100 text-orange-800 border-orange-200",
   other_language: "bg-violet-100 text-violet-800 border-violet-200",
+  other_sales_person: "bg-gray-100 text-gray-700 border-gray-200",
   demo_class: "bg-indigo-100 text-indigo-800 border-indigo-200",
 };
 
