@@ -23,7 +23,8 @@ export const LEAD_SOURCE_VALUES = [
   { value: "triner_referals", label: "TRINER Referals" },
   { value: "ai_calling_agent", label: "AI Calling Agent" },
   { value: "workshop", label: "Workshop" },
-  
+  { value: "outside_friend_suggested", label: "Outside Friend Suggested" },
+  { value: "direct_message", label: "Direct Message" },
 ];
 
 /** Leads list filter — includes all sources + unknown (empty source). */
