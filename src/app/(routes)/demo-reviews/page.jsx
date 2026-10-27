@@ -16,10 +16,102 @@ function sourceBadgeMeta(source) {
   return { label: "Demo", className: "bg-emerald-100 text-emerald-700" };
 }
 
+function hasContent(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "boolean") return true;
+  if (Array.isArray(value)) return value.length > 0;
+  const text = String(value).trim();
+  return text !== "";
+}
+
 function readValue(v) {
+  if (v === true) return "Yes";
+  if (v === false) return "No";
+  if (Array.isArray(v)) {
+    const joined = v.map((item) => String(item).trim()).filter(Boolean).join(", ");
+    return joined || "—";
+  }
   if (v === null || v === undefined) return "—";
   const text = String(v).trim();
   return text || "—";
+}
+
+function Field({ label, value, className = "" }) {
+  if (!hasContent(value)) return null;
+  return (
+    <div className={className}>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-0.5 whitespace-pre-wrap break-words font-medium">{readValue(value)}</p>
+    </div>
+  );
+}
+
+function LevelBlock({ label, level, suggestions }) {
+  if (!hasContent(level) && !hasContent(suggestions)) return null;
+  return (
+    <div className="rounded-md border bg-muted/20 p-3">
+      <p className="text-sm font-semibold">{label}</p>
+      <div className="mt-2 grid gap-2 sm:grid-cols-12">
+        {hasContent(level) ? (
+          <div className={hasContent(suggestions) ? "sm:col-span-2" : "sm:col-span-12"}>
+            <p className="text-xs text-muted-foreground">Level</p>
+            <p className="font-medium">{readValue(level)}</p>
+          </div>
+        ) : null}
+        {hasContent(suggestions) ? (
+          <div className={hasContent(level) ? "sm:col-span-10" : "sm:col-span-12"}>
+            <p className="text-xs text-muted-foreground">Suggestions</p>
+            <p className="whitespace-pre-wrap text-sm">{readValue(suggestions)}</p>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function TechBlock({ title, techs, level, suggestions }) {
+  if (!hasContent(techs) && !hasContent(level) && !hasContent(suggestions)) return null;
+  return (
+    <div className="rounded-md border bg-muted/20 p-3">
+      <p className="text-sm font-semibold">{title}</p>
+      {hasContent(techs) ? (
+        <p className="mt-2 text-sm">{readValue(techs)}</p>
+      ) : null}
+      <div className="mt-2 grid gap-2 sm:grid-cols-12">
+        {hasContent(level) ? (
+          <div className={hasContent(suggestions) ? "sm:col-span-2" : "sm:col-span-12"}>
+            <p className="text-xs text-muted-foreground">Level</p>
+            <p className="font-medium">{readValue(level)}</p>
+          </div>
+        ) : null}
+        {hasContent(suggestions) ? (
+          <div className={hasContent(level) ? "sm:col-span-10" : "sm:col-span-12"}>
+            <p className="text-xs text-muted-foreground">Suggestions</p>
+            <p className="whitespace-pre-wrap text-sm">{readValue(suggestions)}</p>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function CustomEvalItems({ items }) {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  const rows = items.filter((item) => item && (item.title || item.level || item.suggestions));
+  if (!rows.length) return null;
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground">Custom evaluation</p>
+      {rows.map((item, idx) => (
+        <LevelBlock
+          key={`${item.title || "item"}-${idx}`}
+          label={item.title || `Item ${idx + 1}`}
+          level={item.level}
+          suggestions={item.suggestions}
+        />
+      ))}
+    </div>
+  );
 }
 
 function DemoReviewsPage() {
@@ -227,96 +319,129 @@ function DemoReviewsPage() {
             </div>
             <div className="grid gap-5 p-5">
               <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">Candidate Name</p>
-                  <p className="font-medium">{readValue(selectedReview.candidate_name)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Mobile</p>
-                  <p className="font-medium">{readValue(selectedReview.mobile_no)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Email</p>
-                  <p className="font-medium break-words">{readValue(selectedReview.candidate_email)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Course / Batch</p>
-                  <p className="font-medium">{readValue(selectedReview.course_batch)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Review Date</p>
-                  <p className="font-medium">{readValue(selectedReview.review_date)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Review Source</p>
-                  <p className="font-medium">{sourceBadgeMeta(selectedReview.review_source).label}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Referrer</p>
-                  <p className="font-medium">
-                    {readValue(
-                      selectedReview.sales_person_name ||
-                        selectedReview.referrer_mentor_name ||
-                        selectedReview.lead
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Reviewed By</p>
-                  <p className="font-medium">{readValue(selectedReview.mentor_name)}</p>
-                </div>
+                <Field label="Candidate Name" value={selectedReview.candidate_name} />
+                <Field label="Mobile" value={selectedReview.mobile_no} />
+                <Field label="Email" value={selectedReview.candidate_email} />
+                <Field label="Course / Batch" value={selectedReview.course_batch} />
+                <Field label="Batch no" value={selectedReview.batch_no} />
+                <Field label="Review Date" value={selectedReview.review_date} />
+                <Field label="Created at" value={selectedReview.created_at} />
+                <Field label="Review Source" value={sourceBadgeMeta(selectedReview.review_source).label} />
+                <Field label="Ready to placement" value={selectedReview.ready_to_placement} />
+                <Field label="Native place" value={selectedReview.native_place} />
+                <Field label="Passed out year / branch" value={selectedReview.passed_out_year_branch} />
+                <Field
+                  label="Referrer (sales)"
+                  value={
+                    selectedReview.sales_person_name
+                      ? `${selectedReview.sales_person_name}${selectedReview.sales_person_email ? ` (${selectedReview.sales_person_email})` : ""}`
+                      : null
+                  }
+                />
+                <Field
+                  label="Referrer (mentor)"
+                  value={
+                    selectedReview.referrer_mentor_name
+                      ? `${selectedReview.referrer_mentor_name}${selectedReview.referrer_mentor_role_type ? ` · ${selectedReview.referrer_mentor_role_type}` : ""}`
+                      : null
+                  }
+                />
+                <Field label="Lead (free text)" value={selectedReview.lead} />
+                <Field
+                  label="Reviewed By"
+                  value={
+                    selectedReview.mentor_name
+                      ? `${selectedReview.mentor_name}${selectedReview.reviewed_by_email ? ` (${selectedReview.reviewed_by_email})` : ""}`
+                      : null
+                  }
+                />
+                <Field
+                  label="Linked student"
+                  value={
+                    selectedReview.student_name
+                      ? `${selectedReview.student_name}${selectedReview.student_email ? ` (${selectedReview.student_email})` : ""}`
+                      : null
+                  }
+                />
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Communication</p>
-                  <p className="font-medium">{readValue(selectedReview.communication_level)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Backend / Programming</p>
-                  <p className="font-medium">{readValue(selectedReview.tech_languages_level)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Frontend</p>
-                  <p className="font-medium">{readValue(selectedReview.frontend_level)}</p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs text-muted-foreground">Overall Feedback</p>
-                <p className="mt-1 whitespace-pre-wrap rounded-md border bg-muted/20 p-3 text-sm">
-                  {readValue(selectedReview.overall_feedback)}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs text-muted-foreground">Suggestions</p>
-                <p className="mt-1 whitespace-pre-wrap rounded-md border bg-muted/20 p-3 text-sm">
-                  {readValue(selectedReview.suggestions_general)}
-                </p>
+              <div className="space-y-2">
+                <LevelBlock
+                  label="Communication"
+                  level={selectedReview.communication_level}
+                  suggestions={selectedReview.communication_suggestions}
+                />
+                <TechBlock
+                  title="Backend / Programming"
+                  techs={selectedReview.tech_languages}
+                  level={selectedReview.tech_languages_level}
+                  suggestions={selectedReview.tech_languages_suggestions}
+                />
+                <TechBlock
+                  title="Frontend"
+                  techs={selectedReview.frontend_techs}
+                  level={selectedReview.frontend_level}
+                  suggestions={selectedReview.frontend_suggestions}
+                />
+                <LevelBlock
+                  label="Problem solving"
+                  level={selectedReview.problem_solving_level}
+                  suggestions={selectedReview.problem_solving_suggestions}
+                />
+                <LevelBlock
+                  label="Database"
+                  level={selectedReview.database_level}
+                  suggestions={selectedReview.database_suggestions}
+                />
+                <LevelBlock
+                  label="Deployment"
+                  level={selectedReview.deployment_level}
+                  suggestions={selectedReview.deployment_suggestions}
+                />
+                <LevelBlock
+                  label="Aptitude"
+                  level={selectedReview.aptitude_level}
+                  suggestions={selectedReview.aptitude_suggestions}
+                />
+                <LevelBlock
+                  label="Power BI"
+                  level={selectedReview.power_bi_level}
+                  suggestions={selectedReview.power_bi_suggestions}
+                />
+                <LevelBlock
+                  label="SQL analytics"
+                  level={selectedReview.sql_analytics_level}
+                  suggestions={selectedReview.sql_analytics_suggestions}
+                />
+                <LevelBlock
+                  label="Excel reporting"
+                  level={selectedReview.excel_reporting_level}
+                  suggestions={selectedReview.excel_reporting_suggestions}
+                />
+                <LevelBlock
+                  label="Data viz / storytelling"
+                  level={selectedReview.data_viz_storytelling_level}
+                  suggestions={selectedReview.data_viz_storytelling_suggestions}
+                />
+                <CustomEvalItems items={selectedReview.custom_evaluation_items} />
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">LinkedIn Active</p>
-                  <p className="font-medium">{readValue(selectedReview.linkedin_active)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Jobs Applying</p>
-                  <p className="font-medium">{readValue(selectedReview.jobs_applying)}</p>
-                </div>
-                <div className="sm:col-span-2">
-                  <p className="text-xs text-muted-foreground">LinkedIn Suggestions</p>
-                  <p className="mt-1 whitespace-pre-wrap rounded-md border bg-muted/20 p-3 text-sm">
-                    {readValue(selectedReview.linkedin_suggestions)}
-                  </p>
-                </div>
-                <div className="sm:col-span-2">
-                  <p className="text-xs text-muted-foreground">Issues</p>
-                  <p className="mt-1 whitespace-pre-wrap rounded-md border bg-muted/20 p-3 text-sm">
-                    {readValue(selectedReview.issues)}
-                  </p>
-                </div>
+                <Field label="LinkedIn Active" value={selectedReview.linkedin_active} />
+                <Field label="Jobs Applying" value={selectedReview.jobs_applying} />
+                <Field label="Resume rating" value={selectedReview.resume_rating} className="sm:col-span-2" />
+                <Field label="LinkedIn Suggestions" value={selectedReview.linkedin_suggestions} className="sm:col-span-2" />
+                <Field label="Background" value={selectedReview.background} className="sm:col-span-2" />
+                <Field label="Previous interview feedback" value={selectedReview.previous_interview_feedback} className="sm:col-span-2" />
+                <Field label="Overall Feedback" value={selectedReview.overall_feedback} className="sm:col-span-2" />
+                <Field label="Suggestions" value={selectedReview.suggestions_general} className="sm:col-span-2" />
+                <Field label="Issues" value={selectedReview.issues} className="sm:col-span-2" />
+                <Field label="Follow-up task" value={selectedReview.follow_up_task} className="sm:col-span-2" />
+                <Field label="Concepts to learn" value={selectedReview.concepts_to_learn} className="sm:col-span-2" />
+                <Field label="Follow-up deadline" value={selectedReview.follow_up_deadline} />
+                <Field label="Follow-up submission link" value={selectedReview.follow_up_submission_link} />
+                <Field label="Follow-up submitted at" value={selectedReview.follow_up_submitted_at} />
+                <Field label="Concepts acknowledged at" value={selectedReview.concepts_acknowledged_at} />
               </div>
             </div>
           </div>
