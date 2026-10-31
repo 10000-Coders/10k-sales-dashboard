@@ -9,6 +9,64 @@ export function trimCellValue(value, { collapseInner = true } = {}) {
   return s;
 }
 
+/** Lowercase + strip spaces/underscores for header matching (Name, NAME, name → name). */
+function normalizeHeaderKey(label) {
+  return String(label ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "");
+}
+
+/**
+ * Map any Name/Phone-like header to canonical keys used downstream.
+ * Accepts: Name, NAME, name, Phone, PHONE, phone, Mobile, etc.
+ */
+function canonicalizeHeader(label) {
+  const norm = normalizeHeaderKey(label);
+  if (!norm) return "";
+  if (norm === "name") return "Name";
+  if (
+    norm === "phone" ||
+    norm === "phonenumber" ||
+    norm === "phoneno" ||
+    norm === "mobile" ||
+    norm === "mobilenumber" ||
+    norm === "mobileno" ||
+    norm === "contact" ||
+    norm === "contactnumber"
+  ) {
+    return "Phone";
+  }
+  if (norm === "email" || norm === "emailid" || norm === "mail") return "Email";
+  if (norm === "addedtime" || norm === "addedat") return "Added Time";
+  if (norm === "referredby") return "Referred By";
+  if (norm === "referredbybatch") return "Referred By Batch";
+  return String(label ?? "").trim();
+}
+
+function isNameHeader(label) {
+  return canonicalizeHeader(label) === "Name";
+}
+
+function isPhoneHeader(label) {
+  return canonicalizeHeader(label) === "Phone";
+}
+
+/** Read a field from a parsed row by canonical or original key (any casing). */
+function getRowValue(row, canonicalKey) {
+  if (!row || typeof row !== "object") return "";
+  if (row[canonicalKey] != null && String(row[canonicalKey]).trim() !== "") {
+    return row[canonicalKey];
+  }
+  const target = normalizeHeaderKey(canonicalKey);
+  for (const [key, value] of Object.entries(row)) {
+    if (canonicalizeHeader(key) === canonicalKey || normalizeHeaderKey(key) === target) {
+      return value;
+    }
+  }
+  return "";
+}
+
 /** Row labels like "May 1st", "May 2nd-3rd", "January 2026" — not lead data */
 function isMonthSectionLabel(text) {
   const t = String(text ?? "").trim();
@@ -20,41 +78,64 @@ function isMonthSectionLabel(text) {
 }
 
 function isLeadDataRow(row) {
-  const name = String(row.Name ?? "").trim();
-  const phone = String(row.Phone ?? "").trim();
+  const name = String(getRowValue(row, "Name") ?? "").trim();
+  const phone = String(getRowValue(row, "Phone") ?? "").trim();
 
   if (!name && !phone) return false;
-  if (name.toLowerCase() === "name") return false;
+  if (normalizeHeaderKey(name) === "name") return false;
+  if (isPhoneHeader(name) && !phone) return false;
   if (isMonthSectionLabel(name) && !phone) return false;
   return true;
 }
 
 /**
+ * Find the header row: any cell that looks like Name or Phone (any casing, any column).
+ */
+function findHeaderRowIndex(raw) {
+  for (let i = 0; i < raw.length; i++) {
+    const row = raw[i] ?? [];
+    const hasName = row.some((cell) => isNameHeader(cell));
+    const hasPhone = row.some((cell) => isPhoneHeader(cell));
+    if (hasName || hasPhone) return i;
+  }
+  return -1;
+}
+
+/**
  * Parse a leads worksheet: skip month/section rows, one object per data row.
- * Expects headers on the row where column A is "Name" (usually row 2).
+ * Finds Name/Phone headers in any row/column, any casing (Name, NAME, phone, PHONE, …).
  */
 export function parseLeadsWorksheet(worksheet) {
   const raw = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
   if (!raw.length) return [];
 
-  let headerRowIndex = raw.findIndex(
-    (row) => String(row[0] ?? "").trim().toLowerCase() === "name"
-  );
-  if (headerRowIndex === -1) headerRowIndex = 1;
+  let headerRowIndex = findHeaderRowIndex(raw);
+  if (headerRowIndex === -1) headerRowIndex = Math.min(1, raw.length - 1);
 
-  const headerRow = raw[headerRowIndex];
+  const headerRow = raw[headerRowIndex] ?? [];
   const colCount = Math.max(
     headerRow.length,
-    ...raw.slice(headerRowIndex + 1).map((r) => r.length)
+    ...raw.slice(headerRowIndex + 1).map((r) => (r ?? []).length),
+    0
   );
+
+  // Prefer first occurrence of Name / Phone; keep other columns under trimmed label
+  const usedCanonical = new Set();
   const headers = Array.from({ length: colCount }, (_, j) => {
-    const label = String(headerRow[j] ?? "").trim();
-    return label || `Column_${j + 1}`;
+    const rawLabel = String(headerRow[j] ?? "").trim();
+    if (!rawLabel) return `Column_${j + 1}`;
+    const canonical = canonicalizeHeader(rawLabel);
+    if ((canonical === "Name" || canonical === "Phone") && usedCanonical.has(canonical)) {
+      return `Column_${j + 1}`;
+    }
+    if (canonical === "Name" || canonical === "Phone") usedCanonical.add(canonical);
+    return canonical || `Column_${j + 1}`;
   });
+
   const leads = [];
 
   for (let i = headerRowIndex + 1; i < raw.length; i++) {
-    const row = raw[i];
+    const row = raw[i] ?? [];
     const obj = {};
     headers.forEach((key, j) => {
       if (!key.startsWith("Column_")) obj[key] = trimCellValue(row[j]);
@@ -107,10 +188,10 @@ function parseAddedTime(value) {
  * Source must be passed via `selectedSource` from the UI dropdown (never from Excel).
  */
 export function mapExcelRowToLeadPayload(row, salesPersonId, { selectedSource, relatedType = "none" } = {}) {
-  const name = trimCellValue(row.Name);
-  const mobile = cleanExcelPhone(row.Phone ?? row.phone);
-  const email = trimCellValue(row.Email);
-  const next_follow_up_at = parseAddedTime(row["Added Time"] ?? row["Added time"]);
+  const name = trimCellValue(getRowValue(row, "Name"));
+  const mobile = cleanExcelPhone(getRowValue(row, "Phone"));
+  const email = trimCellValue(getRowValue(row, "Email"));
+  const next_follow_up_at = parseAddedTime(getRowValue(row, "Added Time"));
 
   const payload = {
     sales_person: salesPersonId,
@@ -120,8 +201,8 @@ export function mapExcelRowToLeadPayload(row, salesPersonId, { selectedSource, r
     status: "new",
     source: selectedSource,
     is_related: relatedType || "none",
-    referred_by_name: trimCellValue(row["Referred By"] ?? row.referred_by_name) || "",
-    referred_by_batch: trimCellValue(row["Referred By Batch"] ?? row.referred_by_batch) || "",
+    referred_by_name: trimCellValue(getRowValue(row, "Referred By")) || "",
+    referred_by_batch: trimCellValue(getRowValue(row, "Referred By Batch")) || "",
   };
   if (next_follow_up_at) payload.next_follow_up_at = next_follow_up_at;
   return payload;
@@ -129,9 +210,9 @@ export function mapExcelRowToLeadPayload(row, salesPersonId, { selectedSource, r
 
 /** Validate one Excel row; returns missing field labels for UI. */
 export function validateExcelLeadRow(row) {
-  const name = trimCellValue(row.Name);
-  const mobile = cleanExcelPhone(row.Phone ?? row.phone);
-  const email = trimCellValue(row.Email);
+  const name = trimCellValue(getRowValue(row, "Name"));
+  const mobile = cleanExcelPhone(getRowValue(row, "Phone"));
+  const email = trimCellValue(getRowValue(row, "Email"));
   const missing = [];
 
   if (!name) missing.push("Name");

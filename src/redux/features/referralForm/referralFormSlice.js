@@ -55,12 +55,12 @@ export function validateReferralForm(form) {
   }
 
   const email = trim(form.referred_email).toLowerCase();
-  if (!email) {
-    errors.referred_email = "Email is required.";
-  } else if (!EMAIL_REGEX.test(email)) {
-    errors.referred_email = "Enter a valid email address.";
-  } else if (email.length > 254) {
-    errors.referred_email = "Email is too long.";
+  if (email) {
+    if (!EMAIL_REGEX.test(email)) {
+      errors.referred_email = "Enter a valid email address.";
+    } else if (email.length > 254) {
+      errors.referred_email = "Email is too long.";
+    }
   }
 
   const mobileRaw = trim(form.referred_mobile);
@@ -173,7 +173,7 @@ function normalizePayload(form) {
   const trim = (v) => (typeof v === "string" ? v.trim() : v);
   return {
     referred_name: trim(form.referred_name),
-    referred_email: trim(form.referred_email).toLowerCase(),
+    referred_email: trim(form.referred_email).toLowerCase() || null,
     referred_mobile:
       trim(form.referred_mobile).replace(/\D/g, "").slice(-10) || trim(form.referred_mobile),
     referred_college: trim(form.referred_college) || "",

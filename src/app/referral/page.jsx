@@ -370,7 +370,6 @@ function ReferralFormContent() {
                     form={form}
                     fieldErrors={fieldErrors}
                     onChange={handleChange}
-                    required
                     type="email"
                     maxLength={254}
                     placeholder="you@example.com"
