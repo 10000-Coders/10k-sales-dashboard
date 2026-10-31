@@ -189,7 +189,7 @@ export default function StudentReferralModal({ open, referrer, onClose }) {
               </Field>
             </div>
 
-            <Field label="Email" required error={fieldErrors.referred_email}>
+            <Field label="Email" error={fieldErrors.referred_email}>
               <input
                 type="email"
                 value={form.referred_email}
