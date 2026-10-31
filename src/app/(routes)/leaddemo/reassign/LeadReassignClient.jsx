@@ -453,13 +453,13 @@ export default function LeadReassignClient() {
                 <label htmlFor="transfer-reason" className="text-xs font-medium text-muted-foreground">
                   Transfer reason
                 </label>
-                <input
+                <textarea
                   id="transfer-reason"
-                  type="text"
+                  rows={3}
                   maxLength={500}
                   value={transferReason}
                   onChange={(e) => setTransferReason(e.target.value)}
-                  className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                  className="min-h-[72px] resize-y rounded-md border border-input bg-background px-3 py-2 text-sm"
                   placeholder="Why are these leads moving?"
                 />
               </div>

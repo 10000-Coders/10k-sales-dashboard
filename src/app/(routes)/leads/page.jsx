@@ -88,8 +88,6 @@ function formatDateTime(d) {
   return dt.toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-const ACTIVITY_TYPE_LABELS = { call: "Call", whatsapp: "WhatsApp" };
-
 const LEAD_TABLE_HEAD =
   "h-9 whitespace-nowrap !p-0 px-2 py-2 text-left align-middle text-[10px] font-medium uppercase tracking-wide text-muted-foreground";
 const LEAD_TABLE_CELL = "!p-0 px-2 py-2.5 align-middle text-[10px] leading-snug";
@@ -416,7 +414,7 @@ function LeadsPageInner() {
   const goToDetail = (lead) => {
     router.push(`/leads/${lead.id}`);
   };
-  const headerRow=[
+  const headerRow = [
     "Name",
     "Phone",
     "Email",
@@ -425,14 +423,27 @@ function LeadsPageInner() {
     "Status",
     "Sales Person",
     "Activity Count",
-    "Activity At",
-    "Activity Type",
-    "Outcome",
-    "Notes",
-    "Next Follow-up",
-  ]
+  ];
+  const isExcelDateRangeValid = useMemo(() => {
+    if (!filterDateFrom || !filterDateTo) return false;
+    const start = new Date(`${filterDateFrom}T00:00:00`);
+    const end = new Date(`${filterDateTo}T00:00:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
+    if (start > end) return false;
+    const dayMs = 24 * 60 * 60 * 1000;
+    const inclusiveDays = Math.floor((end - start) / dayMs) + 1;
+    return inclusiveDays <= 31;
+  }, [filterDateFrom, filterDateTo]);
+
+  const canDownloadExcel = isExcelDateRangeValid;
+  const excelDownloadDisabledReason = !filterDateFrom || !filterDateTo
+    ? "Select Created from and Created to dates to enable Excel download"
+    : !isExcelDateRangeValid
+      ? "Date range cannot exceed one month (max 31 days)"
+      : "";
+
   const handleExcelsheetDownload = async () => {
-    if (downloadLoading) return;
+    if (downloadLoading || !canDownloadExcel) return;
     setDownloadLoading(true);
     try {
       const params = new URLSearchParams();
@@ -440,37 +451,25 @@ function LeadsPageInner() {
       if (filterSources.length) params.set("source", filterSources.join(","));
       if (filterCourses.length) params.set("course", filterCourses.join(","));
       if (filterIsRelated) params.set("is_related", filterIsRelated);
-      if (filterDateFrom) params.set("created_after", filterDateFrom);
-      if (filterDateTo) params.set("created_before", filterDateTo);
+      params.set("created_after", filterDateFrom);
+      params.set("created_before", filterDateTo);
       if (searchDebounce.trim()) params.set("search", searchDebounce.trim());
       if (isManagerRole && filterPerson) {
         params.set("sales_person", filterPerson);
       }
-      const qs = params.toString();
-      const { data } = await axios.get(`/leads/excel-sheet-download/${qs ? `?${qs}` : ""}`);
+
+      const { data } = await axios.get(`/leads/excel-sheet-download/?${params.toString()}`);
       const rows = Array.isArray(data) ? data : data?.results ?? [];
-      const sheetRows = rows.flatMap((lead) => {
-        const leadColumns = {
-          Name: lead.name || "",
-          Phone: lead.mobile || "",
-          Email: lead.email || "",
-          Source: getInquirySourceLabel(lead.source) || lead.source || "",
-          Course: getLeadCourseLabel(lead.course) || lead.course || "",
-          Status: lead.status || "",
-          "Sales Person": lead.sales_person_name || "",
-        };
-        const activities = lead.activities ?? [];
-        leadColumns["Activity Count"] = lead.activities_count ?? activities.length;
-        if (!activities.length) return [leadColumns];
-        return activities.map((activity) => ({
-          ...leadColumns,
-          "Activity At": activity.activity_at ? formatDateTime(activity.activity_at) : "",
-          "Activity Type": ACTIVITY_TYPE_LABELS[activity.activity_type] || activity.activity_type || "",
-          Outcome: activity.outcome_label || activity.outcome || "",
-          Notes: activity.notes || "",
-          "Next Follow-up": activity.next_follow_up_at ? formatDateTime(activity.next_follow_up_at) : "",
-        }));
-      });
+      const sheetRows = rows.map((lead) => ({
+        Name: lead.name || "",
+        Phone: lead.mobile || "",
+        Email: lead.email || "",
+        Source: getInquirySourceLabel(lead.source) || lead.source || "",
+        Course: getLeadCourseLabel(lead.course) || lead.course || "",
+        Status: lead.status || "",
+        "Sales Person": lead.sales_person_name || "",
+        "Activity Count": lead.activities_count ?? 0,
+      }));
       const excelSheetData = XLSX.utils.json_to_sheet(sheetRows, { header: headerRow });
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, excelSheetData, "Leads");
@@ -500,7 +499,12 @@ function LeadsPageInner() {
               <button
                 type="button"
                 onClick={handleExcelsheetDownload}
-                disabled={downloadLoading}
+                disabled={downloadLoading || !canDownloadExcel}
+                title={
+                  canDownloadExcel
+                    ? "Download leads for the selected date range (max 1 month)"
+                    : excelDownloadDisabledReason
+                }
                 className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-muted/50 disabled:opacity-50"
               >
                 {downloadLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

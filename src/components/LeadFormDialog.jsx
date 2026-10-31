@@ -205,7 +205,6 @@ const validateForm = () => {
   else if (mobileDigits.length !== 10) nextErrors.mobile = "Mobile must be exactly 10 digits.";
   const email = (form.email || "").trim();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) nextErrors.email = "Enter a valid email.";
-  if (isFriendSource && !email) nextErrors.email = "Email is required for Friend source.";
   if (!(form.source || "").trim()) nextErrors.source = "Source is required.";
   if (isFriendSource) {
     if (!(form.referred_by_batch || "").trim()) nextErrors.referred_by_batch = "Batch is required.";
