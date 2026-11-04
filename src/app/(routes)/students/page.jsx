@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import axios from "@/axios";
@@ -22,14 +22,100 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Loader2, Phone, Search } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Loader2, Phone, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getLeadCourseLabel } from "@/constants/leadCourse";
+import {
+  getInquirySourceLabel,
+  LEAD_SOURCE_FILTER_OPTIONS,
+} from "@/constants/leadInquirySource";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
 import { useFollowUp } from "@/context/FollowUpProvider";
 
 /** Manager and Super Admin see all students; Admin/Counselor see only their own. */
 import withPrivateAuth from "@/components/withPrivateAuth";
+
+const SOURCE_OPTIONS = LEAD_SOURCE_FILTER_OPTIONS.filter((o) => o.value);
+
+const FILTER_SELECT_CLASS =
+  "rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+function StudentSourceMultiSelect({
+  id,
+  label,
+  options,
+  selected,
+  onChange,
+  open,
+  onOpenChange,
+  dropdownRef,
+  allLabel,
+  minWidth = "min-w-[160px]",
+}) {
+  const displayLabel = useMemo(() => {
+    if (!selected.length) return allLabel;
+    if (selected.length === 1) {
+      return options.find((o) => o.value === selected[0])?.label ?? selected[0];
+    }
+    return `${selected.length} selected`;
+  }, [selected, options, allLabel]);
+
+  const toggle = (value) => {
+    onChange(
+      selected.includes(value)
+        ? selected.filter((v) => v !== value)
+        : [...selected, value]
+    );
+  };
+
+  return (
+    <div className={cn("relative", minWidth)} ref={dropdownRef}>
+      <button
+        type="button"
+        id={id}
+        onClick={() => onOpenChange(!open)}
+        className={cn("flex h-9 w-full items-center justify-between gap-2", FILTER_SELECT_CLASS)}
+        aria-label={label}
+        aria-expanded={open}
+      >
+        <span className="truncate text-left">{displayLabel}</span>
+        <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[220px] rounded-md border border-input bg-white shadow-md dark:bg-slate-900">
+          <ul className="max-h-[240px] overflow-auto py-1">
+            <li>
+              <button
+                type="button"
+                className={cn(
+                  "w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800",
+                  selected.length === 0 && "bg-slate-100 dark:bg-slate-800 font-medium"
+                )}
+                onClick={() => onChange([])}
+              >
+                {allLabel}
+              </button>
+            </li>
+            {options.map((o) => (
+              <li key={o.value}>
+                <button
+                  type="button"
+                  className={cn(
+                    "w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800",
+                    selected.includes(o.value) && "bg-slate-100 dark:bg-slate-800 font-medium"
+                  )}
+                  onClick={() => toggle(o.value)}
+                >
+                  {o.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Module-level dedup: prevent double students fetch when React Strict Mode remounts */
 let studentsCache = { key: null, data: null, pagination: null, at: 0 };
@@ -98,6 +184,9 @@ function StudentsPage() {
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
   const [filterSalesBatch, setFilterSalesBatch] = useState("");
+  const [filterSources, setFilterSources] = useState([]);
+  const [sourceDropdownOpen, setSourceDropdownOpen] = useState(false);
+  const sourceDropdownRef = useRef(null);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({
     count: 0,
@@ -106,9 +195,21 @@ function StudentsPage() {
     total_pages: 0,
   });
 
+  useEffect(() => {
+    if (!sourceDropdownOpen) return;
+    const onDocClick = (e) => {
+      if (sourceDropdownRef.current && !sourceDropdownRef.current.contains(e.target)) {
+        setSourceDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [sourceDropdownOpen]);
+
   const fetchStudents = useCallback(async (forceRefresh = false, pageOverride) => {
     const effectivePage = pageOverride ?? page;
-    const cacheKey = `${searchDebounce}|${filterPerson}|${filterDateFrom}|${filterDateTo}|${filterSalesBatch}|${effectivePage}|${user?.id}`;
+    const sourcesKey = filterSources.join(",");
+    const cacheKey = `${searchDebounce}|${filterPerson}|${filterDateFrom}|${filterDateTo}|${filterSalesBatch}|${sourcesKey}|${effectivePage}|${user?.id}`;
 
     if (!forceRefresh && studentsCache.key === cacheKey && Date.now() - studentsCache.at < STUDENTS_CACHE_MS) {
       setStudents(studentsCache.data);
@@ -154,6 +255,7 @@ function StudentsPage() {
         if (filterDateFrom) params.set("created_after", filterDateFrom);
         if (filterDateTo) params.set("created_before", filterDateTo);
         if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
+        if (filterSources.length) params.set("lead_source", filterSources.join(","));
         const { data } = await axios.get(`/students/?${params.toString()}`);
         const list = data?.results ?? (Array.isArray(data) ? data : []);
         const meta = {
@@ -177,7 +279,7 @@ function StudentsPage() {
       }
     })();
     await studentsFetchPromise;
-  }, [searchDebounce, canSeeAll, filterPerson, filterDateFrom, filterDateTo, filterSalesBatch, page, user?.id, setUpcomingFollowUpsFromStudents]);
+  }, [searchDebounce, canSeeAll, filterPerson, filterDateFrom, filterDateTo, filterSalesBatch, filterSources, page, user?.id, setUpcomingFollowUpsFromStudents]);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounce(searchQuery), 3000);
@@ -186,7 +288,7 @@ function StudentsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [searchDebounce, filterPerson, filterDateFrom, filterDateTo, filterSalesBatch]);
+  }, [searchDebounce, filterPerson, filterDateFrom, filterDateTo, filterSalesBatch, filterSources]);
 
   useEffect(() => {
     fetchStudents();
@@ -206,8 +308,8 @@ function StudentsPage() {
             <CardTitle className="text-2xl">{canSeeAll ? "All students" : "My students"}</CardTitle>
             <CardDescription>
               {canSeeAll
-                ? "Enrolled students. Choose whose students to show (by sales person), then filter by name, mobile, email, sales batch, or date range."
-                : "Enrolled students from your leads. Filter by name, mobile, email or date."}
+                ? "Enrolled students. Filter by sales person, lead source, sales batch, or date range."
+                : "Enrolled students from your leads. Filter by name, lead source, or date."}
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-3 pt-4">
@@ -234,6 +336,17 @@ function StudentsPage() {
                 ))}
               </select>
             )}
+            <StudentSourceMultiSelect
+              id="filter-student-source"
+              label="Filter by lead source"
+              options={SOURCE_OPTIONS}
+              selected={filterSources}
+              onChange={setFilterSources}
+              open={sourceDropdownOpen}
+              onOpenChange={setSourceDropdownOpen}
+              dropdownRef={sourceDropdownRef}
+              allLabel="All sources"
+            />
             <input
               type="date"
               value={filterDateFrom}
@@ -286,7 +399,9 @@ function StudentsPage() {
                     )}
                     <TableHead className="min-w-[130px]">Next payment follow-up</TableHead>
                     <TableHead className="min-w-[120px]">Activities</TableHead>
-                    <TableHead className="min-w-[140px]">Status</TableHead>
+                    <TableHead className="min-w-[110px]">Status</TableHead>
+                    <TableHead className="min-w-[120px]">Source</TableHead>
+                    <TableHead className="min-w-[110px]">Lead date</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -335,19 +450,22 @@ function StudentsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          <div className="flex flex-wrap items-center gap-1">
-                            <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", getDisplayStatusBadgeClass(s.display_status))}>
-                              {getStatusLabel(s.display_status, s.display_status_label)}
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", getDisplayStatusBadgeClass(s.display_status))}>
+                            {getStatusLabel(s.display_status, s.display_status_label)}
+                          </span>
+                          {s.is_moved_to_batch && (
+                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                              Moved
                             </span>
-                            {s.is_moved_to_batch && (
-                              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                                Moved
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-xs text-muted-foreground">{formatDate(s.created_at)}</span>
+                          )}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {getInquirySourceLabel(s.lead_source) || s.lead_source || "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {formatDate(s.lead_created_at)}
                       </TableCell>
                     </TableRow>
                   ))}
