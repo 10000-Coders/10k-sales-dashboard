@@ -346,7 +346,7 @@ function DateAccountDetailPage() {
               <option value="verified">Verified</option>
               <option value="pending">Pending</option>
               <option value="rejected">Rejected</option>
-              <option value="">All</option>
+              <option value="all">All</option>
             </select>
             <select
               value={paymentMode}
