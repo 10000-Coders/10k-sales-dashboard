@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +11,7 @@ import {
 } from "@/lib/enrollmentFormConstants";
 import { EDU_STATUS_OPTIONS } from "@/lib/validateEnrollmentForm";
 import { normalizeMobile } from "@/lib/studentFormValidations";
+import { fetchCollegeNames } from "@/lib/collegeApi";
 import {
   canSelectMentorApprovedType,
   getPaymentOfferedMinimum,
@@ -60,6 +62,52 @@ export default function StudentEnrollmentFields({
   const clearError = (key) => {
     if (fieldErrors[key]) setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
   };
+
+  const collegeWrapRef = useRef(null);
+  const [collegeQuery, setCollegeQuery] = useState(form.college_name || "");
+  const [collegeOptions, setCollegeOptions] = useState([]);
+  const [collegeLoading, setCollegeLoading] = useState(false);
+  const [collegeOpen, setCollegeOpen] = useState(false);
+  const [collegeFetchError, setCollegeFetchError] = useState("");
+
+  useEffect(() => {
+    setCollegeQuery(form.college_name || "");
+  }, [form.college_name]);
+
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!collegeWrapRef.current?.contains(e.target)) setCollegeOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  useEffect(() => {
+    if (!collegeOpen) return undefined;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setCollegeLoading(true);
+      setCollegeFetchError("");
+      try {
+        const { colleges } = await fetchCollegeNames({
+          search: collegeQuery.trim(),
+          pageSize: 50,
+        });
+        if (!cancelled) setCollegeOptions(colleges);
+      } catch {
+        if (!cancelled) {
+          setCollegeOptions([]);
+          setCollegeFetchError("Could not load colleges. Try again.");
+        }
+      } finally {
+        if (!cancelled) setCollegeLoading(false);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [collegeQuery, collegeOpen]);
 
   const typeOptions = getPaymentOfferedTypeOptions({
     role: userRole,
@@ -573,17 +621,58 @@ export default function StudentEnrollmentFields({
           <p className="mt-1 text-sm text-destructive">{fieldErrors.guardian_email}</p>
         )}
       </div>
-      <div id="field-college_name">
-        <Label>College <span className="text-destructive">*</span></Label>
+      <div id="field-college_name" ref={collegeWrapRef} className="relative">
+        <Label>College Name <span className="text-destructive">*</span></Label>
         <Input
-          value={form.college_name}
+          value={collegeQuery}
           onChange={(e) => {
-            setForm((f) => ({ ...f, college_name: e.target.value }));
+            const v = e.target.value;
+            setCollegeQuery(v);
+            setForm((f) => ({ ...f, college_name: "" }));
+            setCollegeOpen(true);
             clearError("college_name");
           }}
-          placeholder="College name"
+          onFocus={() => setCollegeOpen(true)}
+          placeholder="Search and select college name"
+          autoComplete="off"
           className={fieldErrors.college_name ? "border-destructive" : ""}
         />
+        {collegeOpen && (
+          <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-background shadow-md">
+            {collegeLoading ? (
+              <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading colleges…
+              </div>
+            ) : collegeFetchError ? (
+              <p className="px-3 py-2 text-sm text-destructive">{collegeFetchError}</p>
+            ) : collegeOptions.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-muted-foreground">No colleges found</p>
+            ) : (
+              collegeOptions.map((college) => (
+                <button
+                  key={college.id}
+                  type="button"
+                  className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                  onClick={() => {
+                    const name = college.college_name || "";
+                    setCollegeQuery(name);
+                    setForm((f) => ({ ...f, college_name: name }));
+                    setCollegeOpen(false);
+                    clearError("college_name");
+                  }}
+                >
+                  <span className="font-medium">{college.college_name}</span>
+                  {college.college_code ? (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {college.college_code}
+                    </span>
+                  ) : null}
+                </button>
+              ))
+            )}
+          </div>
+        )}
         {fieldErrors.college_name && (
           <p className="mt-1 text-sm text-destructive">{fieldErrors.college_name}</p>
         )}

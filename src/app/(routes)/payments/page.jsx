@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
+import Select from "react-select";
 import withPrivateAuth from "@/components/withPrivateAuth";
 
 import axios from "@/axios";
+import { useSalesPersons, useSalesBatchDropdown } from "@/hooks/useSalesData";
 import {
   Card,
   CardContent,
@@ -25,6 +27,43 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Check, X, ImageIcon, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COURSE_LABELS } from "@/constants/leadCourse";
+
+const FILTER_SELECT_STYLES = {
+  control: (base, state) => ({
+    ...base,
+    minHeight: 36,
+    height: 36,
+    fontSize: 14,
+    backgroundColor: "hsl(var(--background))",
+    borderColor: state.isFocused ? "hsl(var(--ring))" : "hsl(var(--input))",
+    boxShadow: state.isFocused ? "0 0 0 2px hsl(var(--ring) / 0.2)" : "none",
+    "&:hover": {
+      borderColor: state.isFocused ? "hsl(var(--ring))" : "hsl(var(--input))",
+    },
+  }),
+  singleValue: (base) => ({ ...base, color: "hsl(var(--foreground))" }),
+  input: (base) => ({ ...base, color: "hsl(var(--foreground))", margin: 0, padding: 0 }),
+  placeholder: (base) => ({ ...base, color: "hsl(var(--muted-foreground))" }),
+  valueContainer: (base) => ({ ...base, paddingTop: 0, paddingBottom: 0 }),
+  indicatorsContainer: (base) => ({ ...base, height: 36 }),
+  clearIndicator: (base) => ({ ...base, color: "hsl(var(--muted-foreground))", padding: 4 }),
+  dropdownIndicator: (base) => ({ ...base, color: "hsl(var(--muted-foreground))", padding: 4 }),
+  indicatorSeparator: (base) => ({ ...base, backgroundColor: "hsl(var(--input))" }),
+  menu: (base) => ({
+    ...base,
+    backgroundColor: "hsl(var(--background))",
+    border: "1px solid hsl(var(--input))",
+    zIndex: 50,
+  }),
+  option: (base, state) => ({
+    ...base,
+    backgroundColor: state.isFocused || state.isSelected
+      ? "hsl(var(--muted))"
+      : "hsl(var(--background))",
+    color: "hsl(var(--foreground))",
+    fontWeight: state.isSelected ? 500 : 400,
+  }),
+};
 
 function formatDate(d) {
   if (!d) return "—";
@@ -135,6 +174,9 @@ function PaymentsPage() {
   const canView = canViewPayments(userRole);
   const canVerify = userRole === "manager";
   const canManageReceivers = userRole === "manager";
+  const canFilterByPerson = userRole === "manager" || userRole === "super_admin";
+  const { persons } = useSalesPersons({ enabled: canFilterByPerson });
+  const { salesBatchDropdown, loading: salesBatchesLoading } = useSalesBatchDropdown();
   const superAdminNeedsBatch =
     userRole === "super_admin" && !filterSalesBatch && !mentorBatchDebounce;
 
@@ -530,14 +572,30 @@ function PaymentsPage() {
     }
   };
 
-  const salesPersonOptions = Array.from(
-    new Map(
-      payments
-        .filter((p) => p?.added_by != null)
-        .map((p) => [String(p.added_by), p.sales_person_name || p.added_by_name || `User ${p.added_by}`])
-    ).entries()
-  ).map(([id, name]) => ({ id, name }));
-  const salesBatchOptions = Array.from(new Set(payments.map((p) => p.sales_batch_name).filter(Boolean)));
+  const salesPersonSelectOptions = useMemo(
+    () => [
+      { value: "", label: "All sales persons" },
+      ...persons.map((p) => ({ value: String(p.id), label: p.name })),
+    ],
+    [persons]
+  );
+  const selectedSalesPersonOption =
+    salesPersonSelectOptions.find((o) => o.value === filterSalesPerson) ||
+    salesPersonSelectOptions[0];
+
+  const salesBatchSelectOptions = useMemo(
+    () => [
+      {
+        value: "",
+        label: salesBatchesLoading ? "Loading sales batches..." : "All sales batches",
+      },
+      ...salesBatchDropdown.map((b) => ({ value: String(b.id), label: b.name })),
+    ],
+    [salesBatchDropdown, salesBatchesLoading]
+  );
+  const selectedSalesBatchOption =
+    salesBatchSelectOptions.find((o) => o.value === filterSalesBatch) ||
+    salesBatchSelectOptions[0];
 
   const getVerifiedAmount = (row) => {
     const keys = [
@@ -591,28 +649,33 @@ function PaymentsPage() {
                 <option value="verified">Verified</option>
                 <option value="rejected">Rejected</option>
               </select>
-              {(user?.role === "manager" || user?.role === "super_admin") && (
-                <select
-                  value={filterSalesPerson}
-                  onChange={(e) => setFilterSalesPerson(e.target.value)}
-                  className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
-                >
-                  <option value="">All sales persons</option>
-                  {salesPersonOptions.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
+              {canFilterByPerson && (
+                <div className="min-w-[200px]">
+                  <Select
+                    options={salesPersonSelectOptions}
+                    value={selectedSalesPersonOption}
+                    onChange={(option) => setFilterSalesPerson(option?.value || "")}
+                    isSearchable
+                    isClearable
+                    placeholder="Search sales person..."
+                    styles={FILTER_SELECT_STYLES}
+                    aria-label="Filter by sales person"
+                  />
+                </div>
               )}
-              <select
-                value={filterSalesBatch}
-                onChange={(e) => setFilterSalesBatch(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
-              >
-                <option value="">All sales batches</option>
-                {salesBatchOptions.map((name) => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
+              <div className="min-w-[220px]">
+                <Select
+                  options={salesBatchSelectOptions}
+                  value={selectedSalesBatchOption}
+                  onChange={(option) => setFilterSalesBatch(option?.value || "")}
+                  isSearchable
+                  isClearable
+                  isDisabled={salesBatchesLoading}
+                  placeholder="Search sales batch..."
+                  styles={FILTER_SELECT_STYLES}
+                  aria-label="Filter by sales batch"
+                />
+              </div>
               <input
                 type="text"
                 value={mentorBatchQuery}

@@ -30,9 +30,29 @@ import Select from "react-select";
 import { COURSE_LABELS, LEAD_COURSE_VALUES } from "@/constants/leadCourse";
 
 const COURSE_OPTIONS = LEAD_COURSE_VALUES;
+/** Max amount due allowed to move a student to an actual mentor batch (frontend gate). */
+const MAX_AMOUNT_DUE_FOR_MOVE = 15000;
 
 function canManageSalesBatches(role) {
   return role === "manager" || role === "super_admin";
+}
+
+function getStudentAmountDue(student, paymentSummaryByStudent = {}) {
+  const fromSummary = paymentSummaryByStudent?.[student?.id]?.pending;
+  if (fromSummary != null && !Number.isNaN(Number(fromSummary))) {
+    return Number(fromSummary);
+  }
+  const fromStudent = student?.amount_due;
+  if (fromStudent != null && !Number.isNaN(Number(fromStudent))) {
+    return Number(fromStudent);
+  }
+  return 0;
+}
+
+/** Eligible to move when not already moved and amount due is at most 15000. */
+function canSelectStudentForMove(student, paymentSummaryByStudent = {}) {
+  if (!student || student.is_moved_to_batch) return false;
+  return getStudentAmountDue(student, paymentSummaryByStudent) <= MAX_AMOUNT_DUE_FOR_MOVE;
 }
 
 function formatMoveStudentsError(data, fallback = "Failed to move selected students.") {
@@ -354,6 +374,13 @@ function BatchesPage() {
   };
 
   const toggleStudentSelection = (studentId) => {
+    const student = batchStudents.find((s) => s.id === studentId);
+    if (student && !canSelectStudentForMove(student, paymentSummaryByStudent)) {
+      showErrorToast(
+        `Cannot select: amount due is more than ₹${MAX_AMOUNT_DUE_FOR_MOVE.toLocaleString()}.`,
+      );
+      return;
+    }
     setSelectedStudentIds((prev) =>
       prev.includes(studentId) ? prev.filter((id) => id !== studentId) : [...prev, studentId]
     );
@@ -362,7 +389,7 @@ function BatchesPage() {
   const toggleSelectAll = (checked) => {
     if (checked) {
       const ids = batchStudents
-        .filter((s) => !s?.is_moved_to_batch)
+        .filter((s) => canSelectStudentForMove(s, paymentSummaryByStudent))
         .map((s) => s.id)
         .filter((id) => id != null);
       setSelectedStudentIds(ids);
@@ -383,6 +410,20 @@ function BatchesPage() {
   const handleMoveSelectedStudents = async (e) => {
     e.preventDefault();
     if (!selectedSalesBatchId || selectedStudentIds.length === 0 || !targetBatch.trim()) return;
+
+    const blocked = selectedStudentIds
+      .map((id) => batchStudents.find((s) => s.id === id))
+      .filter((s) => s && !canSelectStudentForMove(s, paymentSummaryByStudent));
+    if (blocked.length > 0) {
+      const names = blocked
+        .map((s) => s.student_name || `Student ${s.id}`)
+        .join(", ");
+      const message = `Cannot move when amount due is more than ₹${MAX_AMOUNT_DUE_FOR_MOVE.toLocaleString()}: ${names}`;
+      setMoveError(message);
+      showErrorToast(message);
+      return;
+    }
+
     setMoveSubmitting(true);
     setMoveError(null);
     try {
@@ -678,6 +719,9 @@ function BatchesPage() {
                     Move Selected to Actual Batch
                   </Button>
                 )}
+                <span className="text-xs text-muted-foreground">
+                  Move allowed only if Amount Due is ₹{MAX_AMOUNT_DUE_FOR_MOVE.toLocaleString()} or less.
+                </span>
               </div>
               {batchStudentsLoading ? (
                 <div className="flex justify-center py-8">
@@ -695,12 +739,17 @@ function BatchesPage() {
                         <TableHead className="w-[40px]">
                           <input
                             type="checkbox"
-                            checked={
-                              batchStudents.some((s) => !s?.is_moved_to_batch) &&
-                              selectedStudentIds.length === batchStudents.filter((s) => !s?.is_moved_to_batch).length
-                            }
+                            checked={(() => {
+                              const eligible = batchStudents.filter((s) =>
+                                canSelectStudentForMove(s, paymentSummaryByStudent),
+                              );
+                              return (
+                                eligible.length > 0 &&
+                                selectedStudentIds.length === eligible.length
+                              );
+                            })()}
                             onChange={(e) => toggleSelectAll(e.target.checked)}
-                            aria-label="Select all students"
+                            aria-label="Select all eligible students"
                           />
                         </TableHead>
                       )}
@@ -715,14 +764,25 @@ function BatchesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {batchStudents.map((s) => (
-                      <TableRow key={s.id}>
+                    {batchStudents.map((s) => {
+                      const amountDue = getStudentAmountDue(s, paymentSummaryByStudent);
+                      const selectable = canSelectStudentForMove(s, paymentSummaryByStudent);
+                      const dueTooHigh =
+                        !s.is_moved_to_batch && amountDue > MAX_AMOUNT_DUE_FOR_MOVE;
+                      return (
+                      <TableRow key={s.id} className={cn(dueTooHigh && "opacity-70")}>
                       {canManage && (
                         <TableCell>
                           {!s.is_moved_to_batch ? (
                             <input
                               type="checkbox"
                               checked={selectedStudentIds.includes(s.id)}
+                              disabled={!selectable}
+                              title={
+                                dueTooHigh
+                                  ? `Amount due ₹${amountDue.toLocaleString()} exceeds ₹${MAX_AMOUNT_DUE_FOR_MOVE.toLocaleString()}`
+                                  : undefined
+                              }
                               onChange={() => toggleStudentSelection(s.id)}
                               aria-label={`Select ${s.student_name}`}
                             />
@@ -745,6 +805,11 @@ function BatchesPage() {
                           {paymentSummaryLoading
                             ? "..."
                             : `₹ ${Number(paymentSummaryByStudent[s.id]?.pending || 0).toLocaleString()}`}
+                          {dueTooHigh ? (
+                            <span className="mt-1 block text-[10px] font-medium text-destructive">
+                              Due &gt; ₹{MAX_AMOUNT_DUE_FOR_MOVE.toLocaleString()} — cannot move
+                            </span>
+                          ) : null}
                         </TableCell>
                         <TableCell>
                           {s.is_moved_to_batch ? (
@@ -754,7 +819,8 @@ function BatchesPage() {
                           )}
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}

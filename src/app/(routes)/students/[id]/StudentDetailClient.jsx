@@ -33,6 +33,7 @@ import { useSalesBatchDropdown } from "@/hooks/useSalesData";
 import StudentDetailsEditForm from "@/components/students/StudentDetailsEditForm";
 import { COURSE_LABELS, LEAD_COURSE_VALUES } from "@/constants/leadCourse";
 import { paymentOfferedTypeLabel } from "@/lib/paymentOffered";
+import { getStudentsListHref } from "@/lib/studentsFiltersUrl";
 
 const PAYMENT_MODE_OPTIONS = [
   { value: "upi", label: "UPI" },
@@ -718,7 +719,7 @@ export default function StudentDetailClient() {
   if (error || !student) {
     return (
       <div className="flex flex-1 flex-col gap-4 p-8">
-        <Button variant="ghost" onClick={() => router.push("/students")}>
+        <Button variant="ghost" onClick={() => router.push(getStudentsListHref())}>
           <ArrowLeft className="h-4 w-4" /> Back to students
         </Button>
         <p className="text-destructive">{error || "Student not found."}</p>
@@ -730,7 +731,7 @@ export default function StudentDetailClient() {
 
   return (
     <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
-      <Button variant="ghost" className="w-fit" onClick={() => router.push("/students")}>
+      <Button variant="ghost" className="w-fit" onClick={() => router.push(getStudentsListHref())}>
         <ArrowLeft className="h-4 w-4" /> Back to students
       </Button>
 
