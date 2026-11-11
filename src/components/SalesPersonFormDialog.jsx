@@ -96,8 +96,6 @@ export function SalesPersonFormDialog({
   const [otpError, setOtpError] = useState({});
   const [sending, setSending] = useState({ email: false, mobile: false });
   const [verifying, setVerifying] = useState({ email: false, mobile: false });
-  const [originalEmail, setOriginalEmail] = useState("");
-  const [originalMobile, setOriginalMobile] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -123,12 +121,9 @@ export function SalesPersonFormDialog({
       setOtpError({});
       setEmailCooldown(0);
       setMobileCooldown(0);
-      const emailVal = person?.email ?? "";
-      const mobileVal = person?.personal_mobile ?? "";
-      setOriginalEmail(emailVal);
-      setOriginalMobile(mobileVal);
-      setEmailVerified(!!person); // assume existing records are already verified
-      setMobileVerified(!!person);
+      // Create and edit both require fresh OTP verification before submit
+      setEmailVerified(false);
+      setMobileVerified(false);
     }
   }, [open, person]);
 
@@ -510,66 +505,68 @@ export function SalesPersonFormDialog({
                       {errors.personal_mobile && <p className="text-[11px] font-medium text-destructive">{errors.personal_mobile}</p>}
                     </div>
 
-                    {!isEdit && (
-                      <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-[11px] font-semibold text-gray-700">Mobile verification</span>
-                          <div className="flex items-center gap-2">
-                            {mobileVerified ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-700">
-                                <CheckCircle2 className="h-4 w-4" /> Verified
-                              </span>
-                            ) : null}
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="h-9 px-4"
-                              variant="secondary"
-                              disabled={sending.mobile || mobileCooldown > 0 || mobileVerified || verifying.mobile}
-                              onClick={() => sendOtp("mobile")}
-                            >
-                              {sending.mobile ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                              {mobileVerified
-                                ? "Verified"
-                                : mobileCooldown > 0
-                                ? `Resend in ${mobileCooldown}s`
-                                : mobileSent
-                                ? "Resend code"
-                                : "Send code"}
-                            </Button>
-                          </div>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[11px] font-semibold text-gray-700">Mobile verification</span>
+                        <div className="flex items-center gap-2">
+                          {mobileVerified ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-700">
+                              <CheckCircle2 className="h-4 w-4" /> Verified
+                            </span>
+                          ) : null}
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-9 px-4"
+                            variant="secondary"
+                            disabled={sending.mobile || mobileCooldown > 0 || mobileVerified || verifying.mobile}
+                            onClick={() => sendOtp("mobile")}
+                          >
+                            {sending.mobile ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            {mobileVerified
+                              ? "Verified"
+                              : mobileCooldown > 0
+                              ? `Resend in ${mobileCooldown}s`
+                              : mobileSent
+                              ? "Resend code"
+                              : "Send code"}
+                          </Button>
                         </div>
-
-                        {mobileSent && !mobileVerified && (
-                          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                            <Input
-                              placeholder="Enter OTP"
-                              value={mobileOtp}
-                              onChange={(e) => setMobileOtp(e.target.value)}
-                              disabled={verifying.mobile}
-                              className="h-9 w-32 text-sm"
-                            />
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="h-9 px-4"
-                              disabled={verifying.mobile || !mobileOtp}
-                              onClick={() => verifyOtp("mobile")}
-                            >
-                              {verifying.mobile ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
-                            </Button>
-                            {mobileCooldown > 0 && (
-                              <span className="text-[11px] font-medium text-gray-500">Resend in {mobileCooldown}s</span>
-                            )}
-                          </div>
-                        )}
-
-                        {!mobileSent && !mobileVerified && (
-                          <p className="text-[11px] font-medium text-gray-600">Send a code to verify this mobile number.</p>
-                        )}
-                        {otpError.mobile && <p className="text-[11px] font-medium text-destructive">{otpError.mobile}</p>}
                       </div>
-                    )}
+
+                      {mobileSent && !mobileVerified && (
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                          <Input
+                            placeholder="Enter OTP"
+                            value={mobileOtp}
+                            onChange={(e) => setMobileOtp(e.target.value)}
+                            disabled={verifying.mobile}
+                            className="h-9 w-32 text-sm"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-9 px-4"
+                            disabled={verifying.mobile || !mobileOtp}
+                            onClick={() => verifyOtp("mobile")}
+                          >
+                            {verifying.mobile ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+                          </Button>
+                          {mobileCooldown > 0 && (
+                            <span className="text-[11px] font-medium text-gray-500">Resend in {mobileCooldown}s</span>
+                          )}
+                        </div>
+                      )}
+
+                      {!mobileSent && !mobileVerified && (
+                        <p className="text-[11px] font-medium text-gray-600">
+                          {isEdit
+                            ? "Verify mobile with OTP before updating this account."
+                            : "Send a code to verify this mobile number."}
+                        </p>
+                      )}
+                      {otpError.mobile && <p className="text-[11px] font-medium text-destructive">{otpError.mobile}</p>}
+                    </div>
                   </div>
 
                   {/* Email with OTP */}
@@ -584,73 +581,74 @@ export function SalesPersonFormDialog({
                           value={form.email}
                           onChange={(e) => handleChange("email", e.target.value)}
                           placeholder="email@example.com"
-                          disabled={isEdit}
                           className={cn("pl-10 h-11", errors.email && "border-destructive ring-destructive")}
                         />
                       </div>
                       {errors.email && <p className="text-[11px] font-medium text-destructive">{errors.email}</p>}
                     </div>
 
-                    {!isEdit && (
-                      <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-[11px] font-semibold text-gray-700">Email verification</span>
-                          <div className="flex items-center gap-2">
-                            {emailVerified ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-700">
-                                <CheckCircle2 className="h-4 w-4" /> Verified
-                              </span>
-                            ) : null}
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="h-9 px-4"
-                              variant="secondary"
-                              disabled={sending.email || emailCooldown > 0 || emailVerified || verifying.email}
-                              onClick={() => sendOtp("email")}
-                            >
-                              {sending.email ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                              {emailVerified
-                                ? "Verified"
-                                : emailCooldown > 0
-                                ? `Resend in ${emailCooldown}s`
-                                : emailSent
-                                ? "Resend code"
-                                : "Send code"}
-                            </Button>
-                          </div>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[11px] font-semibold text-gray-700">Email verification</span>
+                        <div className="flex items-center gap-2">
+                          {emailVerified ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-700">
+                              <CheckCircle2 className="h-4 w-4" /> Verified
+                            </span>
+                          ) : null}
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-9 px-4"
+                            variant="secondary"
+                            disabled={sending.email || emailCooldown > 0 || emailVerified || verifying.email}
+                            onClick={() => sendOtp("email")}
+                          >
+                            {sending.email ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            {emailVerified
+                              ? "Verified"
+                              : emailCooldown > 0
+                              ? `Resend in ${emailCooldown}s`
+                              : emailSent
+                              ? "Resend code"
+                              : "Send code"}
+                          </Button>
                         </div>
-
-                        {emailSent && !emailVerified && (
-                          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                            <Input
-                              placeholder="Enter OTP"
-                              value={emailOtp}
-                              onChange={(e) => setEmailOtp(e.target.value)}
-                              disabled={verifying.email}
-                              className="h-9 w-32 text-sm"
-                            />
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="h-9 px-4"
-                              disabled={verifying.email || !emailOtp}
-                              onClick={() => verifyOtp("email")}
-                            >
-                              {verifying.email ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
-                            </Button>
-                            {emailCooldown > 0 && (
-                              <span className="text-[11px] font-medium text-gray-500">Resend in {emailCooldown}s</span>
-                            )}
-                          </div>
-                        )}
-
-                        {!emailSent && !emailVerified && (
-                          <p className="text-[11px] font-medium text-gray-600">Send a code to verify this email.</p>
-                        )}
-                        {otpError.email && <p className="text-[11px] font-medium text-destructive">{otpError.email}</p>}
                       </div>
-                    )}
+
+                      {emailSent && !emailVerified && (
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                          <Input
+                            placeholder="Enter OTP"
+                            value={emailOtp}
+                            onChange={(e) => setEmailOtp(e.target.value)}
+                            disabled={verifying.email}
+                            className="h-9 w-32 text-sm"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-9 px-4"
+                            disabled={verifying.email || !emailOtp}
+                            onClick={() => verifyOtp("email")}
+                          >
+                            {verifying.email ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+                          </Button>
+                          {emailCooldown > 0 && (
+                            <span className="text-[11px] font-medium text-gray-500">Resend in {emailCooldown}s</span>
+                          )}
+                        </div>
+                      )}
+
+                      {!emailSent && !emailVerified && (
+                        <p className="text-[11px] font-medium text-gray-600">
+                          {isEdit
+                            ? "Verify email with OTP before updating this account."
+                            : "Send a code to verify this email."}
+                        </p>
+                      )}
+                      {otpError.email && <p className="text-[11px] font-medium text-destructive">{otpError.email}</p>}
+                    </div>
                   </div>
                 </div>
               </section>

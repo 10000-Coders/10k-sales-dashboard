@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux";
 import axios from "@/axios";
 import { useSalesPersons, useSalesBatchDropdown } from "@/hooks/useSalesData";
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import Select from "react-select";
 import { ChevronDown, ChevronLeft, ChevronRight, Loader2, Phone, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getLeadCourseLabel } from "@/constants/leadCourse";
@@ -31,9 +32,24 @@ import {
 } from "@/constants/leadInquirySource";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
 import { useFollowUp } from "@/context/FollowUpProvider";
+import StudentEnrollmentAnalytics from "@/components/StudentEnrollmentAnalytics";
+import { saveStudentsFiltersQuery } from "@/lib/studentsFiltersUrl";
 
 /** Manager and Super Admin see all students; Admin/Counselor see only their own. */
 import withPrivateAuth from "@/components/withPrivateAuth";
+
+function parseCsvParam(value) {
+  if (!value) return [];
+  return String(value)
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+function parsePageParam(value) {
+  const n = Number.parseInt(String(value || "1"), 10);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
 
 const SOURCE_OPTIONS = LEAD_SOURCE_FILTER_OPTIONS.filter((o) => o.value);
 
@@ -167,8 +183,9 @@ function getStatusLabel(displayStatus, displayStatusLabel) {
   return String(displayStatusLabel).split("·")[0].trim();
 }
 
-function StudentsPage() {
+function StudentsPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useSelector((state) => state.userAuth?.user);
   const { setUpcomingFollowUpsFromStudents } = useFollowUp();
   const canSeeAll = canSeeAllStudents(user?.role);
@@ -178,16 +195,23 @@ function StudentsPage() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchDebounce, setSearchDebounce] = useState("");
-  const [filterPerson, setFilterPerson] = useState("");
-  const [filterDateFrom, setFilterDateFrom] = useState("");
-  const [filterDateTo, setFilterDateTo] = useState("");
-  const [filterSalesBatch, setFilterSalesBatch] = useState("");
-  const [filterSources, setFilterSources] = useState([]);
+  // Restore from URL like leads so sidebar / back keeps the same filters.
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("q") || "");
+  const [searchDebounce, setSearchDebounce] = useState(() => searchParams.get("q") || "");
+  const [filterPerson, setFilterPerson] = useState(() => searchParams.get("person") || "");
+  const [filterDateFrom, setFilterDateFrom] = useState(() => searchParams.get("date_from") || "");
+  const [filterDateTo, setFilterDateTo] = useState(() => searchParams.get("date_to") || "");
+  const [filterSalesBatch, setFilterSalesBatch] = useState(
+    () => searchParams.get("sales_batch") || "",
+  );
+  const [filterSources, setFilterSources] = useState(() =>
+    parseCsvParam(searchParams.get("source")),
+  );
   const [sourceDropdownOpen, setSourceDropdownOpen] = useState(false);
   const sourceDropdownRef = useRef(null);
-  const [page, setPage] = useState(1);
+  const skipPageResetRef = useRef(true);
+  const skipUrlSyncRef = useRef(true);
+  const [page, setPage] = useState(() => parsePageParam(searchParams.get("page")));
   const [pagination, setPagination] = useState({
     count: 0,
     page: 1,
@@ -287,8 +311,42 @@ function StudentsPage() {
   }, [searchQuery]);
 
   useEffect(() => {
+    if (skipPageResetRef.current) {
+      skipPageResetRef.current = false;
+      return;
+    }
     setPage(1);
   }, [searchDebounce, filterPerson, filterDateFrom, filterDateTo, filterSalesBatch, filterSources]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filterPerson) params.set("person", filterPerson);
+    if (filterSources.length) params.set("source", filterSources.join(","));
+    if (filterDateFrom) params.set("date_from", filterDateFrom);
+    if (filterDateTo) params.set("date_to", filterDateTo);
+    if (filterSalesBatch) params.set("sales_batch", filterSalesBatch);
+    if (searchDebounce.trim()) params.set("q", searchDebounce.trim());
+    if (page > 1) params.set("page", String(page));
+    const qs = params.toString();
+
+    if (skipUrlSyncRef.current) {
+      skipUrlSyncRef.current = false;
+      // Keep sidebar restore working when landing via Back (URL already has filters).
+      if (qs) saveStudentsFiltersQuery(qs);
+      return;
+    }
+    saveStudentsFiltersQuery(qs);
+    router.replace(qs ? `/students?${qs}` : "/students", { scroll: false });
+  }, [
+    filterPerson,
+    filterSources,
+    filterDateFrom,
+    filterDateTo,
+    filterSalesBatch,
+    searchDebounce,
+    page,
+    router,
+  ]);
 
   useEffect(() => {
     fetchStudents();
@@ -300,8 +358,77 @@ function StudentsPage() {
   const rangeFrom = totalCount === 0 ? 0 : (currentPage - 1) * STUDENTS_PAGE_SIZE + 1;
   const rangeTo = Math.min(currentPage * STUDENTS_PAGE_SIZE, totalCount);
 
+  const salesPersonOptions = useMemo(
+    () => [
+      { value: "", label: "All students" },
+      ...persons.map((p) => ({ value: String(p.id), label: p.name })),
+    ],
+    [persons]
+  );
+  const selectedSalesPersonOption =
+    salesPersonOptions.find((o) => o.value === filterPerson) || salesPersonOptions[0];
+
+  const salesBatchOptions = useMemo(
+    () => [
+      {
+        value: "",
+        label: salesBatchesLoading ? "Loading sales batches..." : "All Sales Batches",
+      },
+      ...salesBatchDropdown.map((b) => ({ value: String(b.id), label: b.name })),
+    ],
+    [salesBatchDropdown, salesBatchesLoading]
+  );
+  const selectedSalesBatchOption =
+    salesBatchOptions.find((o) => o.value === filterSalesBatch) || salesBatchOptions[0];
+
+  const filterSelectStyles = {
+    control: (base, state) => ({
+      ...base,
+      minHeight: 36,
+      height: 36,
+      fontSize: 14,
+      backgroundColor: "hsl(var(--background))",
+      borderColor: state.isFocused ? "hsl(var(--ring))" : "hsl(var(--input))",
+      boxShadow: state.isFocused ? "0 0 0 2px hsl(var(--ring) / 0.2)" : "none",
+      "&:hover": {
+        borderColor: state.isFocused ? "hsl(var(--ring))" : "hsl(var(--input))",
+      },
+    }),
+    singleValue: (base) => ({ ...base, color: "hsl(var(--foreground))" }),
+    input: (base) => ({ ...base, color: "hsl(var(--foreground))", margin: 0, padding: 0 }),
+    placeholder: (base) => ({ ...base, color: "hsl(var(--muted-foreground))" }),
+    valueContainer: (base) => ({ ...base, paddingTop: 0, paddingBottom: 0 }),
+    indicatorsContainer: (base) => ({ ...base, height: 36 }),
+    clearIndicator: (base) => ({ ...base, color: "hsl(var(--muted-foreground))", padding: 4 }),
+    dropdownIndicator: (base) => ({ ...base, color: "hsl(var(--muted-foreground))", padding: 4 }),
+    indicatorSeparator: (base) => ({ ...base, backgroundColor: "hsl(var(--input))" }),
+    menu: (base) => ({
+      ...base,
+      backgroundColor: "hsl(var(--background))",
+      border: "1px solid hsl(var(--input))",
+      zIndex: 50,
+    }),
+    option: (base, state) => ({
+      ...base,
+      backgroundColor: state.isFocused || state.isSelected
+        ? "hsl(var(--muted))"
+        : "hsl(var(--background))",
+      color: "hsl(var(--foreground))",
+      fontWeight: state.isSelected ? 500 : 400,
+    }),
+  };
+
   return (
     <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <StudentEnrollmentAnalytics
+        salesPersonId={canSeeAll ? filterPerson : ""}
+        salesBatchId={filterSalesBatch}
+        leadSources={filterSources}
+        dateFrom={filterDateFrom}
+        dateTo={filterDateTo}
+        search={searchDebounce}
+      />
+
       <Card>
         <CardHeader>
           <div>
@@ -324,17 +451,18 @@ function StudentsPage() {
               />
             </div>
             {canSeeAll && (
-              <select
-                value={filterPerson}
-                onChange={(e) => setFilterPerson(e.target.value)}
-                className="h-9 min-w-[180px] rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                title="Show students added by this sales person"
-              >
-                <option value="">All students</option>
-                {persons.map((p) => (
-                  <option key={p.id} value={String(p.id)}>Students of {p.name}</option>
-                ))}
-              </select>
+              <div className="min-w-[200px]">
+                <Select
+                  options={salesPersonOptions}
+                  value={selectedSalesPersonOption}
+                  onChange={(option) => setFilterPerson(option?.value || "")}
+                  isSearchable
+                  isClearable
+                  placeholder="Search sales person..."
+                  styles={filterSelectStyles}
+                  aria-label="Filter by sales person"
+                />
+              </div>
             )}
             <StudentSourceMultiSelect
               id="filter-student-source"
@@ -363,17 +491,19 @@ function StudentsPage() {
               placeholder="To"
               title="Created to date"
             />
-            <select
-              value={filterSalesBatch}
-              onChange={(e) => setFilterSalesBatch(e.target.value)}
-              className="h-9 min-w-[190px] rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              disabled={salesBatchesLoading}
-            >
-              <option value="">{salesBatchesLoading ? "Loading sales batches..." : "All Sales Batches"}</option>
-              {salesBatchDropdown.map((b) => (
-                <option key={b.id} value={String(b.id)}>{b.name}</option>
-              ))}
-            </select>
+            <div className="min-w-[220px]">
+              <Select
+                options={salesBatchOptions}
+                value={selectedSalesBatchOption}
+                onChange={(option) => setFilterSalesBatch(option?.value || "")}
+                isSearchable
+                isClearable
+                isDisabled={salesBatchesLoading}
+                placeholder="Search sales batch..."
+                styles={filterSelectStyles}
+                aria-label="Filter by sales batch"
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -510,6 +640,20 @@ function StudentsPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function StudentsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-1 items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <StudentsPageInner />
+    </Suspense>
   );
 }
 

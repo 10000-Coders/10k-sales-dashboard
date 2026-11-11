@@ -44,6 +44,19 @@ export const LEAD_IS_RELATED_FILTER_OPTIONS = [
   ...LEAD_RELATED_VALUES,
 ];
 
+/** Leads list boolean filters — query params: true | false */
+export const LEAD_IS_AGENT_FILTER_OPTIONS = [
+  { value: "", label: "All (agent)" },
+  { value: "true", label: "Agent" },
+  { value: "false", label: "Not agent" },
+];
+
+export const LEAD_IS_INTERESTED_FILTER_OPTIONS = [
+  { value: "", label: "All (interested)" },
+  { value: "true", label: "Interested" },
+  { value: "false", label: "Not interested" },
+];
+
 const RELATED_LABEL_BY_VALUE = Object.fromEntries(
   LEAD_RELATED_VALUES.map((o) => [o.value, o.label])
 );

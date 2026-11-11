@@ -29,6 +29,8 @@ import { getInquirySourceLabel, LEAD_SOURCE_FILTER_OPTIONS } from "@/constants/l
 import {
   LEAD_COURSE_FILTER_OPTIONS,
   LEAD_IS_RELATED_FILTER_OPTIONS,
+  LEAD_IS_AGENT_FILTER_OPTIONS,
+  LEAD_IS_INTERESTED_FILTER_OPTIONS,
   getLeadCourseLabel,
   getLeadRelatedLabel,
   LEAD_RELATED_BADGE_STYLES,
@@ -74,6 +76,8 @@ const STATUS_OPTIONS = LEAD_STATUS_FILTER_OPTIONS;
 const SOURCE_OPTIONS = LEAD_SOURCE_FILTER_OPTIONS.filter((o) => o.value);
 const COURSE_OPTIONS = LEAD_COURSE_FILTER_OPTIONS.filter((o) => o.value);
 const IS_RELATED_OPTIONS = LEAD_IS_RELATED_FILTER_OPTIONS;
+const IS_AGENT_OPTIONS = LEAD_IS_AGENT_FILTER_OPTIONS;
+const IS_INTERESTED_OPTIONS = LEAD_IS_INTERESTED_FILTER_OPTIONS;
 
 function formatDate(d) {
   const dt = d ? new Date(d) : new Date();
@@ -189,6 +193,10 @@ function LeadsPageInner() {
   const [filterSources, setFilterSources] = useState(() => parseCsvParam(searchParams.get("source")));
   const [filterCourses, setFilterCourses] = useState(() => parseCsvParam(searchParams.get("course")));
   const [filterIsRelated, setFilterIsRelated] = useState(() => searchParams.get("is_related") || "");
+  const [filterIsAgent, setFilterIsAgent] = useState(() => searchParams.get("is_agent") || "");
+  const [filterIsInterested, setFilterIsInterested] = useState(
+    () => searchParams.get("is_interested") || "",
+  );
   const [filterPerson, setFilterPerson] = useState(() => searchParams.get("person") || "");
   const [filterDateFrom, setFilterDateFrom] = useState(() => searchParams.get("date_from") || "");
   const [filterDateTo, setFilterDateTo] = useState(() => searchParams.get("date_to") || "");
@@ -247,7 +255,7 @@ function LeadsPageInner() {
 
   const fetchLeads = useCallback(async (forceRefresh = false, pageOverride) => {
     const effectivePage = pageOverride ?? page;
-    const cacheKey = `${filterStatus}|${filterSources.join(",")}|${filterCourses.join(",")}|${filterIsRelated}|${filterPerson}|${filterDateFrom}|${filterDateTo}|${searchDebounce}|${effectivePage}|${user?.id}`;
+    const cacheKey = `${filterStatus}|${filterSources.join(",")}|${filterCourses.join(",")}|${filterIsRelated}|${filterIsAgent}|${filterIsInterested}|${filterPerson}|${filterDateFrom}|${filterDateTo}|${searchDebounce}|${effectivePage}|${user?.id}`;
 
     if (forceRefresh) {
       leadsCache = { key: null, data: null, pagination: null, at: 0 };
@@ -294,6 +302,8 @@ function LeadsPageInner() {
         if (filterSources.length) params.set("source", filterSources.join(","));
         if (filterCourses.length) params.set("course", filterCourses.join(","));
         if (filterIsRelated) params.set("is_related", filterIsRelated);
+        if (isManagerRole && filterIsAgent) params.set("is_agent", filterIsAgent);
+        if (isManagerRole && filterIsInterested) params.set("is_interested", filterIsInterested);
         if (filterDateFrom) params.set("created_after", filterDateFrom);
         if (filterDateTo) params.set("created_before", filterDateTo);
         if (searchDebounce.trim()) params.set("search", searchDebounce.trim());
@@ -324,13 +334,15 @@ function LeadsPageInner() {
       }
     })();
     await leadsFetchPromise;
-  }, [filterStatus, filterSources, filterCourses, filterIsRelated, filterPerson, filterDateFrom, filterDateTo, searchDebounce, page, isManagerRole, user?.id, setUpcomingFollowUpsFromLeads]);
+  }, [filterStatus, filterSources, filterCourses, filterIsRelated, filterIsAgent, filterIsInterested, filterPerson, filterDateFrom, filterDateTo, searchDebounce, page, isManagerRole, user?.id, setUpcomingFollowUpsFromLeads]);
 
   const clearFilters = useCallback(() => {
     setFilterStatus("");
     setFilterSources([]);
     setFilterCourses([]);
     setFilterIsRelated("");
+    setFilterIsAgent("");
+    setFilterIsInterested("");
     setFilterPerson("");
     setFilterDateFrom("");
     setFilterDateTo("");
@@ -355,7 +367,7 @@ function LeadsPageInner() {
       return;
     }
     setPage(1);
-  }, [filterStatus, filterSources, filterCourses, filterIsRelated, filterPerson, filterDateFrom, filterDateTo, searchDebounce]);
+  }, [filterStatus, filterSources, filterCourses, filterIsRelated, filterIsAgent, filterIsInterested, filterPerson, filterDateFrom, filterDateTo, searchDebounce]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -363,7 +375,9 @@ function LeadsPageInner() {
     if (filterSources.length) params.set("source", filterSources.join(","));
     if (filterCourses.length) params.set("course", filterCourses.join(","));
     if (filterIsRelated) params.set("is_related", filterIsRelated);
-    if (filterPerson) params.set("person", filterPerson);
+    if (isManagerRole && filterIsAgent) params.set("is_agent", filterIsAgent);
+    if (isManagerRole && filterIsInterested) params.set("is_interested", filterIsInterested);
+    if (isManagerRole && filterPerson) params.set("person", filterPerson);
     if (filterDateFrom) params.set("date_from", filterDateFrom);
     if (filterDateTo) params.set("date_to", filterDateTo);
     if (searchDebounce.trim()) params.set("q", searchDebounce.trim());
@@ -383,11 +397,14 @@ function LeadsPageInner() {
     filterSources,
     filterCourses,
     filterIsRelated,
+    filterIsAgent,
+    filterIsInterested,
     filterPerson,
     filterDateFrom,
     filterDateTo,
     searchDebounce,
     page,
+    isManagerRole,
     router,
   ]);
 
@@ -451,6 +468,8 @@ function LeadsPageInner() {
       if (filterSources.length) params.set("source", filterSources.join(","));
       if (filterCourses.length) params.set("course", filterCourses.join(","));
       if (filterIsRelated) params.set("is_related", filterIsRelated);
+      if (isManagerRole && filterIsAgent) params.set("is_agent", filterIsAgent);
+      if (isManagerRole && filterIsInterested) params.set("is_interested", filterIsInterested);
       params.set("created_after", filterDateFrom);
       params.set("created_before", filterDateTo);
       if (searchDebounce.trim()) params.set("search", searchDebounce.trim());
@@ -609,6 +628,30 @@ function LeadsPageInner() {
                 <option key={o.value || "all-related"} value={o.value}>{o.label}</option>
               ))}
             </select>
+            {isManagerRole && (
+              <select
+                value={filterIsAgent}
+                onChange={(e) => setFilterIsAgent(e.target.value)}
+                className={cn(FILTER_SELECT_CLASS, "min-w-[130px]")}
+                aria-label="Filter by agent"
+              >
+                {IS_AGENT_OPTIONS.map((o) => (
+                  <option key={o.value || "all-agent"} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            )}
+            {isManagerRole && (
+              <select
+                value={filterIsInterested}
+                onChange={(e) => setFilterIsInterested(e.target.value)}
+                className={cn(FILTER_SELECT_CLASS, "min-w-[150px]")}
+                aria-label="Filter by interested"
+              >
+                {IS_INTERESTED_OPTIONS.map((o) => (
+                  <option key={o.value || "all-interested"} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            )}
             {isManagerRole && (
               <div className="relative" ref={counselorDropdownRef}>
                 <button

@@ -45,9 +45,15 @@ import { formatApiError } from "@/utils/formatApiError";
 const SOURCE_OPTIONS = INQUIRY_SOURCE_OPTIONS.filter((o) => o.value);
 const RELATED_OPTIONS = LEAD_RELATED_VALUES;
 
+const AGENT_OPTIONS = [
+  { value: "false", label: "Not agent" },
+  { value: "true", label: "Agent" },
+];
+
 const initialDefaults = {
   source: "",
   relatedType: "none",
+  isAgent: "false",
 };
 
 function formatFailedErrors(errors) {
@@ -72,8 +78,12 @@ export default function BulkLeadUploadClient() {
   const [importResult, setImportResult] = useState(null);
 
   const importOptions = useMemo(
-    () => ({ selectedSource: defaults.source, relatedType: defaults.relatedType }),
-    [defaults.source, defaults.relatedType]
+    () => ({
+      selectedSource: defaults.source,
+      relatedType: defaults.relatedType,
+      isAgent: defaults.isAgent === "true",
+    }),
+    [defaults.source, defaults.relatedType, defaults.isAgent]
   );
 
   const previewRows = useMemo(
@@ -153,6 +163,7 @@ export default function BulkLeadUploadClient() {
         ...row.payload,
         source: defaults.source,
         is_related: defaults.relatedType || "none",
+        is_agent: defaults.isAgent === "true",
       }));
     if (leads.length === 0) {
       toast.warn("No valid rows to import. Fix missing data shown in the preview.");
@@ -178,7 +189,7 @@ export default function BulkLeadUploadClient() {
       setImportResult(err?.detail || err?.failed ? err : null);
       toast.error(formatApiError(err, "Bulk import failed."));
     }
-  }, [defaults.source, defaults.relatedType, dispatch, parsedRows.length, previewRows, user?.id]);
+  }, [defaults.source, defaults.relatedType, defaults.isAgent, dispatch, parsedRows.length, previewRows, user?.id]);
 
   const failedFromApi = importResult?.failed || [];
 
@@ -203,7 +214,7 @@ export default function BulkLeadUploadClient() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label>Inquiry source *</Label>
               <Select
@@ -233,6 +244,21 @@ export default function BulkLeadUploadClient() {
                 styles={formSelectStyles}
                 menuPortalTarget={formSelectMenuPortalTarget}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Is Agent</Label>
+              <Select
+                options={AGENT_OPTIONS}
+                value={AGENT_OPTIONS.find((o) => o.value === defaults.isAgent) || AGENT_OPTIONS[0]}
+                onChange={(opt) =>
+                  setDefaults((prev) => ({ ...prev, isAgent: opt?.value || "false" }))
+                }
+                styles={formSelectStyles}
+                menuPortalTarget={formSelectMenuPortalTarget}
+              />
+              <p className="text-xs text-muted-foreground">
+                Applied to every lead in this import.
+              </p>
             </div>
           </div>
 
@@ -289,6 +315,11 @@ export default function BulkLeadUploadClient() {
                     {getLeadRelatedLabel(defaults.relatedType)}
                   </span>
                   {" · "}
+                  Agent:{" "}
+                  <span className="font-medium text-foreground">
+                    {defaults.isAgent === "true" ? "Yes" : "No"}
+                  </span>
+                  {" · "}
                   {previewRows.length} row{previewRows.length === 1 ? "" : "s"} — {validCount} ready,{" "}
                   {rowDataIssuesCount} with missing data
                 </CardDescription>
@@ -317,6 +348,7 @@ export default function BulkLeadUploadClient() {
                     <TableHead>Email</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead>Related</TableHead>
+                    <TableHead>Agent</TableHead>
                     <TableHead>Row</TableHead>
                     <TableHead>Missing / issues</TableHead>
                   </TableRow>
@@ -336,6 +368,9 @@ export default function BulkLeadUploadClient() {
                       </TableCell>
                       <TableCell className="text-sm">
                         {getLeadRelatedLabel(defaults.relatedType)}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {defaults.isAgent === "true" ? "Yes" : "No"}
                       </TableCell>
                       <TableCell>
                         {row.validation.isValid ? (

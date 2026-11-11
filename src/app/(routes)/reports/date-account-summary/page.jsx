@@ -1,13 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSelector } from "react-redux";
+import Select from "react-select";
 import withPrivateAuth from "@/components/withPrivateAuth";
 import axios from "@/axios";
 import { useSalesBatchDropdown, useSalesPersons } from "@/hooks/useSalesData";
 import { getRangeForPreset } from "@/lib/dateUtils";
-import { cn } from "@/lib/utils";
+import {
+  BATCH_MULTI_SELECT_COMPONENTS,
+  BATCH_MULTI_SELECT_STYLES,
+  FILTER_SELECT_STYLES,
+} from "@/lib/filterSelectStyles";
 
 import {
   Card,
@@ -26,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Download, ChevronDown } from "lucide-react";
+import { Loader2, Download } from "lucide-react";
 
 function downloadTextFile(filename, text, mime = "text/csv;charset=utf-8") {
   const blob = new Blob([text], { type: mime });
@@ -48,105 +53,6 @@ function formatINR(n) {
 
 /** Backend date-account-summary uses receiver_id -1 for cash payments without a receiver. */
 const CASH_BUCKET_ID = -1;
-
-const FILTER_SELECT_CLASS =
-  "rounded-md border border-input bg-background px-3 text-sm";
-
-function SalesBatchMultiSelect({ options, selected, onChange }) {
-  const [open, setOpen] = useState(false);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open]);
-
-  const displayLabel = useMemo(() => {
-    if (!selected.length) return "All";
-    if (selected.length === 1) {
-      return options.find((o) => o.id === selected[0])?.name ?? selected[0];
-    }
-    return `${selected.length} batches selected`;
-  }, [selected, options]);
-
-  const toggle = (id) => {
-    onChange(
-      selected.includes(id) ? selected.filter((v) => v !== id) : [...selected, id]
-    );
-  };
-
-  return (
-    <div className="relative min-w-[220px]" ref={dropdownRef}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "flex h-9 w-full items-center justify-between gap-2",
-          FILTER_SELECT_CLASS
-        )}
-        aria-label="Sales batch"
-        aria-expanded={open}
-      >
-        <span className="truncate text-left">{displayLabel}</span>
-        <ChevronDown
-          className={cn("h-4 w-4 shrink-0 text-muted-foreground", open && "rotate-180")}
-        />
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[240px] rounded-md border border-input bg-white shadow-md dark:bg-slate-900">
-          <ul className="max-h-[240px] overflow-auto py-1">
-            <li>
-              <button
-                type="button"
-                className={cn(
-                  "w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800",
-                  selected.length === 0 && "bg-slate-100 font-medium dark:bg-slate-800"
-                )}
-                onClick={() => onChange([])}
-              >
-                All
-              </button>
-            </li>
-            {options.map((b) => {
-              const checked = selected.includes(b.id);
-              return (
-                <li key={b.id}>
-                  <button
-                    type="button"
-                    className={cn(
-                      "flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800",
-                      checked && "bg-slate-100 font-medium dark:bg-slate-800"
-                    )}
-                    onClick={() => toggle(b.id)}
-                  >
-                    <span
-                      className={cn(
-                        "flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px]",
-                        checked
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-input"
-                      )}
-                      aria-hidden
-                    >
-                      {checked ? "✓" : ""}
-                    </span>
-                    <span className="truncate">{b.name}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function accountKey(id) {
   if (id === null || id === undefined) return "__unassigned__";
@@ -328,23 +234,48 @@ function DateAccountSummaryPage() {
     downloadTextFile(filename, lines.join("\n"));
   }, [grid, dateFrom, dateTo]);
 
-  const salesBatchOptions = useMemo(
+  const salesBatchSelectOptions = useMemo(
     () =>
       (salesBatchDropdown || []).map((b) => ({
-        id: String(b.id),
-        name: b.name || `Batch ${b.id}`,
+        value: String(b.id),
+        label: b.name || `Batch ${b.id}`,
       })),
     [salesBatchDropdown]
   );
+  const selectedSalesBatchOptions = useMemo(
+    () => salesBatchSelectOptions.filter((o) => salesBatchIds.includes(o.value)),
+    [salesBatchSelectOptions, salesBatchIds]
+  );
 
-  const salesPersonOptions = useMemo(
-    () =>
-      (persons || []).map((p) => ({
-        id: String(p.id),
-        name: p.name || `User ${p.id}`,
+  const salesPersonSelectOptions = useMemo(
+    () => [
+      { value: "", label: "All" },
+      ...(persons || []).map((p) => ({
+        value: String(p.id),
+        label: p.name || `User ${p.id}`,
       })),
+    ],
     [persons]
   );
+  const selectedSalesPersonOption =
+    salesPersonSelectOptions.find((o) => o.value === String(salesPersonId || "")) ||
+    salesPersonSelectOptions[0];
+
+  const receiverSelectOptions = useMemo(
+    () => [
+      { value: "", label: "All" },
+      ...(receivers || []).map((r) => ({
+        value: String(r.id),
+        label: r.bank_name || r.upi_id
+          ? `${r.receiver_name} – ${r.bank_name || r.upi_id}`
+          : r.receiver_name,
+      })),
+    ],
+    [receivers]
+  );
+  const selectedReceiverOption =
+    receiverSelectOptions.find((o) => o.value === String(receiverId || "")) ||
+    receiverSelectOptions[0];
 
   const handlePreset = useCallback(
     (preset) => {
@@ -446,57 +377,58 @@ function DateAccountSummaryPage() {
               <label className="text-sm font-medium">To</label>
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9" />
             </div>
-            <div>
-              <label className="text-sm font-medium">Status</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              >
-                <option value="verified">Verified</option>
-                <option value="pending">Pending</option>
-                <option value="rejected">Rejected</option>
-                <option value="">All</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Sales batch</label>
-              <SalesBatchMultiSelect
-                options={salesBatchOptions}
-                selected={salesBatchIds}
-                onChange={setSalesBatchIds}
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              aria-label="Status"
+            >
+              <option value="verified">Verified</option>
+              <option value="pending">Pending</option>
+              <option value="rejected">Rejected</option>
+              <option value="all">All</option>
+            </select>
+            <div className="min-w-[220px]">
+              <Select
+                options={salesBatchSelectOptions}
+                value={selectedSalesBatchOptions}
+                onChange={(opts) => setSalesBatchIds((opts || []).map((o) => o.value))}
+                isMulti
+                isSearchable
+                isClearable
+                closeMenuOnSelect={false}
+                hideSelectedOptions={false}
+                placeholder="Search sales batch..."
+                components={BATCH_MULTI_SELECT_COMPONENTS}
+                styles={BATCH_MULTI_SELECT_STYLES}
+                aria-label="Sales batch"
               />
             </div>
-            <div>
-              <label className="text-sm font-medium">Sales person</label>
-              <select
-                value={salesPersonId}
-                onChange={(e) => setSalesPersonId(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm min-w-[220px]"
-                disabled={!canFilterBySalesPerson}
-                title={!canFilterBySalesPerson ? "Manager/Super Admin only" : ""}
-              >
-                <option value="">All</option>
-                {salesPersonOptions.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+            <div className="min-w-[220px]">
+              <Select
+                options={salesPersonSelectOptions}
+                value={selectedSalesPersonOption}
+                onChange={(option) => setSalesPersonId(option?.value || "")}
+                isSearchable
+                isClearable
+                isDisabled={!canFilterBySalesPerson}
+                placeholder="Search sales person..."
+                styles={FILTER_SELECT_STYLES}
+                aria-label="Sales person"
+              />
             </div>
-            <div>
-              <label className="text-sm font-medium">Receiver</label>
-              <select
-                value={receiverId}
-                onChange={(e) => setReceiverId(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm min-w-[240px]"
-                disabled={receiverLoading}
-              >
-                <option value="">All</option>
-                {receivers.map((r) => (
-                  <option key={r.id} value={String(r.id)}>
-                    {r.receiver_name}{r.bank_name || r.upi_id ? ` – ${r.bank_name || r.upi_id}` : ""}
-                  </option>
-                ))}
-              </select>
+            <div className="min-w-[240px]">
+              <Select
+                options={receiverSelectOptions}
+                value={selectedReceiverOption}
+                onChange={(option) => setReceiverId(option?.value || "")}
+                isSearchable
+                isClearable
+                isDisabled={receiverLoading}
+                placeholder="Search receiver..."
+                styles={FILTER_SELECT_STYLES}
+                aria-label="Receiver"
+              />
             </div>
             <Button onClick={fetchSummary} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Apply"}

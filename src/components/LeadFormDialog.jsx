@@ -37,6 +37,7 @@ const initialForm = {
   status: "",
   course: "",
   is_related: "none",
+  is_agent: false,
   next_follow_up_at: "",
 };
 
@@ -90,6 +91,7 @@ export function LeadFormDialog({ open, onClose, lead = null, currentUserId, onSu
           status: lead.status ?? "new",
           course: lead.course ?? "",
           is_related: normalizeLeadRelatedValue(lead.is_related),
+          is_agent: Boolean(lead.is_agent),
           next_follow_up_at: lead.next_follow_up_at ? lead.next_follow_up_at.slice(0, 16) : "",
         });
       } else {
@@ -231,6 +233,7 @@ const validateForm = () => {
       source: (form.source || "").trim(),
       course: (form.course || "").trim(),
       is_related: normalizeLeadRelatedValue(form.is_related),
+      is_agent: Boolean(form.is_agent),
     };
     if (isFriendSource) {
       payload.referrer = form.referrer ? Number(form.referrer) : null;
@@ -431,6 +434,19 @@ const validateForm = () => {
                       {opt.label}
                     </option>
                   ))}
+                </select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="is_agent" className="text-xs font-semibold text-gray-700 uppercase">Is Agent</Label>
+                <select
+                  id="is_agent"
+                  value={form.is_agent ? "true" : "false"}
+                  onChange={(e) => handleChange("is_agent", e.target.value === "true")}
+                  className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
                 </select>
               </div>
 

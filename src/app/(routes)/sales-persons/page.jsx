@@ -1,10 +1,8 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import withPrivateAuth from "@/components/withPrivateAuth";
 import { useSalesPersons } from "@/hooks/useSalesData";
-import axios from "@/axios";
 import {
   Card,
   CardContent,
@@ -21,18 +19,45 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { SalesPersonFormDialog } from "@/components/SalesPersonFormDialog";
 import { cn } from "@/lib/utils";
-import { Users, Loader2, UserPlus, Pencil, Phone } from "lucide-react";
+import { Users, Loader2, UserPlus, Pencil, Search } from "lucide-react";
 
 function SalesPersonsPage() {
-  const router = useRouter();
   const user = useSelector((state) => state.userAuth?.user);
   const userRole = (user?.role || "").toLowerCase();
   const isManager = userRole === "manager" || userRole === "super_admin";
   const { persons, loading, error, refetch: refetchPersons } = useSalesPersons({ enabled: isManager });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredPersons = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return persons;
+    return persons.filter((p) => {
+      const id = String(p.id ?? "").toLowerCase();
+      const paddedId = id.padStart(4, "0");
+      const name = (p.name || "").toLowerCase();
+      const email = (p.email || "").toLowerCase();
+      const role = (p.role || "").toLowerCase().replace("_", " ");
+      const status = (p.status || "").toLowerCase();
+      const personal = (p.personal_mobile || "").toLowerCase();
+      const company = (p.company_mobile || "").toLowerCase();
+      return (
+        name.includes(q) ||
+        email.includes(q) ||
+        id.includes(q) ||
+        paddedId.includes(q) ||
+        `#${paddedId}`.includes(q) ||
+        role.includes(q) ||
+        status.includes(q) ||
+        personal.includes(q) ||
+        company.includes(q)
+      );
+    });
+  }, [persons, searchQuery]);
 
   const openAdd = () => {
     setEditingPerson(null);
@@ -64,17 +89,31 @@ function SalesPersonsPage() {
               <div>
                 <CardTitle className="text-2xl font-bold text-gray-900 mb-1">Sales Force</CardTitle>
                 <CardDescription className="text-sm font-medium">
-                  Currently managing {persons.length} active team members.
+                  Currently managing {persons.length} active team members
+                  {searchQuery.trim() ? ` · showing ${filteredPersons.length}` : ""}.
                 </CardDescription>
               </div>
             </div>
-            <Button 
-              onClick={openAdd}
-              className="h-12 px-6 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all active:scale-95 flex items-center gap-2"
-            >
-              <UserPlus className="h-5 w-5" />
-              Onboard Personnel
-            </Button>
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+              <div className="relative w-full sm:w-[280px]">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by name, email, mobile..."
+                  className="h-12 rounded-xl border-gray-200 bg-background pl-9"
+                  aria-label="Search sales persons"
+                />
+              </div>
+              <Button
+                onClick={openAdd}
+                className="h-12 px-6 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all active:scale-95 flex items-center gap-2"
+              >
+                <UserPlus className="h-5 w-5" />
+                Onboard Personnel
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -86,6 +125,8 @@ function SalesPersonsPage() {
             <p className="py-6 text-center text-destructive">{error}</p>
           ) : persons.length === 0 ? (
             <p className="py-6 text-center text-muted-foreground">No sales persons yet.</p>
+          ) : filteredPersons.length === 0 ? (
+            <p className="py-6 text-center text-muted-foreground">No team members match your search.</p>
           ) : (
             <Table>
               <TableHeader className="bg-gray-50/50">
@@ -99,7 +140,7 @@ function SalesPersonsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {persons.map((p) => (
+                {filteredPersons.map((p) => (
                   <TableRow key={p.id} className="hover:bg-gray-50/30 transition-colors border-gray-100">
                     <TableCell className="px-8 py-4">
                       <div className="flex flex-col">

@@ -84,7 +84,7 @@ export function validateEnrollmentForm(form, options = {}) {
     errors.guardian_email = "Enter a valid guardian email.";
 
   const collegeName = (form.college_name || "").trim();
-  if (!collegeName) errors.college_name = "College name is required.";
+  if (!collegeName) errors.college_name = "Select a college name from the list.";
   else if (!formTitleRegex.test(collegeName))
     errors.college_name = "Invalid college name; must contain at least 5 letters.";
 
