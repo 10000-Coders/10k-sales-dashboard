@@ -438,7 +438,7 @@ const validateForm = () => {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="is_agent" className="text-xs font-semibold text-gray-700 uppercase">Is Agent</Label>
+                <Label htmlFor="is_agent" className="text-xs font-semibold text-gray-700 uppercase">Is this ai calling agent lead</Label>
                 <select
                   id="is_agent"
                   value={form.is_agent ? "true" : "false"}

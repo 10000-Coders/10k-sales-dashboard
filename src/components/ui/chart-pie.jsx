@@ -9,21 +9,61 @@ import {
 } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
 
+/** Bright Google/Material-style palette — one distinct color per category. */
 export const STUDENT_CHART_COLORS = [
-  "#FCA47C",
-  "#23CED9",
-  "#097C87",
-  "#F9D779",
-  "#A1CCAA",
+  "#4285F4", // Google Blue
+  "#EA4335", // Google Red
+  "#FBBC04", // Google Yellow
+  "#34A853", // Google Green
+  "#FF6D01", // Orange
+  "#46BDC6", // Teal
+  "#7BAAF7", // Light Blue
+  "#F07B72", // Coral
+  "#FCD04F", // Amber
+  "#71C287", // Light Green
+  "#A142F4", // Purple
+  "#FF8A80", // Soft Red
+  "#00ACC1", // Cyan
+  "#F4B400", // Gold
+  "#0F9D58", // Deep Green
+  "#DB4437", // Brick
+  "#AB47BC", // Violet
+  "#5C6BC0", // Indigo
+  "#26A69A", // Seafoam
+  "#EF6C00", // Deep Orange
+  "#EC407A", // Pink
+  "#29B6F6", // Sky
+  "#9CCC65", // Lime
+  "#8D6E63", // Brown
+  "#78909C", // Blue Grey
+  "#C0CA33", // Chartreuse
+  "#FF7043", // Deep Coral
+  "#26C6DA", // Bright Cyan
+  "#7E57C2", // Deep Purple
+  "#66BB6A", // Mid Green
 ];
+
+/**
+ * Pick a unique color for each index. Uses the fixed palette first, then
+ * evenly spaced HSL hues so two categories never share the same color.
+ */
+export function colorForIndex(index, total = 0) {
+  if (index < STUDENT_CHART_COLORS.length) {
+    return STUDENT_CHART_COLORS[index];
+  }
+  const n = Math.max(total, index + 1);
+  const hue = Math.round((360 * index) / n);
+  return `hsl(${hue} 72% 48%)`;
+}
 
 /**
  * @param {{ key: string, label: string, value: number }[]} items
  */
 export function buildChartSeries(items) {
+  const list = items || [];
   const chartConfig = { value: { label: "Students" } };
-  const chartData = (items || []).map((item, index) => {
-    const color = STUDENT_CHART_COLORS[index % STUDENT_CHART_COLORS.length];
+  const chartData = list.map((item, index) => {
+    const color = colorForIndex(index, list.length);
     chartConfig[item.key] = {
       label: item.label,
       color,

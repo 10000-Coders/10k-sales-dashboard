@@ -1,12 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Users } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import axios from "@/axios";
 import {
   Card,
   CardContent,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -16,7 +15,6 @@ import {
   buildChartSeries,
 } from "@/components/ui/chart-pie";
 import { getInquirySourceLabel } from "@/constants/leadInquirySource";
-import { cn } from "@/lib/utils";
 
 function slugKey(value, fallback = "unknown") {
   const raw = String(value || fallback)
@@ -59,36 +57,32 @@ function AnalyticsDonutCard({ title, items, total, loading }) {
     total ?? chartData.reduce((acc, row) => acc + row.value, 0);
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden">
+    <Card className="flex h-full min-w-0 flex-col overflow-hidden">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold sm:text-lg">
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-center">
+      <CardContent className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
         {loading ? (
           <div className="flex min-h-[220px] w-full items-center justify-center text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
         ) : (
           <>
-            <div className="w-full shrink-0 sm:w-[46%] sm:max-w-[240px]">
+            <div className="mx-auto w-full shrink-0 sm:mx-0 sm:w-[44%] sm:max-w-[220px]">
               <ChartPie
                 data={chartData}
                 config={chartConfig}
                 totalLabel="Total Students"
               />
             </div>
-            <ChartPieLegend data={chartData} total={displayTotal} />
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <ChartPieLegend data={chartData} total={displayTotal} />
+            </div>
           </>
         )}
       </CardContent>
-      <CardFooter className="mt-auto flex items-center justify-between border-t px-6 py-3 text-sm">
-        <span className="text-muted-foreground">Total</span>
-        <span className="font-semibold tabular-nums text-foreground">
-          {(displayTotal || 0).toLocaleString()}
-        </span>
-      </CardFooter>
     </Card>
   );
 }
@@ -159,36 +153,15 @@ export default function StudentEnrollmentAnalytics({
     fetchAnalytics();
   }, [fetchAnalytics]);
 
-  const headingTotal = sourceTotal || salesTotal;
-
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardContent className="flex items-center gap-4 p-5">
-          <div
-            className={cn(
-              "flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
-              "bg-[var(--chart-1)] text-white"
-            )}
-          >
-            <Users className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Total Students</p>
-            <p className="text-3xl font-bold tabular-nums tracking-tight">
-              {loading ? "—" : headingTotal.toLocaleString()}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
+    <div className="flex min-w-0 flex-col gap-4">
       {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
         <AnalyticsDonutCard
           title="By Inquiry Source"
           items={sourceItems}

@@ -27,7 +27,7 @@ export default function AppShell({ children }) {
         />
       ) : null}
 
-      <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden lg:ml-[250px]">
+      <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden lg:ml-[200px]">
         <TopNavbar onMenuClick={openMobile} />
         <main className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-gradient-to-b from-slate-50/90 via-slate-50/50 to-slate-100/30">
           {children}
