@@ -194,24 +194,23 @@ export default function BulkLeadUploadClient() {
   const failedFromApi = importResult?.failed || [];
 
   return (
-    <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
-      <div className="flex items-center gap-3">
-        <Link
-          href="/leads"
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to leads
-        </Link>
-      </div>
-
+    <div className="flex w-full max-w-full flex-1 flex-col gap-4">
       <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Bulk lead upload</CardTitle>
-          <CardDescription>
-            Choose inquiry source first, then upload Excel. Source is never read from the sheet — it
-            always comes from the dropdown below.
-          </CardDescription>
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="text-2xl">Bulk lead upload</CardTitle>
+            <CardDescription>
+              Choose inquiry source first, then upload Excel. Source is never read from the sheet — it
+              always comes from the dropdown below.
+            </CardDescription>
+          </div>
+          <Link
+            href="/leads"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to leads
+          </Link>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -246,7 +245,7 @@ export default function BulkLeadUploadClient() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Is Agent</Label>
+              <Label>Is this ai calling agent</Label>
               <Select
                 options={AGENT_OPTIONS}
                 value={AGENT_OPTIONS.find((o) => o.value === defaults.isAgent) || AGENT_OPTIONS[0]}

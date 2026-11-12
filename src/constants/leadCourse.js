@@ -46,7 +46,7 @@ export const LEAD_IS_RELATED_FILTER_OPTIONS = [
 
 /** Leads list boolean filters — query params: true | false */
 export const LEAD_IS_AGENT_FILTER_OPTIONS = [
-  { value: "", label: "All (agent)" },
+  { value: "", label: "All (ai calling leads)" },
   { value: "true", label: "Agent" },
   { value: "false", label: "Not agent" },
 ];

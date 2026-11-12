@@ -127,6 +127,18 @@ function clearPaymentsListAndSummaryCache() {
 function PaymentsPage() {
   const router = useRouter();
   const user = useSelector((state) => state.userAuth?.user);
+
+  // Keep the outer AppShell main from scrolling — only the summary table scrolls.
+  useEffect(() => {
+    const main = document.querySelector("main");
+    if (!main) return undefined;
+    const previousOverflowY = main.style.overflowY;
+    main.style.overflowY = "hidden";
+    return () => {
+      main.style.overflowY = previousOverflowY;
+    };
+  }, []);
+
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -628,151 +640,143 @@ function PaymentsPage() {
 
 
   return (
-    <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-2xl">Payments</CardTitle>
-              <CardDescription>
-                View all payments. Batch summary is shown above the table for quick drill-down.
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
-              >
-                <option value="">All</option>
-                <option value="pending">Pending</option>
-                <option value="verified">Verified</option>
-                <option value="rejected">Rejected</option>
-              </select>
-              {canFilterByPerson && (
-                <div className="min-w-[200px]">
-                  <Select
-                    options={salesPersonSelectOptions}
-                    value={selectedSalesPersonOption}
-                    onChange={(option) => setFilterSalesPerson(option?.value || "")}
-                    isSearchable
-                    isClearable
-                    placeholder="Search sales person..."
-                    styles={FILTER_SELECT_STYLES}
-                    aria-label="Filter by sales person"
-                  />
-                </div>
-              )}
-              <div className="min-w-[220px]">
+    <div className="flex h-full min-h-0 w-full max-w-full flex-1 flex-col gap-4 overflow-hidden">
+      <Card className="shrink-0">
+        <CardHeader className="py-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+            >
+              <option value="">All</option>
+              <option value="pending">Pending</option>
+              <option value="verified">Verified</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            {canFilterByPerson && (
+              <div className="min-w-[200px]">
                 <Select
-                  options={salesBatchSelectOptions}
-                  value={selectedSalesBatchOption}
-                  onChange={(option) => setFilterSalesBatch(option?.value || "")}
+                  options={salesPersonSelectOptions}
+                  value={selectedSalesPersonOption}
+                  onChange={(option) => setFilterSalesPerson(option?.value || "")}
                   isSearchable
                   isClearable
-                  isDisabled={salesBatchesLoading}
-                  placeholder="Search sales batch..."
+                  placeholder="Search sales person..."
                   styles={FILTER_SELECT_STYLES}
-                  aria-label="Filter by sales batch"
+                  aria-label="Filter by sales person"
                 />
               </div>
-              <input
-                type="text"
-                value={mentorBatchQuery}
-                onChange={(e) => setMentorBatchQuery(e.target.value)}
-                placeholder="Mentor batch (id or name)"
-                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+            )}
+            <div className="min-w-[220px]">
+              <Select
+                options={salesBatchSelectOptions}
+                value={selectedSalesBatchOption}
+                onChange={(option) => setFilterSalesBatch(option?.value || "")}
+                isSearchable
+                isClearable
+                isDisabled={salesBatchesLoading}
+                placeholder="Search sales batch..."
+                styles={FILTER_SELECT_STYLES}
+                aria-label="Filter by sales batch"
               />
-              <select
-                value={filterDateRange}
-                onChange={(e) => setFilterDateRange(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+            </div>
+            <input
+              type="text"
+              value={mentorBatchQuery}
+              onChange={(e) => setMentorBatchQuery(e.target.value)}
+              placeholder="Mentor batch (id or name)"
+              className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+            />
+            <select
+              value={filterDateRange}
+              onChange={(e) => setFilterDateRange(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+            >
+              <option value="">Date preset</option>
+              <option value="today">Today</option>
+              <option value="this_week">This Week</option>
+              <option value="this_month">This Month</option>
+            </select>
+            <input
+              type="date"
+              value={filterDateFrom}
+              onChange={(e) => setFilterDateFrom(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+              placeholder="From"
+            />
+            <input
+              type="date"
+              value={filterDateTo}
+              onChange={(e) => setFilterDateTo(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+              placeholder="To"
+            />
+            {canManageReceivers && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setReceiverListModalOpen(true)}
+                className="h-9"
               >
-                <option value="">Date preset</option>
-                <option value="today">Today</option>
-                <option value="this_week">This Week</option>
-                <option value="this_month">This Month</option>
-              </select>
-              <input
-                type="date"
-                value={filterDateFrom}
-                onChange={(e) => setFilterDateFrom(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
-                placeholder="From"
-              />
-              <input
-                type="date"
-                value={filterDateTo}
-                onChange={(e) => setFilterDateTo(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
-                placeholder="To"
-              />
-              {canManageReceivers && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setReceiverListModalOpen(true)}
-                  className="h-9"
-                >
-                  Bank
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 rounded-lg border p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-medium">Sales Batch-wise summary</p>
-            </div>
-            {summaryLoading ? (
-              <div className="flex justify-center py-6">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : summaryError ? (
-              <p className="py-4 text-sm text-destructive">{summaryError}</p>
-            ) : summaryRows.length === 0 ? (
-              <p className="py-4 text-sm text-muted-foreground">No summary rows.</p>
-            ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Batch</TableHead>
-                <TableHead>Total Payments</TableHead>
-                <TableHead>Verified Amount</TableHead>
-                <TableHead>Total Due</TableHead>
-                <TableHead>Pending</TableHead>
-                <TableHead>Verified</TableHead>
-                <TableHead>Rejected</TableHead>
-              </TableRow>
-            </TableHeader>
-                <TableBody>
-                  {summaryRows.map((row) => (
-                    <TableRow
-                      key={`sales_batch-${row.batch_key}-${row.batch_name}`}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => openBatchPaymentsModal(row)}
-                    >
-                      <TableCell className="font-medium">{row.batch_name || "Unassigned"}</TableCell>
-                      <TableCell>{row.total_payments ?? 0}</TableCell>
-                      <TableCell>₹ {getVerifiedAmount(row).toLocaleString()}</TableCell>
-                      <TableCell className="font-medium text-orange-700 dark:text-orange-400">
-                        ₹ {getTotalDueAmount(row).toLocaleString()}
-                      </TableCell>
-                      <TableCell>{row.pending_count ?? 0}</TableCell>
-                      <TableCell>{row.verified_count ?? 0}</TableCell>
-                      <TableCell>{row.rejected_count ?? 0}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                All Banks Accounts
+              </Button>
             )}
           </div>
+        </CardHeader>
+      </Card>
 
-          <p className="py-2 text-sm text-muted-foreground">
-            Click a sales batch row above to view all payments in that batch.
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="shrink-0 border-b px-6 py-4">
+          <p className="text-sm font-medium">Sales Batch-wise summary</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Click a sales batch row to view all payments in that batch.
           </p>
-        </CardContent>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto">
+          {summaryLoading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : summaryError ? (
+            <p className="px-6 py-6 text-sm text-destructive">{summaryError}</p>
+          ) : summaryRows.length === 0 ? (
+            <p className="px-6 py-6 text-sm text-muted-foreground">No summary rows.</p>
+          ) : (
+            <table className="w-full caption-bottom text-sm">
+              <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="bg-card">Batch</TableHead>
+                  <TableHead className="bg-card">Total Payments</TableHead>
+                  <TableHead className="bg-card">Verified Amount</TableHead>
+                  <TableHead className="bg-card">Total Due</TableHead>
+                  <TableHead className="bg-card">Pending</TableHead>
+                  <TableHead className="bg-card">Verified</TableHead>
+                  <TableHead className="bg-card">Rejected</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {summaryRows.map((row) => (
+                  <TableRow
+                    key={`sales_batch-${row.batch_key}-${row.batch_name}`}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openBatchPaymentsModal(row)}
+                  >
+                    <TableCell className="font-medium">{row.batch_name || "Unassigned"}</TableCell>
+                    <TableCell>{row.total_payments ?? 0}</TableCell>
+                    <TableCell>₹ {getVerifiedAmount(row).toLocaleString()}</TableCell>
+                    <TableCell className="font-medium text-orange-700 dark:text-orange-400">
+                      ₹ {getTotalDueAmount(row).toLocaleString()}
+                    </TableCell>
+                    <TableCell>{row.pending_count ?? 0}</TableCell>
+                    <TableCell>{row.verified_count ?? 0}</TableCell>
+                    <TableCell>{row.rejected_count ?? 0}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </table>
+          )}
+        </div>
       </Card>
 
       {batchPaymentsModalOpen && (

@@ -59,7 +59,7 @@ function HomePage() {
   const teamPeriodLabel = formatStatsPeriodLabel(fromDate, toDate);
 
   return (
-    <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+    <div className="flex w-full max-w-full flex-1 flex-col gap-6">
       <Card className="overflow-hidden border-0 shadow-md ring-1 ring-black/[0.04]">
         <CardHeader className="space-y-1 border-b border-border/60 bg-gradient-to-r from-card via-card to-primary/[0.04] pb-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

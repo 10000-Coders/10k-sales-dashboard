@@ -144,6 +144,10 @@ export default function LeadDetailClient() {
     e.preventDefault();
     if (!id) return;
     const trimmedNotes = (activityForm.notes || "").trim();
+    if (!trimmedNotes) {
+      setActivityError("Notes are required.");
+      return;
+    }
     if (trimmedNotes.length > 200) {
       setActivityError("Notes must be 200 characters or less.");
       return;
@@ -420,12 +424,15 @@ export default function LeadDetailClient() {
               </div>
             </div>
             <div className="grid gap-2">
-              <Label>Notes</Label>
+              <Label>
+                Notes <span className="text-destructive">*</span>
+              </Label>
               <textarea
                 value={activityForm.notes}
                 onChange={(e) => setActivityForm((p) => ({ ...p, notes: e.target.value }))}
-                placeholder="Optional notes (max 200 chars)"
+                placeholder="Add notes (max 200 chars)"
                 rows={3}
+                required
                 className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 maxLength={200}
               />

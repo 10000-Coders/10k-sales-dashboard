@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { LeadFormDialog } from "@/components/LeadFormDialog";
-import { Loader2, UserPlus, Pencil, Phone, Mail, Search, ChevronDown, ChevronLeft, ChevronRight, Upload, ArrowRightLeft, BarChart3 } from "lucide-react";
+import { Loader2, UserPlus, Pencil, Phone, Search, ChevronDown, ChevronLeft, ChevronRight, Upload, ArrowRightLeft, BarChart3 } from "lucide-react";
 import { LEAD_STATUS_FILTER_OPTIONS, LEAD_STATUS_STYLES } from "@/constants/leadStatus";
 import { getInquirySourceLabel, LEAD_SOURCE_FILTER_OPTIONS } from "@/constants/leadInquirySource";
 import {
@@ -92,9 +92,6 @@ function formatDateTime(d) {
   return dt.toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-const LEAD_TABLE_HEAD =
-  "h-9 whitespace-nowrap !p-0 px-2 py-2 text-left align-middle text-[10px] font-medium uppercase tracking-wide text-muted-foreground";
-const LEAD_TABLE_CELL = "!p-0 px-2 py-2.5 align-middle text-[10px] leading-snug";
 const FILTER_SELECT_CLASS =
   "h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -502,19 +499,36 @@ function LeadsPageInner() {
   };
 
   return (
-    <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+    <div className="flex w-full max-w-full flex-1 flex-col">
       <Card>
         <CardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <CardTitle className="text-2xl">{isManagerRole ? "All leads" : "My leads"}</CardTitle>
-              <CardDescription>
-                {isManagerRole
-                  ? "View all leads, filter by counselor, status, source, course and date. See who owns each lead and track activity."
-                  : "Track your own leads. Filter by status, source, course and date."}
-              </CardDescription>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href="/bulk-upload"
+                className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-muted/50"
+              >
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                Bulk upload
+              </Link>
+              {isManagerRole && (
+                <Link
+                  href="/leaddemo/reassign"
+                  className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-muted/50"
+                >
+                  <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
+                  Transfer leads
+                </Link>
+              )}
+              <Link
+                href="/leaddemo/analytics"
+                className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-muted/50"
+              >
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                Source analytics
+              </Link>
             </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-3">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={handleExcelsheetDownload}
@@ -534,32 +548,6 @@ function LeadsPageInner() {
                 Add lead
               </Button>
             </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Link
-              href="/bulk-upload"
-              className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-muted/50"
-            >
-              <Upload className="h-4 w-4 text-muted-foreground" />
-              Bulk upload
-            </Link>
-            {isManagerRole && (
-              <Link
-                href="/leaddemo/reassign"
-                className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-muted/50"
-              >
-                <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
-                Transfer leads
-              </Link>
-            )}
-            <Link
-              href="/leaddemo/analytics"
-              className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-muted/50"
-            >
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              Source analytics
-            </Link>
-            
           </div>
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -758,72 +746,74 @@ function LeadsPageInner() {
           ) : leads.length === 0 ? (
             <p className="py-6 text-center text-muted-foreground">No leads yet. Add one to get started.</p>
           ) : (
-            <div className="w-full min-w-0 overflow-x-auto rounded-md border border-border/60">
-              <Table className="min-w-[880px] text-[10px] leading-tight">
+            <div className="w-full min-w-0 overflow-x-auto">
+              <Table className="min-w-[1100px]">
                 <TableHeader>
-                  <TableRow className="hover:bg-transparent border-b bg-muted/30">
-                    <TableHead className={cn("min-w-[96px]", LEAD_TABLE_HEAD)}>Name</TableHead>
-                    <TableHead className={cn("min-w-[148px]", LEAD_TABLE_HEAD)}>Phone / Email</TableHead>
+                  <TableRow>
+                    <TableHead className="sticky left-0 z-20 min-w-[140px] w-[140px] bg-card">
+                      Name
+                    </TableHead>
+                    <TableHead className="sticky left-[140px] z-20 min-w-[140px] w-[140px] bg-card">
+                      Mobile
+                    </TableHead>
                     {isManagerRole && (
-                      <TableHead className={cn("min-w-[88px]", LEAD_TABLE_HEAD)}>Counselor</TableHead>
+                      <TableHead className="min-w-[100px]">Counselor</TableHead>
                     )}
-                    <TableHead className={cn("min-w-[108px]", LEAD_TABLE_HEAD)}>Status / Related</TableHead>
-                    <TableHead className={cn("w-[1%] min-w-[112px]", LEAD_TABLE_HEAD, "pr-1")}>Course / Source</TableHead>
-                    <TableHead className={cn("w-[1%] min-w-[56px]", LEAD_TABLE_HEAD, "pl-1 pr-2 text-center")}>Transfers</TableHead>
-                    <TableHead className={cn("min-w-[100px]", LEAD_TABLE_HEAD, "pr-2")}>Next follow-up</TableHead>
-                    <TableHead className={cn("min-w-[108px]", LEAD_TABLE_HEAD)}>Last activity</TableHead>
-                    <TableHead className={cn("w-10 text-right", LEAD_TABLE_HEAD)} />
+                    <TableHead className="min-w-[130px]">Status / Related</TableHead>
+                    {isManagerRole && (
+                      <TableHead className="min-w-[120px]">At least once interested</TableHead>
+                    )}
+                    <TableHead className="min-w-[140px]">Course / Source</TableHead>
+                    <TableHead className="min-w-[90px] text-center">Transfers</TableHead>
+                    <TableHead className="min-w-[130px]">Next follow-up</TableHead>
+                    <TableHead className="min-w-[140px]">Last activity</TableHead>
+                    <TableHead className="w-12 text-right" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {leads.map((lead) => {
                     const transferCount =
                       lead.transfer_count > 0 ? lead.transfer_count : lead.is_transferred ? 1 : 0;
+                    const courseValue = lead.enrolled_student_course || lead.course;
+                    const courseLabel = courseValue ? getLeadCourseLabel(courseValue) : null;
+                    const sourceLabel = lead.source ? getInquirySourceLabel(lead.source) : null;
                     return (
                     <TableRow
                       key={lead.id}
-                      className="cursor-pointer hover:bg-muted/50 border-b border-border/50 last:border-0"
+                      className="group cursor-pointer hover:bg-muted/50"
                       onClick={() => goToDetail(lead)}
                     >
-                      <TableCell className={cn("font-medium", LEAD_TABLE_CELL)}>
-                        <span className="block max-w-[120px] truncate" title={lead.name}>
+                      <TableCell className="sticky left-0 z-10 min-w-[140px] w-[140px] bg-card font-medium group-hover:bg-muted">
+                        <span className="block truncate" title={lead.name}>
                           {lead.name || "—"}
                         </span>
                       </TableCell>
-                      <TableCell className={cn("text-muted-foreground", LEAD_TABLE_CELL)}>
-                        <div className="flex max-w-[180px] flex-col gap-1 py-0.5">
-                          {lead.mobile ? (
-                            <span className="inline-flex items-center gap-0.5 truncate" title={lead.mobile}>
-                              <Phone className="h-2.5 w-2.5 shrink-0 text-muted-foreground/80" />
-                              <span className="truncate">{lead.mobile}</span>
-                            </span>
-                          ) : null}
-                          {lead.email ? (
-                            <span className="inline-flex items-center gap-0.5 truncate" title={lead.email}>
-                              <Mail className="h-2.5 w-2.5 shrink-0 text-muted-foreground/80" />
-                              <span className="truncate">{lead.email}</span>
-                            </span>
-                          ) : null}
-                          {!lead.mobile && !lead.email ? (
-                            <span className="text-muted-foreground/60">—</span>
-                          ) : null}
-                        </div>
+                      <TableCell className="sticky left-[140px] z-10 min-w-[140px] w-[140px] bg-card text-sm text-muted-foreground group-hover:bg-muted">
+
+                        {lead.mobile ? (
+                          <span className="flex items-center gap-1" title={lead.mobile}>
+                            <Phone className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{lead.mobile}</span>
+                          </span>
+                        ) : (
+                          "—"
+                        )}
                       </TableCell>
                       {isManagerRole && (
-                        <TableCell className={LEAD_TABLE_CELL}>
+                        <TableCell className="text-sm text-muted-foreground">
                           <span
-                            className="block max-w-[100px] truncate text-muted-foreground"
+                            className="block max-w-[120px] truncate"
                             title={getSalesPersonName(lead)}
                           >
                             {getSalesPersonName(lead)}
                           </span>
                         </TableCell>
                       )}
-                      <TableCell className={LEAD_TABLE_CELL}>
-                        <div className="flex max-w-[120px] flex-wrap items-center gap-1 py-0.5">
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-1">
                           <span
                             className={cn(
-                              "inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
+                              "rounded-full px-2 py-0.5 text-xs font-medium capitalize",
                               LEAD_STATUS_STYLES[lead.status] ?? "bg-muted text-muted-foreground"
                             )}
                           >
@@ -831,7 +821,7 @@ function LeadsPageInner() {
                           </span>
                           <span
                             className={cn(
-                              "inline-flex whitespace-nowrap rounded-full px-1.5 py-px text-[9px] font-medium",
+                              "rounded-full px-2 py-0.5 text-xs font-medium",
                               LEAD_RELATED_BADGE_STYLES[normalizeLeadRelatedValue(lead.is_related)]
                             )}
                           >
@@ -839,63 +829,61 @@ function LeadsPageInner() {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className={cn(LEAD_TABLE_CELL, "w-[1%] pr-1")}>
-                        {(() => {
-                          const courseValue = lead.enrolled_student_course || lead.course;
-                          const courseLabel = courseValue ? getLeadCourseLabel(courseValue) : null;
-                          const sourceLabel = lead.source ? getInquirySourceLabel(lead.source) : null;
-                          if (!courseLabel && !sourceLabel) {
-                            return <span className="text-muted-foreground/60">—</span>;
-                          }
-                          return (
-                            <div className="flex max-w-[120px] flex-col gap-0.5 py-0.5">
-                              <span
-                                className={cn(
-                                  "truncate",
-                                  courseLabel ? "font-medium text-foreground" : "text-muted-foreground/60"
-                                )}
-                                title={courseLabel ?? undefined}
-                              >
-                                {courseLabel ?? "—"}
+                      {isManagerRole && (
+                        <TableCell>
+                          <span
+                            className={cn(
+                              "rounded-full px-2 py-0.5 text-xs font-medium",
+                              lead.is_interested
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-muted text-muted-foreground"
+                            )}
+                          >
+                            {lead.is_interested ? "Yes" : "No"}
+                          </span>
+                        </TableCell>
+                      )}
+                      <TableCell className="text-muted-foreground">
+                        {!courseLabel && !sourceLabel ? (
+                          "—"
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            <span className={cn("whitespace-nowrap", courseLabel && "font-medium text-foreground")}>
+                              {courseLabel ?? "—"}
+                            </span>
+                            {sourceLabel ? (
+                              <span className="w-fit rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                                {sourceLabel}
                               </span>
-                              <span
-                                className="truncate text-[9px] text-muted-foreground"
-                                title={sourceLabel ?? undefined}
-                              >
-                                {sourceLabel ?? "—"}
-                              </span>
-                            </div>
-                          );
-                        })()}
+                            ) : null}
+                          </div>
+                        )}
                       </TableCell>
-                      <TableCell className={cn(LEAD_TABLE_CELL, "w-[1%] pl-1 pr-2text-center")}>
+                      <TableCell className="text-center">
                         {transferCount > 0 ? (
                           <span
-                            className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-[10px] font-medium tabular-nums text-amber-800"
+                            className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-amber-100 px-2 text-xs font-medium tabular-nums text-amber-800"
                             title="Times transferred"
                           >
                             {transferCount}
                           </span>
                         ) : (
-                          <span className="text-muted-foreground/60">—</span>
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell className={cn(LEAD_TABLE_CELL, "pr-2")}>
+                      <TableCell className="text-sm text-muted-foreground">
                         {lead.next_follow_up_at ? (
-                          <FollowUpTimer followUpAt={lead.next_follow_up_at} className="gap-0.5 text-[10px] [&_svg]:h-2.5 [&_svg]:w-2.5" />
+                          <FollowUpTimer followUpAt={lead.next_follow_up_at} className="text-[11px]" />
                         ) : (
-                          <span className="text-muted-foreground/60">—</span>
+                          "—"
                         )}
                       </TableCell>
-                      <TableCell className={cn("text-muted-foreground", LEAD_TABLE_CELL)}>
-                        <div className="flex min-w-0 flex-col gap-px">
-                          <span className="whitespace-nowrap text-[10px]">
+                      <TableCell className="text-sm text-muted-foreground">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="whitespace-nowrap">
                             {formatDateTime(lead.last_activity_at)}
                           </span>
-                          <span
-                            className="text-[9px] text-muted-foreground/80"
-                            title="Logged calls and WhatsApp contacts"
-                          >
+                          <span className="text-xs" title="Logged calls and WhatsApp contacts">
                             {(lead.activities_count ?? 0) === 1
                               ? "1 activity"
                               : `${lead.activities_count ?? 0} activities`}
@@ -903,17 +891,17 @@ function LeadsPageInner() {
                         </div>
                       </TableCell>
                       <TableCell
-                        className={cn("text-right", LEAD_TABLE_CELL)}
+                        className="text-right"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6"
+                          className="h-8 w-8"
                           onClick={() => openEdit(lead)}
                           aria-label={`Edit ${lead.name}`}
                         >
-                          <Pencil className="h-3 w-3" />
+                          <Pencil className="h-4 w-4" />
                         </Button>
                       </TableCell>
                     </TableRow>

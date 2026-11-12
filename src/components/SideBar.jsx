@@ -106,7 +106,7 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
     <>
       <aside
         className={cn(
-          "fixed left-0 top-0 z-30 flex h-[100dvh] max-h-[100dvh] w-[250px] flex-shrink-0 flex-col overflow-hidden border-r border-border/80 bg-card shadow-[4px_0_24px_-12px_rgba(0,0,0,0.08)]",
+          "fixed left-0 top-0 z-30 flex h-[100dvh] max-h-[100dvh] w-[200px] flex-shrink-0 flex-col overflow-hidden border-r border-border/80 bg-card shadow-[4px_0_24px_-12px_rgba(0,0,0,0.08)]",
           "transition-transform duration-200 ease-out",
           "lg:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
