@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Loader2, Mail, Phone } from "lucide-react";
+import { Loader2, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DemoStudentFeedbackModal from "@/components/demoStudents/DemoStudentFeedbackModal";
 
@@ -23,7 +23,6 @@ export default function DemoStudentsTable({
   onToggleOne,
   onPrev,
   onNext,
-  appliedFilters = {},
 }) {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const page = listMeta.page || 1;
@@ -64,7 +63,7 @@ export default function DemoStudentsTable({
                 <TableRow className="border-b bg-muted/30 hover:bg-transparent">
                   {showCheckboxes && <TableHead className={cn(TH, "w-9")} />}
                   <TableHead className={cn(TH, "w-[14%]")}>Name</TableHead>
-                  <TableHead className={cn(TH, "w-[20%]")}>Phone / Email</TableHead>
+                  <TableHead className={cn(TH, "w-[20%]")}>Phone</TableHead>
                   <TableHead className={cn(TH, "w-[16%]")}>Course / Trainer</TableHead>
                   <TableHead className={cn(TH, "w-[14%]")}>Topic</TableHead>
                   <TableHead className={cn(TH, "w-[8%] text-center")}>Feedbacks</TableHead>
@@ -96,21 +95,14 @@ export default function DemoStudentsTable({
                       </span>
                     </TableCell>
                     <TableCell className={cn(TD, "text-muted-foreground")}>
-                      <div className="flex min-w-0 flex-col gap-0.5">
-                        {s.student_phonenumber ? (
-                          <span className="inline-flex min-w-0 items-center gap-1" title={s.student_phonenumber}>
-                            <Phone className="h-3 w-3 shrink-0 opacity-70" />
-                            <span className="truncate">{s.student_phonenumber}</span>
-                          </span>
-                        ) : null}
-                        {s.student_email ? (
-                          <span className="inline-flex min-w-0 items-center gap-1" title={s.student_email}>
-                            <Mail className="h-3 w-3 shrink-0 opacity-70" />
-                            <span className="truncate">{s.student_email}</span>
-                          </span>
-                        ) : null}
-                        {!s.student_phonenumber && !s.student_email ? "—" : null}
-                      </div>
+                      {s.student_phonenumber ? (
+                        <span className="inline-flex min-w-0 items-center gap-1" title={s.student_phonenumber}>
+                          <Phone className="h-3 w-3 shrink-0 opacity-70" />
+                          <span className="truncate">{s.student_phonenumber}</span>
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell className={TD}>
                       <div className="min-w-0">
@@ -191,7 +183,6 @@ export default function DemoStudentsTable({
         open={Boolean(selectedStudent)}
         studentId={selectedStudent?.id}
         studentPreview={selectedStudent}
-        appliedFilters={appliedFilters}
         onClose={() => setSelectedStudent(null)}
       />
     </Card>

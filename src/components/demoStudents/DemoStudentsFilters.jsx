@@ -16,13 +16,6 @@ function validateDateRange(fromDate, toDate) {
   if (toDate < fromDate) {
     return "To date cannot be earlier than from date.";
   }
-  const from = new Date(`${fromDate}T00:00:00`);
-  const to = new Date(`${toDate}T00:00:00`);
-  const maxTo = new Date(from);
-  maxTo.setDate(maxTo.getDate() + 7);
-  if (to > maxTo) {
-    return "Date range cannot be greater than one week.";
-  }
   return null;
 }
 
@@ -65,7 +58,7 @@ export default function DemoStudentsFilters({
           <Input
             type="search"
             className="h-9 pl-9"
-            placeholder="Search by name, email, or phone..."
+            placeholder="Search by name or phone..."
             value={filters.search}
             onChange={(e) => set("search", e.target.value)}
             autoComplete="off"

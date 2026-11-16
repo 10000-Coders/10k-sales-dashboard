@@ -1,15 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Button } from "@/components/ui/button";
 import { Loader2, X } from "lucide-react";
-import { toast } from "react-toastify";
 import {
   fetchDemoStudentDetail,
   clearDemoStudentDetail,
-  updateDemoStudentStatus,
-  fetchDemoStudentStats,
 } from "@/redux/features/demoStudents/demoStudentsSlice";
 
 const RATING_FIELDS = [
@@ -21,8 +18,6 @@ const RATING_FIELDS = [
   ["body_language", "Body language"],
   ["real_time_examples", "Real-time examples"],
 ];
-
-const STUDENT_STATUS_OPTIONS = ["New", "Enrolled", "Active", "Not Interested"];
 
 function formatDate(value) {
   if (!value) return "—";
@@ -38,18 +33,9 @@ export default function DemoStudentFeedbackModal({
   onClose,
   studentId,
   studentPreview,
-  appliedFilters,
 }) {
   const dispatch = useDispatch();
-  const {
-    detail,
-    detailLoading,
-    detailError,
-    statusUpdateLoading,
-    statusUpdateError,
-  } = useSelector((state) => state.demoStudents);
-
-  const [studentStatus, setStudentStatus] = useState("");
+  const { detail, detailLoading, detailError } = useSelector((state) => state.demoStudents);
 
   useEffect(() => {
     if (!open || !studentId) return;
@@ -59,36 +45,10 @@ export default function DemoStudentFeedbackModal({
     };
   }, [open, studentId, dispatch]);
 
-  useEffect(() => {
-    const current = detail?.student_status || studentPreview?.student_status || "";
-    setStudentStatus(current);
-  }, [detail?.student_status, studentPreview?.student_status, open]);
-
   if (!open) return null;
 
   const student = detail || studentPreview;
   const feedbacks = Array.isArray(detail?.feedbacks) ? detail.feedbacks : [];
-  const currentStatus = detail?.student_status || studentPreview?.student_status || "";
-  const statusDirty = Boolean(studentStatus) && studentStatus !== currentStatus;
-
-  const handleUpdateStatus = async () => {
-    if (!studentId || !studentStatus || !statusDirty) return;
-    const result = await dispatch(
-      updateDemoStudentStatus({ id: studentId, student_status: studentStatus })
-    );
-    if (updateDemoStudentStatus.fulfilled.match(result)) {
-      toast.success("Student status updated.");
-      dispatch(fetchDemoStudentStats({ filters: appliedFilters || {} }));
-    } else {
-      const err = result.payload;
-      const msg =
-        (typeof err === "string" && err) ||
-        err?.detail ||
-        err?.student_status?.[0] ||
-        "Failed to update student status.";
-      toast.error(msg);
-    }
-  };
 
   return (
     <div
@@ -105,8 +65,7 @@ export default function DemoStudentFeedbackModal({
               {student?.student_name || "Student feedback"}
             </h3>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {student?.student_phonenumber}
-              {student?.student_email ? ` · ${student.student_email}` : ""}
+              {student?.student_phonenumber || "—"}
             </p>
             {!detailLoading && (
               <p className="mt-1 text-xs text-muted-foreground">
@@ -125,46 +84,6 @@ export default function DemoStudentFeedbackModal({
         </div>
 
         <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
-          <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
-            <label className="mb-1 block text-sm font-medium" htmlFor="demo-student-status">
-              Demo student status
-            </label>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <select
-                id="demo-student-status"
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm sm:max-w-xs"
-                value={studentStatus}
-                disabled={detailLoading || statusUpdateLoading}
-                onChange={(e) => setStudentStatus(e.target.value)}
-              >
-                {!studentStatus && <option value="">Select status</option>}
-                {STUDENT_STATUS_OPTIONS.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-              <Button
-                type="button"
-                disabled={!statusDirty || statusUpdateLoading || detailLoading || !studentStatus}
-                onClick={handleUpdateStatus}
-              >
-                {statusUpdateLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "Update"
-                )}
-              </Button>
-            </div>
-            {statusUpdateError && (
-              <p className="mt-2 text-sm text-destructive">
-                {typeof statusUpdateError === "string"
-                  ? statusUpdateError
-                  : "Failed to update student status."}
-              </p>
-            )}
-          </div>
-
           {detailLoading ? (
             <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" /> Loading feedback…
@@ -218,10 +137,6 @@ export default function DemoStudentFeedbackModal({
                   <p>
                     <span className="text-muted-foreground">Feedback: </span>
                     {fb.feedback || "—"}
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Comments: </span>
-                    {fb.comments || "—"}
                   </p>
                 </div>
               </article>

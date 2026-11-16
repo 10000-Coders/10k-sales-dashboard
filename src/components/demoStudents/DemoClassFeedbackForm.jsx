@@ -96,22 +96,6 @@ export default function DemoClassFeedbackForm({
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium">
-          Email
-          <RequiredMark />
-        </label>
-        <Input
-          type="email"
-          value={form.student_email}
-          onChange={(e) => setField("student_email", e.target.value)}
-          placeholder="enter your email"
-          maxLength={100}
-          required
-          aria-invalid={Boolean(fieldErrors.student_email)}
-        />
-        <FieldError message={fieldErrors.student_email} />
-      </div>
-      <div>
-        <label className="mb-1 block text-sm font-medium">
           Phone
           <RequiredMark />
         </label>
@@ -127,39 +111,6 @@ export default function DemoClassFeedbackForm({
           aria-invalid={Boolean(fieldErrors.student_phonenumber)}
         />
         <FieldError message={fieldErrors.student_phonenumber} />
-      </div>
-      <div>
-        <label className="mb-1 block text-sm font-medium">
-          Branch
-          <RequiredMark />
-        </label>
-        <Input
-          value={form.student_branch}
-          onChange={(e) => setField("student_branch", e.target.value)}
-          placeholder="e.g. CSE, ECE, ME, Civil"
-          maxLength={100}
-          required
-          aria-invalid={Boolean(fieldErrors.student_branch)}
-        />
-        <FieldError message={fieldErrors.student_branch} />
-      </div>
-      <div>
-        <label className="mb-1 block text-sm font-medium">
-          Year of pass
-          <RequiredMark />
-        </label>
-        <Input
-          value={form.student_year_of_pass}
-          onChange={(e) =>
-            setField("student_year_of_pass", e.target.value.replace(/\D/g, "").slice(0, 4))
-          }
-          placeholder="e.g. 2026"
-          maxLength={4}
-          inputMode="numeric"
-          required
-          aria-invalid={Boolean(fieldErrors.student_year_of_pass)}
-        />
-        <FieldError message={fieldErrors.student_year_of_pass} />
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium">
@@ -285,21 +236,6 @@ export default function DemoClassFeedbackForm({
           aria-invalid={Boolean(fieldErrors.feedback)}
         />
         <FieldError message={fieldErrors.feedback} />
-      </div>
-      <div className="sm:col-span-2">
-        <label className="mb-1 block text-sm font-medium">
-          Comments
-          <RequiredMark />
-        </label>
-        <textarea
-          className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          value={form.comments}
-          onChange={(e) => setField("comments", e.target.value)}
-          placeholder="e.g. Would like more coding practice examples"
-          required
-          aria-invalid={Boolean(fieldErrors.comments)}
-        />
-        <FieldError message={fieldErrors.comments} />
       </div>
 
       {fieldErrors._form && (
