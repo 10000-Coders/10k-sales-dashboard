@@ -16,32 +16,12 @@ export function validateDemoClassForm(form) {
   if (!student_name) errors.student_name = "Student name is required.";
   else if (student_name.length > 50) errors.student_name = "Name must be at most 50 characters.";
 
-  const student_email = (form.student_email || "").trim().toLowerCase();
-  if (!student_email) errors.student_email = "Email is required.";
-  else if (student_email.length > 100) errors.student_email = "Email must be at most 100 characters.";
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(student_email))
-    errors.student_email = "Enter a valid email address.";
-
   const student_phonenumber = String(form.student_phonenumber || "")
     .replace(/\D/g, "")
     .trim();
   if (!student_phonenumber) errors.student_phonenumber = "Phone number is required.";
   else if (student_phonenumber.length !== 10)
     errors.student_phonenumber = "Phone number must be exactly 10 digits.";
-
-  const student_branch = (form.student_branch || "").trim();
-  if (!student_branch) errors.student_branch = "Branch is required.";
-  else if (student_branch.length > 100) errors.student_branch = "Branch must be at most 100 characters.";
-
-  const student_year_of_pass = String(form.student_year_of_pass || "")
-    .replace(/\D/g, "")
-    .trim();
-  const currentYear = new Date().getFullYear();
-  if (!student_year_of_pass) errors.student_year_of_pass = "Year of pass is required.";
-  else if (student_year_of_pass.length !== 4)
-    errors.student_year_of_pass = "Year of pass must be a 4-digit year.";
-  else if (Number(student_year_of_pass) < 1990 || Number(student_year_of_pass) > currentYear + 5)
-    errors.student_year_of_pass = `Enter a year between 1990 and ${currentYear + 5}.`;
 
   const demo_date = (form.demo_date || "").trim();
   if (!demo_date) errors.demo_date = "Demo date is required.";
@@ -91,9 +71,6 @@ export function validateDemoClassForm(form) {
   if (!feedback) errors.feedback = "Feedback is required.";
   else if (feedback.length > 350) errors.feedback = "Feedback must be at most 350 characters.";
 
-  const comments = (form.comments || "").trim();
-  if (!comments) errors.comments = "Comments are required.";
-
   if (Object.keys(errors).length > 0) {
     return { errors, values: null };
   }
@@ -104,10 +81,7 @@ export function validateDemoClassForm(form) {
     errors: {},
     values: {
       student_name,
-      student_email,
       student_phonenumber,
-      student_branch,
-      student_year_of_pass,
       sales_person_name: Number(sales_person_name),
       demo_date,
       course_name,
@@ -121,7 +95,6 @@ export function validateDemoClassForm(form) {
       body_language: (form.body_language || "").trim().toLowerCase(),
       real_time_examples: (form.real_time_examples || "").trim().toLowerCase(),
       feedback,
-      comments,
     },
   };
 }

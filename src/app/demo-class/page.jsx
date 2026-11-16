@@ -22,10 +22,7 @@ import {
 function emptyForm() {
   return {
     student_name: "",
-    student_email: "",
     student_phonenumber: "",
-    student_branch: "",
-    student_year_of_pass: "",
     sales_person_name: "",
     demo_date: new Date().toISOString().slice(0, 10),
     course_name: "",
@@ -39,7 +36,6 @@ function emptyForm() {
     body_language: "",
     real_time_examples: "",
     feedback: "",
-    comments: "",
   };
 }
 

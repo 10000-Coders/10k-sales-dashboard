@@ -40,10 +40,7 @@ const SEARCH_DEBOUNCE_MS = 2000;
 
 const EXPORT_COLUMNS = [
   { key: "student_name", header: "Student Name", width: 18 },
-  { key: "student_email", header: "Email", width: 28 },
   { key: "student_phonenumber", header: "Phone", width: 14 },
-  { key: "student_branch", header: "Branch", width: 18 },
-  { key: "student_year_of_pass", header: "Year of Pass", width: 12 },
   { key: "payment_status", header: "Payment Status", width: 14 },
   { key: "student_status", header: "Status", width: 14 },
   { key: "sales_person_display", header: "Sales Person", width: 14 },
@@ -59,7 +56,6 @@ const EXPORT_COLUMNS = [
   { key: "body_language", header: "Body Language", width: 14 },
   { key: "real_time_examples", header: "Real Time Examples", width: 18 },
   { key: "feedback", header: "Feedback", width: 28 },
-  { key: "comments", header: "Comments", width: 22 },
   { key: "created_at", header: "Created At", width: 18 },
 ];
 
@@ -151,7 +147,8 @@ function DemoStudentsPage() {
 
   const isManagerOrSuper = user?.role === "manager" || user?.role === "super_admin";
   const canManageQr = user?.role !== "counselor";
-  const { persons } = useSalesPersons({ enabled: isManagerOrSuper });
+  // Demo list is shared across all sales roles — filter is available to everyone.
+  const { persons } = useSalesPersons({ enabled: true });
 
   const [filters, setFilters] = useState(emptyFilters);
   const [appliedFilters, setAppliedFilters] = useState(emptyFilters);
@@ -296,7 +293,7 @@ function DemoStudentsPage() {
             onChange={setFilters}
             onApply={applyFilters}
             onReset={resetFilters}
-            showSalesPersonFilter={isManagerOrSuper}
+            showSalesPersonFilter
             persons={persons}
             trainers={trainers}
             trainersLoading={trainersLoading}
@@ -309,7 +306,6 @@ function DemoStudentsPage() {
             return Math.min(maxPage, p + 1);
           })
         }
-        appliedFilters={appliedFilters}
       />
 
       <DemoClassQrModal
