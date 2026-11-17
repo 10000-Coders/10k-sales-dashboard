@@ -5,7 +5,8 @@ import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { LogOut, Loader2 } from "lucide-react";
 import { logout } from "@/redux/features/user/userAuth";
-import { routeObject, MenuItems, SCHOLARSHIP_TEST_NAV_LABEL } from "@/shared/static/sidebarItems";
+import { routeObject, MenuItems } from "@/shared/static/sidebarItems";
+// import { SCHOLARSHIP_TEST_NAV_LABEL } from "@/shared/static/sidebarItems"; // scholarship test
 import { cn } from "@/lib/utils";
 import { getLeadsListHref } from "@/lib/leadsFiltersUrl";
 import { getStudentsListHref } from "@/lib/studentsFiltersUrl";
@@ -41,9 +42,10 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
   );
 
   useEffect(() => {
-    if (pathname?.startsWith("/public-challenges")) {
-      setActiveItem(SCHOLARSHIP_TEST_NAV_LABEL);
-    } else if (pathname?.startsWith("/leads") || pathname?.startsWith("/bulk-upload")) {
+    // if (pathname?.startsWith("/public-challenges")) {
+    //   setActiveItem(SCHOLARSHIP_TEST_NAV_LABEL);
+    // } else
+    if (pathname?.startsWith("/leads") || pathname?.startsWith("/bulk-upload")) {
       setActiveItem("Leads");
     } else if (pathname?.startsWith("/referrals")) {
       setActiveItem("Referrals");
@@ -66,8 +68,8 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
   const handleActiveItem = (text) => {
     if (text === "Dashboard") {
       router.push("/");
-    } else if (text === SCHOLARSHIP_TEST_NAV_LABEL) {
-      router.push("/public-challenges");
+    // } else if (text === SCHOLARSHIP_TEST_NAV_LABEL) {
+    //   router.push("/public-challenges");
     } else if (text === "Sales persons") {
       router.push("/sales-persons");
     } else if (text === "Leads") {
