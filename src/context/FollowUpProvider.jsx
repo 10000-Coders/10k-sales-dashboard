@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { useSelector } from "react-redux";
-import baseAxios from "axios";
 import axios from "@/axios";
 import { toast } from "react-toastify";
 
@@ -121,9 +120,6 @@ export const FollowUpProvider = ({ children }) => {
   const scheduledTimersRef = useRef(new Map());
   const serverTimeOffsetRef = useRef(serverTimeOffset);
 
-  const baseUrl = (process.env.NEXT_PUBLIC_baseUrl || "").replace(/\/$/, "");
-  const apiRoot = baseUrl.replace(/\/api\/api\/?$/, "/api");
-
   useEffect(() => {
     serverTimeOffsetRef.current = serverTimeOffset;
   }, [serverTimeOffset]);
@@ -140,10 +136,10 @@ export const FollowUpProvider = ({ children }) => {
     const doFetch = async () => {
       try {
         const start = Date.now();
-        const endpoint = apiRoot ? `${apiRoot}/student/server-time/` : "/api/student/server-time/";
-        const response = await baseAxios.get(endpoint);
-        const serverTimeStr = response.data.datetime;
+        const response = await axios.get("/server-time/");
+        const serverTimeStr = response.data?.datetime;
         const serverTime = new Date(serverTimeStr).getTime();
+        if (!Number.isFinite(serverTime)) return;
         const end = Date.now();
         const latency = (end - start) / 2;
         const offset = Date.now() - (serverTime + latency);
@@ -157,7 +153,7 @@ export const FollowUpProvider = ({ children }) => {
     };
     serverTimeFetchPromise = doFetch();
     return serverTimeFetchPromise;
-  }, [apiRoot]);
+  }, []);
 
   const unlockAudio = useCallback(() => {
     if (typeof window === "undefined") return;

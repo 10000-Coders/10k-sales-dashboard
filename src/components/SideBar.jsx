@@ -57,6 +57,8 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
       setActiveItem("Demo Students");
     } else if (pathname?.startsWith("/demo-trainers")) {
       setActiveItem("Demo Trainers");
+    } else if (pathname?.startsWith("/wati")) {
+      setActiveItem("WATI Campaigns");
     } else {
       setActiveItem(routeObject[pathname] || "Dashboard");
     }
@@ -88,6 +90,8 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
       router.push("/demo-trainers");
     } else if (text === "Account Summary") {
       router.push("/reports/date-account-summary");
+    } else if (text === "WATI Campaigns") {
+      router.push("/wati/campaigns");
     } else {
       const slug = text.toLowerCase().replace(/\s+/g, "");
       router.push(`/${slug}`);

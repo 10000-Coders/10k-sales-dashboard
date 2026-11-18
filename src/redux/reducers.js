@@ -7,6 +7,7 @@ import referralFormReducer from "./features/referralForm/referralFormSlice";
 import publicChallengeReducer from "./features/publicChallenges/publicChallengeSlice";
 import mcqQuestionReducer from "./features/mcqQuestions/mcqQuestionSlice";
 import demoStudentsReducer from "./features/demoStudents/demoStudentsSlice";
+import watiReducer from "./features/wati/watiSlice";
 
 const rootReducer = combineReducers({
   userAuth: userAuthReducer,
@@ -16,6 +17,7 @@ const rootReducer = combineReducers({
   publicChallenges: publicChallengeReducer,
   mcqQuestions: mcqQuestionReducer,
   demoStudents: demoStudentsReducer,
+  wati: watiReducer,
 });
 
 export default rootReducer;

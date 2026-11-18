@@ -12,6 +12,7 @@ import {
   Trophy,
   Presentation,
   UserCog,
+  Megaphone,
 } from "lucide-react";
 
 /** Nav + page title for /public-challenges (scholarship tests). */
@@ -33,6 +34,7 @@ export const routeObject = {
   "/reports/date-account-summary": "Account Summary",
   "/reports/date-account-detail": "Account Deposit Report",
   "/public-challenges": SCHOLARSHIP_TEST_NAV_LABEL,
+  "/wati/campaigns": "WATI Campaigns",
 };
 
 export const MenuItems = [
@@ -46,6 +48,7 @@ export const MenuItems = [
   { text: "Demo Reviews", icon: ClipboardList },
   { text: "Demo Students", icon: Presentation },
   { text: "Demo Trainers", icon: UserCog, managerOrSuperAdminOnly: true },
+  { text: "WATI Campaigns", icon: Megaphone, managerOrSuperAdminOnly: true },
   { text: SCHOLARSHIP_TEST_NAV_LABEL, icon: Trophy, adminManagerSuperAdminOnly: true },
   { text: "Sales persons", icon: Users, managerOrSuperAdminOnly: true },
   { text: "Activities", icon: Activity },

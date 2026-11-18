@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { LeadFormDialog } from "@/components/LeadFormDialog";
-import { Loader2, UserPlus, Pencil, Phone, Search, ChevronDown, ChevronLeft, ChevronRight, Upload, ArrowRightLeft, BarChart3 } from "lucide-react";
+import { Loader2, UserPlus, Pencil, Phone, Mail, Search, ChevronDown, ChevronLeft, ChevronRight, Upload, ArrowRightLeft, BarChart3, Megaphone } from "lucide-react";
+import CreateCampaignDrawer from "@/components/wati/CreateCampaignDrawer";
 import { LEAD_STATUS_FILTER_OPTIONS, LEAD_STATUS_STYLES } from "@/constants/leadStatus";
 import { getInquirySourceLabel, LEAD_SOURCE_FILTER_OPTIONS } from "@/constants/leadInquirySource";
 import {
@@ -65,6 +66,10 @@ function isManager(role) {
   return role === "manager";
 }
 
+function canCreateWatiCampaign(role) {
+  return role === "manager" || role === "super_admin";
+}
+
 /** Module-level dedup: prevent double leads fetch when React Strict Mode remounts */
 let leadsCache = { key: null, data: null, pagination: null, at: 0 };
 let leadsFetchPromise = null;
@@ -92,6 +97,13 @@ function formatDateTime(d) {
   return dt.toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+const LEAD_TABLE_HEAD =
+  "h-11 whitespace-nowrap px-3 py-2.5 text-left align-middle text-xs font-medium uppercase tracking-wide text-muted-foreground";
+const LEAD_TABLE_CELL = "px-3 py-3 align-middle text-sm leading-snug";
+const LEAD_CHECKBOX_HEAD =
+  "sticky left-0 z-20 w-12 min-w-12 max-w-12 bg-muted/95 px-0 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]";
+const LEAD_CHECKBOX_CELL =
+  "sticky left-0 z-10 w-12 min-w-12 max-w-12 bg-background px-0 text-center shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]";
 const FILTER_SELECT_CLASS =
   "h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -177,6 +189,7 @@ function LeadsPageInner() {
   const searchParams = useSearchParams();
   const user = useSelector((state) => state.userAuth?.user);
   const isManagerRole = isManager(user?.role);
+  const canCampaign = canCreateWatiCampaign(user?.role);
   const { persons, refetch: refetchPersons } = useSalesPersons({ enabled: isManagerRole });
   const { setUpcomingFollowUpsFromLeads } = useFollowUp();
   const { showSuccessToast, showErrorToast } = useToast();
@@ -186,6 +199,10 @@ function LeadsPageInner() {
   const [error, setError] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [selectedLeadsMap, setSelectedLeadsMap] = useState(() => new Map());
+  const [campaignSelectMode, setCampaignSelectMode] = useState(false);
+  const [campaignDrawerOpen, setCampaignDrawerOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState(() => searchParams.get("status") || "");
   const [filterSources, setFilterSources] = useState(() => parseCsvParam(searchParams.get("source")));
   const [filterCourses, setFilterCourses] = useState(() => parseCsvParam(searchParams.get("course")));
@@ -428,6 +445,73 @@ function LeadsPageInner() {
   const goToDetail = (lead) => {
     router.push(`/leads/${lead.id}`);
   };
+
+  const toggleLeadSelected = (lead, checked) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(lead.id);
+      else next.delete(lead.id);
+      return next;
+    });
+    setSelectedLeadsMap((prev) => {
+      const next = new Map(prev);
+      if (checked) next.set(lead.id, lead);
+      else next.delete(lead.id);
+      return next;
+    });
+  };
+
+  const selectAllOnPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      leads.forEach((l) => next.add(l.id));
+      return next;
+    });
+    setSelectedLeadsMap((prev) => {
+      const next = new Map(prev);
+      leads.forEach((l) => next.set(l.id, l));
+      return next;
+    });
+  };
+
+  const clearSelectionOnPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      leads.forEach((l) => next.delete(l.id));
+      return next;
+    });
+    setSelectedLeadsMap((prev) => {
+      const next = new Map(prev);
+      leads.forEach((l) => next.delete(l.id));
+      return next;
+    });
+  };
+
+  const clearAllSelection = () => {
+    setSelectedIds(new Set());
+    setSelectedLeadsMap(new Map());
+  };
+
+  const enterCampaignSelectMode = () => {
+    setCampaignSelectMode(true);
+  };
+
+  const exitCampaignSelectMode = () => {
+    setCampaignSelectMode(false);
+    clearAllSelection();
+    setCampaignDrawerOpen(false);
+  };
+
+  const showCampaignCheckboxes = canCampaign && campaignSelectMode;
+
+  const allOnPageSelected =
+    leads.length > 0 && leads.every((l) => selectedIds.has(l.id));
+  const selectedOnPageCount = leads.filter((l) => selectedIds.has(l.id)).length;
+
+  const selectedLeads = useMemo(
+    () => Array.from(selectedLeadsMap.values()),
+    [selectedLeadsMap]
+  );
   const headerRow = [
     "Name",
     "Phone",
@@ -437,6 +521,7 @@ function LeadsPageInner() {
     "Status",
     "Sales Person",
     "Activity Count",
+    "WATI Campaign Count",
   ];
   const isExcelDateRangeValid = useMemo(() => {
     if (!filterDateFrom || !filterDateTo) return false;
@@ -485,6 +570,7 @@ function LeadsPageInner() {
         Status: lead.status || "",
         "Sales Person": lead.sales_person_name || "",
         "Activity Count": lead.activities_count ?? 0,
+        "WATI Campaign Count": lead.wati_campaigns_count ?? 0,
       }));
       const excelSheetData = XLSX.utils.json_to_sheet(sheetRows, { header: headerRow });
       const workbook = XLSX.utils.book_new();
@@ -549,6 +635,61 @@ function LeadsPageInner() {
               </Button>
             </div>
           </div>
+          {canCampaign ? (
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              {!campaignSelectMode ? (
+                <Button type="button" className="gap-2" onClick={enterCampaignSelectMode}>
+                  <Megaphone className="h-4 w-4" />
+                  Select for campaign
+                </Button>
+              ) : (
+                <Button type="button" variant="outline" onClick={exitCampaignSelectMode}>
+                  Exit selection
+                </Button>
+              )}
+            </div>
+          ) : null}
+          {showCampaignCheckboxes ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5">
+              <span className="text-sm font-medium">
+                {selectedIds.size} selected
+                {leads.length > 0 ? (
+                  <span className="font-normal text-muted-foreground">
+                    {" "}
+                    ({selectedOnPageCount} on this page)
+                  </span>
+                ) : null}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={leads.length === 0}
+                onClick={() => (allOnPageSelected ? clearSelectionOnPage() : selectAllOnPage())}
+              >
+                {allOnPageSelected ? "Deselect this page" : "Select this page"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={selectedIds.size === 0}
+                onClick={clearAllSelection}
+              >
+                Clear
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="gap-2"
+                disabled={selectedIds.size === 0}
+                onClick={() => setCampaignDrawerOpen(true)}
+              >
+                <Megaphone className="h-4 w-4" />
+                Create campaign
+              </Button>
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -746,61 +887,120 @@ function LeadsPageInner() {
           ) : leads.length === 0 ? (
             <p className="py-6 text-center text-muted-foreground">No leads yet. Add one to get started.</p>
           ) : (
-            <div className="w-full min-w-0 overflow-x-auto">
-              <Table className="min-w-[1100px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="sticky left-0 z-20 min-w-[140px] w-[140px] bg-card">
+            <div className="w-full min-w-0 rounded-md border border-border/60">
+              <Table
+                className="min-w-[960px] text-sm leading-snug"
+                containerClassName="max-h-[calc(100vh-280px)]"
+              >
+                <TableHeader className="sticky top-0 z-30">
+                  <TableRow className="hover:bg-transparent border-b bg-muted/95">
+                    {showCampaignCheckboxes ? (
+                      <TableHead
+                        className={cn(LEAD_TABLE_HEAD, LEAD_CHECKBOX_HEAD)}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 cursor-pointer accent-[#FF8000]"
+                          checked={allOnPageSelected}
+                          onChange={(e) =>
+                            e.target.checked ? selectAllOnPage() : clearSelectionOnPage()
+                          }
+                          aria-label="Select all leads on page"
+                        />
+                      </TableHead>
+                    ) : null}
+                    <TableHead
+                      className={cn(
+                        "min-w-[120px]",
+                        LEAD_TABLE_HEAD,
+                        showCampaignCheckboxes && "pl-4"
+                      )}
+                    >
                       Name
                     </TableHead>
-                    <TableHead className="sticky left-[140px] z-20 min-w-[140px] w-[140px] bg-card">
-                      Mobile
-                    </TableHead>
+                    <TableHead className={cn("min-w-[168px]", LEAD_TABLE_HEAD)}>Phone / Email</TableHead>
                     {isManagerRole && (
-                      <TableHead className="min-w-[100px]">Counselor</TableHead>
+                      <TableHead className={cn("min-w-[100px]", LEAD_TABLE_HEAD)}>Counselor</TableHead>
                     )}
-                    <TableHead className="min-w-[130px]">Status / Related</TableHead>
+                    <TableHead className={cn("min-w-[120px]", LEAD_TABLE_HEAD)}>Status / Related</TableHead>
                     {isManagerRole && (
-                      <TableHead className="min-w-[120px]">At least once interested</TableHead>
+                      <TableHead className={cn("min-w-[120px]", LEAD_TABLE_HEAD)}>
+                        At least once interested
+                      </TableHead>
                     )}
-                    <TableHead className="min-w-[140px]">Course / Source</TableHead>
-                    <TableHead className="min-w-[90px] text-center">Transfers</TableHead>
-                    <TableHead className="min-w-[130px]">Next follow-up</TableHead>
-                    <TableHead className="min-w-[140px]">Last activity</TableHead>
-                    <TableHead className="w-12 text-right" />
+                    <TableHead className={cn("min-w-[128px]", LEAD_TABLE_HEAD)}>Course / Source</TableHead>
+                    <TableHead className={cn("min-w-[72px] text-center", LEAD_TABLE_HEAD)}>Transfers</TableHead>
+                    <TableHead className={cn("min-w-[112px]", LEAD_TABLE_HEAD)}>Next follow-up</TableHead>
+                    <TableHead className={cn("min-w-[120px]", LEAD_TABLE_HEAD)}>Last activity</TableHead>
+                    <TableHead className={cn("min-w-[140px]", LEAD_TABLE_HEAD)}>WATI Last Activity</TableHead>
+                    <TableHead className={cn("w-12 text-right", LEAD_TABLE_HEAD)} />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {leads.map((lead) => {
                     const transferCount =
                       lead.transfer_count > 0 ? lead.transfer_count : lead.is_transferred ? 1 : 0;
-                    const courseValue = lead.enrolled_student_course || lead.course;
-                    const courseLabel = courseValue ? getLeadCourseLabel(courseValue) : null;
-                    const sourceLabel = lead.source ? getInquirySourceLabel(lead.source) : null;
+                    const isSelected = selectedIds.has(lead.id);
                     return (
                     <TableRow
                       key={lead.id}
-                      className="group cursor-pointer hover:bg-muted/50"
+                      className={cn(
+                        "cursor-pointer hover:bg-muted/50 border-b border-border/50 last:border-0",
+                        isSelected && "bg-muted/30"
+                      )}
                       onClick={() => goToDetail(lead)}
                     >
-                      <TableCell className="sticky left-0 z-10 min-w-[140px] w-[140px] bg-card font-medium group-hover:bg-muted">
-                        <span className="block truncate" title={lead.name}>
+                      {showCampaignCheckboxes ? (
+                        <TableCell
+                          className={cn(
+                            LEAD_TABLE_CELL,
+                            LEAD_CHECKBOX_CELL,
+                            isSelected && "bg-muted/40"
+                          )}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 cursor-pointer accent-[#FF8000]"
+                            checked={isSelected}
+                            onChange={(e) => toggleLeadSelected(lead, e.target.checked)}
+                            aria-label={`Select ${lead.name || lead.id}`}
+                          />
+                        </TableCell>
+                      ) : null}
+                      <TableCell
+                        className={cn(
+                          "font-medium",
+                          LEAD_TABLE_CELL,
+                          showCampaignCheckboxes && "pl-4"
+                        )}
+                      >
+                        <span className="block max-w-[140px] truncate" title={lead.name}>
                           {lead.name || "—"}
                         </span>
                       </TableCell>
-                      <TableCell className="sticky left-[140px] z-10 min-w-[140px] w-[140px] bg-card text-sm text-muted-foreground group-hover:bg-muted">
-
-                        {lead.mobile ? (
-                          <span className="flex items-center gap-1" title={lead.mobile}>
-                            <Phone className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{lead.mobile}</span>
-                          </span>
-                        ) : (
-                          "—"
-                        )}
+                      <TableCell className={cn("text-muted-foreground", LEAD_TABLE_CELL)}>
+                        <div className="flex max-w-[200px] flex-col gap-1 py-0.5">
+                          {lead.mobile ? (
+                            <span className="inline-flex items-center gap-1 truncate" title={lead.mobile}>
+                              <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
+                              <span className="truncate">{lead.mobile}</span>
+                            </span>
+                          ) : null}
+                          {lead.email ? (
+                            <span className="inline-flex items-center gap-1 truncate" title={lead.email}>
+                              <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
+                              <span className="truncate">{lead.email}</span>
+                            </span>
+                          ) : null}
+                          {!lead.mobile && !lead.email ? (
+                            <span className="text-muted-foreground/60">—</span>
+                          ) : null}
+                        </div>
                       </TableCell>
                       {isManagerRole && (
-                        <TableCell className="text-sm text-muted-foreground">
+                        <TableCell className={cn("text-sm text-muted-foreground", LEAD_TABLE_CELL)}>
                           <span
                             className="block max-w-[120px] truncate"
                             title={getSalesPersonName(lead)}
@@ -809,11 +1009,11 @@ function LeadsPageInner() {
                           </span>
                         </TableCell>
                       )}
-                      <TableCell>
-                        <div className="flex flex-wrap items-center gap-1">
+                      <TableCell className={LEAD_TABLE_CELL}>
+                        <div className="flex max-w-[140px] flex-wrap items-center gap-1.5 py-0.5">
                           <span
                             className={cn(
-                              "rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+                              "inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
                               LEAD_STATUS_STYLES[lead.status] ?? "bg-muted text-muted-foreground"
                             )}
                           >
@@ -821,7 +1021,7 @@ function LeadsPageInner() {
                           </span>
                           <span
                             className={cn(
-                              "rounded-full px-2 py-0.5 text-xs font-medium",
+                              "inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium",
                               LEAD_RELATED_BADGE_STYLES[normalizeLeadRelatedValue(lead.is_related)]
                             )}
                           >
@@ -830,10 +1030,10 @@ function LeadsPageInner() {
                         </div>
                       </TableCell>
                       {isManagerRole && (
-                        <TableCell>
+                        <TableCell className={LEAD_TABLE_CELL}>
                           <span
                             className={cn(
-                              "rounded-full px-2 py-0.5 text-xs font-medium",
+                              "inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium",
                               lead.is_interested
                                 ? "bg-emerald-100 text-emerald-800"
                                 : "bg-muted text-muted-foreground"
@@ -843,23 +1043,36 @@ function LeadsPageInner() {
                           </span>
                         </TableCell>
                       )}
-                      <TableCell className="text-muted-foreground">
-                        {!courseLabel && !sourceLabel ? (
-                          "—"
-                        ) : (
-                          <div className="flex flex-col gap-1">
-                            <span className={cn("whitespace-nowrap", courseLabel && "font-medium text-foreground")}>
-                              {courseLabel ?? "—"}
-                            </span>
-                            {sourceLabel ? (
-                              <span className="w-fit rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">
-                                {sourceLabel}
+                      <TableCell className={LEAD_TABLE_CELL}>
+                        {(() => {
+                          const courseValue = lead.enrolled_student_course || lead.course;
+                          const courseLabel = courseValue ? getLeadCourseLabel(courseValue) : null;
+                          const sourceLabel = lead.source ? getInquirySourceLabel(lead.source) : null;
+                          if (!courseLabel && !sourceLabel) {
+                            return <span className="text-muted-foreground/60">—</span>;
+                          }
+                          return (
+                            <div className="flex max-w-[140px] flex-col gap-0.5 py-0.5">
+                              <span
+                                className={cn(
+                                  "truncate",
+                                  courseLabel ? "font-medium text-foreground" : "text-muted-foreground/60"
+                                )}
+                                title={courseLabel ?? undefined}
+                              >
+                                {courseLabel ?? "—"}
                               </span>
-                            ) : null}
-                          </div>
-                        )}
+                              <span
+                                className="truncate text-xs text-muted-foreground"
+                                title={sourceLabel ?? undefined}
+                              >
+                                {sourceLabel ?? "—"}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className={cn(LEAD_TABLE_CELL, "text-center")}>
                         {transferCount > 0 ? (
                           <span
                             className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-amber-100 px-2 text-xs font-medium tabular-nums text-amber-800"
@@ -871,24 +1084,49 @@ function LeadsPageInner() {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className={LEAD_TABLE_CELL}>
                         {lead.next_follow_up_at ? (
-                          <FollowUpTimer followUpAt={lead.next_follow_up_at} className="text-[11px]" />
+                          <FollowUpTimer followUpAt={lead.next_follow_up_at} className="gap-1 text-xs [&_svg]:h-3.5 [&_svg]:w-3.5" />
                         ) : (
                           "—"
                         )}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="whitespace-nowrap">
+                      <TableCell className={cn("text-muted-foreground", LEAD_TABLE_CELL)}>
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          <span className="whitespace-nowrap text-sm">
                             {formatDateTime(lead.last_activity_at)}
                           </span>
-                          <span className="text-xs" title="Logged calls and WhatsApp contacts">
+                          <span
+                            className="text-xs text-muted-foreground/80"
+                            title="Logged calls and WhatsApp contacts"
+                          >
                             {(lead.activities_count ?? 0) === 1
                               ? "1 activity"
                               : `${lead.activities_count ?? 0} activities`}
                           </span>
                         </div>
+                      </TableCell>
+                      <TableCell className={cn("text-muted-foreground", LEAD_TABLE_CELL)}>
+                        {(() => {
+                          const campaignName = (lead.wati_last_campaign_name || "").trim();
+                          const campaignCount = lead.wati_campaigns_count ?? 0;
+                          return (
+                            <div className="flex min-w-0 flex-col gap-0.5">
+                              <span
+                                className="whitespace-nowrap text-sm"
+                                title={campaignName || undefined}
+                              >
+                                {formatDateTime(lead.wati_last_activity_at)}
+                              </span>
+                              <span
+                                className="text-xs text-muted-foreground/80"
+                                title="WATI campaigns sent to this lead"
+                              >
+                                {campaignCount === 1 ? "1 campaign" : `${campaignCount} campaigns`}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell
                         className="text-right"
@@ -955,6 +1193,33 @@ function LeadsPageInner() {
         currentUserId={user?.id}
         onSuccess={() => { fetchLeads(true); if (isManagerRole) refetchPersons(); }}
       />
+
+      {canCampaign ? (
+        <>
+          {campaignSelectMode && selectedIds.size > 0 && !campaignDrawerOpen ? (
+            <div className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-lg border bg-background px-4 py-3 shadow-lg">
+              <span className="text-sm font-medium">{selectedIds.size} selected</span>
+              <Button type="button" variant="outline" size="sm" onClick={clearAllSelection}>
+                Clear
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="gap-2"
+                onClick={() => setCampaignDrawerOpen(true)}
+              >
+                <Megaphone className="h-4 w-4" />
+                Create campaign
+              </Button>
+            </div>
+          ) : null}
+          <CreateCampaignDrawer
+            open={campaignDrawerOpen}
+            onClose={() => setCampaignDrawerOpen(false)}
+            selectedLeads={selectedLeads}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

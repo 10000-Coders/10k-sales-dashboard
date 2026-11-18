@@ -40,6 +40,10 @@ export function getRangeForPreset(preset) {
       from.setDate(from.getDate() - 6);
       return { from: formatLocalDate(from), to: formatLocalDate(today) };
     }
+    case "last30": {
+      from.setDate(from.getDate() - 29);
+      return { from: formatLocalDate(from), to: formatLocalDate(today) };
+    }
     case "this_month": {
       from.setDate(1);
       return { from: formatLocalDate(from), to: formatLocalDate(today) };
