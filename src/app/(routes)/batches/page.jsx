@@ -25,6 +25,12 @@ import { cn } from "@/lib/utils";
 import useToast from "@/hooks/useToast";
 import Select from "react-select";
 import { COURSE_LABELS, LEAD_COURSE_VALUES } from "@/constants/leadCourse";
+import { FILTER_SELECT_STYLES } from "@/lib/filterSelectStyles";
+
+const BATCH_SELECT_STYLES = {
+  ...FILTER_SELECT_STYLES,
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+};
 
 const COURSE_OPTIONS = LEAD_COURSE_VALUES;
 /** Max amount due allowed to move a student to an actual mentor batch (frontend gate). */
@@ -498,6 +504,9 @@ function BatchesPage() {
                 isSearchable
                 isClearable
                 placeholder="Search and select sales batch (opens modal)"
+                styles={BATCH_SELECT_STYLES}
+                menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                menuPosition="fixed"
               />
               {!loading && salesBatchOptions.length === 0 && (
                 <p className="mt-1 text-xs text-muted-foreground">No sales batches available.</p>
