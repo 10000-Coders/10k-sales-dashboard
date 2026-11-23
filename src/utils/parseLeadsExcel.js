@@ -187,7 +187,11 @@ function parseAddedTime(value) {
  * Map one parsed Excel row to bulk-create API shape.
  * Source must be passed via `selectedSource` from the UI dropdown (never from Excel).
  */
-export function mapExcelRowToLeadPayload(row, salesPersonId, { selectedSource, relatedType = "none" } = {}) {
+export function mapExcelRowToLeadPayload(
+  row,
+  salesPersonId,
+  { selectedSource, relatedType = "none", isAgent = false } = {},
+) {
   const name = trimCellValue(getRowValue(row, "Name"));
   const mobile = cleanExcelPhone(getRowValue(row, "Phone"));
   const email = trimCellValue(getRowValue(row, "Email"));
@@ -201,6 +205,7 @@ export function mapExcelRowToLeadPayload(row, salesPersonId, { selectedSource, r
     status: "new",
     source: selectedSource,
     is_related: relatedType || "none",
+    is_agent: Boolean(isAgent),
     referred_by_name: trimCellValue(getRowValue(row, "Referred By")) || "",
     referred_by_batch: trimCellValue(getRowValue(row, "Referred By Batch")) || "",
   };
@@ -229,7 +234,11 @@ export function validateExcelLeadRow(row) {
 }
 
 /** Build preview rows for bulk import UI (keeps invalid rows visible). */
-export function prepareBulkLeadImportRows(rows, salesPersonId, { selectedSource, relatedType = "none" } = {}) {
+export function prepareBulkLeadImportRows(
+  rows,
+  salesPersonId,
+  { selectedSource, relatedType = "none", isAgent = false } = {},
+) {
   if (!salesPersonId) return [];
   return rows.map((row, index) => {
     const validation = validateExcelLeadRow(row);
@@ -239,7 +248,11 @@ export function prepareBulkLeadImportRows(rows, salesPersonId, { selectedSource,
       raw: row,
       validation,
       payload: canBuildPayload
-        ? mapExcelRowToLeadPayload(row, salesPersonId, { selectedSource, relatedType })
+        ? mapExcelRowToLeadPayload(row, salesPersonId, {
+            selectedSource,
+            relatedType,
+            isAgent,
+          })
         : null,
     };
   });

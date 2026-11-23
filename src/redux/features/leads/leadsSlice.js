@@ -142,7 +142,10 @@ export const bulkReassignLeads = createAsyncThunk(
 
 export const fetchLeadSourceAnalytics = createAsyncThunk(
   "leads/fetchLeadSourceAnalytics",
-  async ({ fromDate, toDate, salesPersonId }, { rejectWithValue }) => {
+  async (
+    { fromDate, toDate, salesPersonId, isAgent, isInterested },
+    { rejectWithValue },
+  ) => {
     if (!fromDate || !toDate) {
       return rejectWithValue({ detail: "From date and to date are required." });
     }
@@ -153,6 +156,8 @@ export const fetchLeadSourceAnalytics = createAsyncThunk(
         to: String(toDate),
       });
       if (salesPersonId) params.set("sales_person", String(salesPersonId));
+      if (isAgent) params.set("is_agent", String(isAgent));
+      if (isInterested) params.set("is_interested", String(isInterested));
       const { data } = await axios.get(`/leads/analytics/simple/?${params.toString()}`);
       return data;
     } catch (err) {

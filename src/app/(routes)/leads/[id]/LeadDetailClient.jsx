@@ -144,6 +144,10 @@ export default function LeadDetailClient() {
     e.preventDefault();
     if (!id) return;
     const trimmedNotes = (activityForm.notes || "").trim();
+    if (!trimmedNotes) {
+      setActivityError("Notes are required.");
+      return;
+    }
     if (trimmedNotes.length > 200) {
       setActivityError("Notes must be 200 characters or less.");
       return;
@@ -179,7 +183,13 @@ export default function LeadDetailClient() {
       }
     } catch (err) {
       const data = err.response?.data;
-      setActivityError(data?.next_follow_up_at?.[0] || data?.detail || "Failed to log activity.");
+      const fieldError =
+        data?.outcome?.[0] ||
+        data?.next_follow_up_at?.[0] ||
+        data?.notes?.[0] ||
+        data?.activity_type?.[0] ||
+        data?.detail;
+      setActivityError(fieldError || "Failed to log activity.");
     } finally {
       setActivitySubmitting(false);
     }
@@ -273,39 +283,57 @@ export default function LeadDetailClient() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-6">
-            <div className="flex items-center gap-2 text-muted-foreground">
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
               <Phone className="h-4 w-4" />
               <span>{lead.mobile || "—"}</span>
             </div>
             {lead.email ? (
-              <div className="flex items-center gap-2 text-muted-foreground">
+              <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
                 <span>{lead.email}</span>
               </div>
             ) : null}
             {lead.source ? (
-              <span className="text-sm text-muted-foreground">Source: {getInquirySourceLabel(lead.source)}</span>
-            ) : null}
-            {(lead.referrer_name || lead.referred_by_name) ? (
-              <span className="text-sm text-muted-foreground">
-                Referred by: {lead.referrer_name || lead.referred_by_name}
-                {(lead.referrer_batch_name || lead.referred_by_batch) ? ` (${lead.referrer_batch_name || lead.referred_by_batch})` : ""}
-              </span>
-            ) : null}
-            {lead.referral ? (
-              <Link href={`/referrals/${lead.referral}`} className="text-sm text-primary underline underline-offset-2">
-                View referral
-              </Link>
+              <span>Source: {getInquirySourceLabel(lead.source)}</span>
             ) : null}
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Calendar className="h-4 w-4" />
+
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+            <span>Interested: {lead.is_interested ? "Yes" : "No"}</span>
+            <span>Agent: {lead.is_agent ? "Yes" : "No"}</span>
+            <span className="inline-flex items-center gap-1">
+              Referral:{" "}
+              {lead.referral ? (
+                <Link
+                  href={`/referrals/${lead.referral}`}
+                  className="text-primary underline underline-offset-2"
+                >
+                  #{lead.referral}
+                </Link>
+              ) : (
+                "—"
+              )}
+            </span>
+            <span>
+              Referred by:{" "}
+              {lead.referred_by_name?.trim() || lead.referrer_name?.trim() || "—"}
+              {(lead.referred_by_batch?.trim() || lead.referrer_batch_name?.trim())
+                ? ` (${lead.referred_by_batch?.trim() || lead.referrer_batch_name?.trim()})`
+                : ""}
+            </span>
+            <span>
+              Created: {lead.created_at ? formatDateTime(lead.created_at) : "—"}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
             <span className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
               Next follow-up: <FollowUpTimer followUpAt={lead.next_follow_up_at} />
             </span>
-            <span className="ml-2">Last activity: {formatDateTime(lead.last_activity_at)}</span>
+            <span>Last activity: {formatDateTime(lead.last_activity_at)}</span>
           </div>
         </CardContent>
       </Card>
@@ -396,12 +424,15 @@ export default function LeadDetailClient() {
               </div>
             </div>
             <div className="grid gap-2">
-              <Label>Notes</Label>
+              <Label>
+                Notes <span className="text-destructive">*</span>
+              </Label>
               <textarea
                 value={activityForm.notes}
                 onChange={(e) => setActivityForm((p) => ({ ...p, notes: e.target.value }))}
-                placeholder="Optional notes (max 200 chars)"
+                placeholder="Add notes (max 200 chars)"
                 rows={3}
+                required
                 className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 maxLength={200}
               />

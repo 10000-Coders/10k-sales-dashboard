@@ -22,6 +22,12 @@
     --input: 214 32% 90%;
     --ring: 24 95% 50%;
     --radius: 0.75rem;
+    /* Student analytics pie palette */
+    --chart-1: #FCA47C;
+    --chart-2: #23CED9;
+    --chart-3: #097C87;
+    --chart-4: #F9D779;
+    --chart-5: #A1CCAA;
   }
   .dark {
     --background: 222.2 84% 4.9%;
@@ -40,6 +46,11 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 24 95% 53%;
+    --chart-1: #FCA47C;
+    --chart-2: #23CED9;
+    --chart-3: #097C87;
+    --chart-4: #F9D779;
+    --chart-5: #A1CCAA;
   }
 }
 

@@ -9,7 +9,7 @@ import {
   Layers,
   Share2,
   ClipboardList,
-  Trophy,
+  // Trophy, // scholarship test
   Presentation,
   UserCog,
 } from "lucide-react";
@@ -32,7 +32,7 @@ export const routeObject = {
   "/batches": "Batches",
   "/reports/date-account-summary": "Account Summary",
   "/reports/date-account-detail": "Account Deposit Report",
-  "/public-challenges": SCHOLARSHIP_TEST_NAV_LABEL,
+  // "/public-challenges": SCHOLARSHIP_TEST_NAV_LABEL,
 };
 
 export const MenuItems = [
@@ -46,7 +46,7 @@ export const MenuItems = [
   { text: "Demo Reviews", icon: ClipboardList },
   { text: "Demo Students", icon: Presentation },
   { text: "Demo Trainers", icon: UserCog, managerOrSuperAdminOnly: true },
-  { text: SCHOLARSHIP_TEST_NAV_LABEL, icon: Trophy, adminManagerSuperAdminOnly: true },
+  // { text: SCHOLARSHIP_TEST_NAV_LABEL, icon: Trophy, adminManagerSuperAdminOnly: true },
   { text: "Sales persons", icon: Users, managerOrSuperAdminOnly: true },
   { text: "Activities", icon: Activity },
 ];

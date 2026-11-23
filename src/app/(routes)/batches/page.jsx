@@ -7,10 +7,7 @@ import withPrivateAuth from "@/components/withPrivateAuth";
 import axios from "@/axios";
 import {
   Card,
-  CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   Table,
@@ -28,11 +25,37 @@ import { cn } from "@/lib/utils";
 import useToast from "@/hooks/useToast";
 import Select from "react-select";
 import { COURSE_LABELS, LEAD_COURSE_VALUES } from "@/constants/leadCourse";
+import { FILTER_SELECT_STYLES } from "@/lib/filterSelectStyles";
+
+const BATCH_SELECT_STYLES = {
+  ...FILTER_SELECT_STYLES,
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+};
 
 const COURSE_OPTIONS = LEAD_COURSE_VALUES;
+/** Max amount due allowed to move a student to an actual mentor batch (frontend gate). */
+const MAX_AMOUNT_DUE_FOR_MOVE = 15000;
 
 function canManageSalesBatches(role) {
   return role === "manager" || role === "super_admin";
+}
+
+function getStudentAmountDue(student, paymentSummaryByStudent = {}) {
+  const fromSummary = paymentSummaryByStudent?.[student?.id]?.pending;
+  if (fromSummary != null && !Number.isNaN(Number(fromSummary))) {
+    return Number(fromSummary);
+  }
+  const fromStudent = student?.amount_due;
+  if (fromStudent != null && !Number.isNaN(Number(fromStudent))) {
+    return Number(fromStudent);
+  }
+  return 0;
+}
+
+/** Eligible to move when not already moved and amount due is at most 15000. */
+function canSelectStudentForMove(student, paymentSummaryByStudent = {}) {
+  if (!student || student.is_moved_to_batch) return false;
+  return getStudentAmountDue(student, paymentSummaryByStudent) <= MAX_AMOUNT_DUE_FOR_MOVE;
 }
 
 function formatMoveStudentsError(data, fallback = "Failed to move selected students.") {
@@ -354,6 +377,13 @@ function BatchesPage() {
   };
 
   const toggleStudentSelection = (studentId) => {
+    const student = batchStudents.find((s) => s.id === studentId);
+    if (student && !canSelectStudentForMove(student, paymentSummaryByStudent)) {
+      showErrorToast(
+        `Cannot select: amount due is more than ₹${MAX_AMOUNT_DUE_FOR_MOVE.toLocaleString()}.`,
+      );
+      return;
+    }
     setSelectedStudentIds((prev) =>
       prev.includes(studentId) ? prev.filter((id) => id !== studentId) : [...prev, studentId]
     );
@@ -362,7 +392,7 @@ function BatchesPage() {
   const toggleSelectAll = (checked) => {
     if (checked) {
       const ids = batchStudents
-        .filter((s) => !s?.is_moved_to_batch)
+        .filter((s) => canSelectStudentForMove(s, paymentSummaryByStudent))
         .map((s) => s.id)
         .filter((id) => id != null);
       setSelectedStudentIds(ids);
@@ -383,6 +413,20 @@ function BatchesPage() {
   const handleMoveSelectedStudents = async (e) => {
     e.preventDefault();
     if (!selectedSalesBatchId || selectedStudentIds.length === 0 || !targetBatch.trim()) return;
+
+    const blocked = selectedStudentIds
+      .map((id) => batchStudents.find((s) => s.id === id))
+      .filter((s) => s && !canSelectStudentForMove(s, paymentSummaryByStudent));
+    if (blocked.length > 0) {
+      const names = blocked
+        .map((s) => s.student_name || `Student ${s.id}`)
+        .join(", ");
+      const message = `Cannot move when amount due is more than ₹${MAX_AMOUNT_DUE_FOR_MOVE.toLocaleString()}: ${names}`;
+      setMoveError(message);
+      showErrorToast(message);
+      return;
+    }
+
     setMoveSubmitting(true);
     setMoveError(null);
     try {
@@ -430,68 +474,78 @@ function BatchesPage() {
   const selectedSalesBatchOption =
     salesBatchOptions.find((o) => o.value === String(selectedSalesBatchId)) ?? null;
 
+  useEffect(() => {
+    const main = document.querySelector("main");
+    if (!main) return undefined;
+    const previousOverflowY = main.style.overflowY;
+    main.style.overflowY = "hidden";
+    return () => {
+      main.style.overflowY = previousOverflowY;
+    };
+  }, []);
+
   return (
-    <div className="flex w-full max-w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle className="text-2xl">Sales Batches</CardTitle>
-                <CardDescription>
-                  Manage sales batch capacity and movement summary before mentor batch assignment.
-                </CardDescription>
-              </div>
-              {canManage && (
-                <Button onClick={openCreateModal}>Create Sales Batch</Button>
+    <div className="flex h-full min-h-0 w-full max-w-full flex-1 flex-col gap-4 overflow-hidden">
+      <Card className="shrink-0">
+        <CardHeader className="py-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 flex-1 sm:max-w-xl">
+              <Select
+                options={salesBatchOptions}
+                value={selectedSalesBatchOption}
+                onChange={(option) => {
+                  if (!option?.value) {
+                    setSelectedSalesBatchId("");
+                    setStudentsModalOpen(false);
+                    return;
+                  }
+                  openBatchStudents(option.value);
+                }}
+                isSearchable
+                isClearable
+                placeholder="Search and select sales batch (opens modal)"
+                styles={BATCH_SELECT_STYLES}
+                menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                menuPosition="fixed"
+              />
+              {!loading && salesBatchOptions.length === 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">No sales batches available.</p>
               )}
             </div>
-            <div>
-              <div className="sm:max-w-2xl">
-                <Select
-                  options={salesBatchOptions}
-                  value={selectedSalesBatchOption}
-                  onChange={(option) => {
-                    if (!option?.value) {
-                      setSelectedSalesBatchId("");
-                      setStudentsModalOpen(false);
-                      return;
-                    }
-                    openBatchStudents(option.value);
-                  }}
-                  isSearchable
-                  isClearable
-                  placeholder="Search and select sales batch (opens modal)"
-                />
-                {!loading && salesBatchOptions.length === 0 && (
-                  <p className="mt-1 text-xs text-muted-foreground">No sales batches available.</p>
-                )}
-              </div>
-            </div>
+            {canManage && (
+              <Button className="shrink-0 self-start sm:self-auto" onClick={openCreateModal}>
+                Create Sales Batch
+              </Button>
+            )}
           </div>
         </CardHeader>
-        <CardContent>
+      </Card>
+
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="min-h-0 flex-1 overflow-auto">
           {loading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : error ? (
-            <p className="py-6 text-center text-destructive">{error}</p>
+            <p className="px-6 py-6 text-center text-destructive">{error}</p>
           ) : salesBatches.length === 0 ? (
-            <p className="py-6 text-center text-muted-foreground">No sales batches found.</p>
+            <p className="px-6 py-6 text-center text-muted-foreground">No sales batches found.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Batch Name</TableHead>
-                  <TableHead>Course</TableHead>
-                  <TableHead>Capacity</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Moved</TableHead>
-                  <TableHead>Not Moved</TableHead>
-                  <TableHead>Remaining Seats</TableHead>
-                  <TableHead>Status</TableHead>
-                  {canManage && <TableHead className="w-[140px] text-right">Actions</TableHead>}
+            <table className="w-full caption-bottom text-sm">
+              <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="bg-card">Batch Name</TableHead>
+                  <TableHead className="bg-card">Course</TableHead>
+                  <TableHead className="bg-card">Capacity</TableHead>
+                  <TableHead className="bg-card">Total</TableHead>
+                  <TableHead className="bg-card">Moved</TableHead>
+                  <TableHead className="bg-card">Not Moved</TableHead>
+                  <TableHead className="bg-card">Remaining Seats</TableHead>
+                  <TableHead className="bg-card">Status</TableHead>
+                  {canManage && (
+                    <TableHead className="w-[140px] bg-card text-right">Actions</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -548,9 +602,9 @@ function BatchesPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </table>
           )}
-        </CardContent>
+        </div>
       </Card>
 
       {modalOpen && (
@@ -678,6 +732,9 @@ function BatchesPage() {
                     Move Selected to Actual Batch
                   </Button>
                 )}
+                <span className="text-xs text-muted-foreground">
+                  Move allowed only if Amount Due is ₹{MAX_AMOUNT_DUE_FOR_MOVE.toLocaleString()} or less.
+                </span>
               </div>
               {batchStudentsLoading ? (
                 <div className="flex justify-center py-8">
@@ -695,12 +752,17 @@ function BatchesPage() {
                         <TableHead className="w-[40px]">
                           <input
                             type="checkbox"
-                            checked={
-                              batchStudents.some((s) => !s?.is_moved_to_batch) &&
-                              selectedStudentIds.length === batchStudents.filter((s) => !s?.is_moved_to_batch).length
-                            }
+                            checked={(() => {
+                              const eligible = batchStudents.filter((s) =>
+                                canSelectStudentForMove(s, paymentSummaryByStudent),
+                              );
+                              return (
+                                eligible.length > 0 &&
+                                selectedStudentIds.length === eligible.length
+                              );
+                            })()}
                             onChange={(e) => toggleSelectAll(e.target.checked)}
-                            aria-label="Select all students"
+                            aria-label="Select all eligible students"
                           />
                         </TableHead>
                       )}
@@ -715,14 +777,25 @@ function BatchesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {batchStudents.map((s) => (
-                      <TableRow key={s.id}>
+                    {batchStudents.map((s) => {
+                      const amountDue = getStudentAmountDue(s, paymentSummaryByStudent);
+                      const selectable = canSelectStudentForMove(s, paymentSummaryByStudent);
+                      const dueTooHigh =
+                        !s.is_moved_to_batch && amountDue > MAX_AMOUNT_DUE_FOR_MOVE;
+                      return (
+                      <TableRow key={s.id} className={cn(dueTooHigh && "opacity-70")}>
                       {canManage && (
                         <TableCell>
                           {!s.is_moved_to_batch ? (
                             <input
                               type="checkbox"
                               checked={selectedStudentIds.includes(s.id)}
+                              disabled={!selectable}
+                              title={
+                                dueTooHigh
+                                  ? `Amount due ₹${amountDue.toLocaleString()} exceeds ₹${MAX_AMOUNT_DUE_FOR_MOVE.toLocaleString()}`
+                                  : undefined
+                              }
                               onChange={() => toggleStudentSelection(s.id)}
                               aria-label={`Select ${s.student_name}`}
                             />
@@ -745,6 +818,11 @@ function BatchesPage() {
                           {paymentSummaryLoading
                             ? "..."
                             : `₹ ${Number(paymentSummaryByStudent[s.id]?.pending || 0).toLocaleString()}`}
+                          {dueTooHigh ? (
+                            <span className="mt-1 block text-[10px] font-medium text-destructive">
+                              Due &gt; ₹{MAX_AMOUNT_DUE_FOR_MOVE.toLocaleString()} — cannot move
+                            </span>
+                          ) : null}
                         </TableCell>
                         <TableCell>
                           {s.is_moved_to_batch ? (
@@ -754,7 +832,8 @@ function BatchesPage() {
                           )}
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}

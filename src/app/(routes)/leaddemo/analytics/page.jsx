@@ -24,6 +24,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { LEAD_STATUS_PREFERRED_ORDER } from "@/constants/leadStatus";
+import {
+  LEAD_IS_AGENT_FILTER_OPTIONS,
+  LEAD_IS_INTERESTED_FILTER_OPTIONS,
+} from "@/constants/leadCourse";
 import { isManagerOrSuperAdmin } from "@/lib/dashboardConstants";
 import useToast from "@/hooks/useToast";
 
@@ -52,6 +56,8 @@ function LeadSourceAnalyticsPage() {
   const [fromDate, setFromDate] = useState(todayDateString());
   const [toDate, setToDate] = useState(todayDateString());
   const [salesPerson, setSalesPerson] = useState("");
+  const [isAgent, setIsAgent] = useState("");
+  const [isInterested, setIsInterested] = useState("");
   const [downloadLoading, setDownloadLoading] = useState(false);
   const { showSuccessToast, showErrorToast } = useToast();
 
@@ -118,6 +124,8 @@ function LeadSourceAnalyticsPage() {
         fromDate,
         toDate,
         salesPersonId: resolvedSalesPerson || undefined,
+        isAgent: isManager && isAgent ? isAgent : undefined,
+        isInterested: isManager && isInterested ? isInterested : undefined,
       })
     );
   };
@@ -193,6 +201,40 @@ function LeadSourceAnalyticsPage() {
                   ))}
               </select>
             </div>
+            {isManager && (
+              <div className="flex flex-col gap-1 min-w-[140px]">
+                <label className="text-xs text-muted-foreground">Is Agent</label>
+                <select
+                  value={isAgent}
+                  onChange={(e) => setIsAgent(e.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                  aria-label="Filter by agent"
+                >
+                  {LEAD_IS_AGENT_FILTER_OPTIONS.map((o) => (
+                    <option key={o.value || "all-agent"} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {isManager && (
+              <div className="flex flex-col gap-1 min-w-[160px]">
+                <label className="text-xs text-muted-foreground">Is Interested</label>
+                <select
+                  value={isInterested}
+                  onChange={(e) => setIsInterested(e.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                  aria-label="Filter by interested"
+                >
+                  {LEAD_IS_INTERESTED_FILTER_OPTIONS.map((o) => (
+                    <option key={o.value || "all-interested"} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <Button
               onClick={loadAnalytics}
               disabled={loading || !fromDate || !toDate}

@@ -5,9 +5,11 @@ import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { LogOut, Loader2 } from "lucide-react";
 import { logout } from "@/redux/features/user/userAuth";
-import { routeObject, MenuItems, SCHOLARSHIP_TEST_NAV_LABEL } from "@/shared/static/sidebarItems";
+import { routeObject, MenuItems } from "@/shared/static/sidebarItems";
+// import { SCHOLARSHIP_TEST_NAV_LABEL } from "@/shared/static/sidebarItems"; // scholarship test
 import { cn } from "@/lib/utils";
 import { getLeadsListHref } from "@/lib/leadsFiltersUrl";
+import { getStudentsListHref } from "@/lib/studentsFiltersUrl";
 
 export default function SideBar({ mobileOpen = false, onMobileClose }) {
   const [activeItem, setActiveItem] = useState("");
@@ -40,9 +42,10 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
   );
 
   useEffect(() => {
-    if (pathname?.startsWith("/public-challenges")) {
-      setActiveItem(SCHOLARSHIP_TEST_NAV_LABEL);
-    } else if (pathname?.startsWith("/leads") || pathname?.startsWith("/bulk-upload")) {
+    // if (pathname?.startsWith("/public-challenges")) {
+    //   setActiveItem(SCHOLARSHIP_TEST_NAV_LABEL);
+    // } else
+    if (pathname?.startsWith("/leads") || pathname?.startsWith("/bulk-upload")) {
       setActiveItem("Leads");
     } else if (pathname?.startsWith("/referrals")) {
       setActiveItem("Referrals");
@@ -65,8 +68,8 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
   const handleActiveItem = (text) => {
     if (text === "Dashboard") {
       router.push("/");
-    } else if (text === SCHOLARSHIP_TEST_NAV_LABEL) {
-      router.push("/public-challenges");
+    // } else if (text === SCHOLARSHIP_TEST_NAV_LABEL) {
+    //   router.push("/public-challenges");
     } else if (text === "Sales persons") {
       router.push("/sales-persons");
     } else if (text === "Leads") {
@@ -76,7 +79,7 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
     } else if (text === "Activities") {
       router.push("/activities");
     } else if (text === "Students") {
-      router.push("/students");
+      router.push(getStudentsListHref());
     } else if (text === "Payments") {
       router.push("/payments");
     } else if (text === "Demo Reviews") {
@@ -105,7 +108,7 @@ export default function SideBar({ mobileOpen = false, onMobileClose }) {
     <>
       <aside
         className={cn(
-          "fixed left-0 top-0 z-30 flex h-[100dvh] max-h-[100dvh] w-[250px] flex-shrink-0 flex-col overflow-hidden border-r border-border/80 bg-card shadow-[4px_0_24px_-12px_rgba(0,0,0,0.08)]",
+          "fixed left-0 top-0 z-30 flex h-[100dvh] max-h-[100dvh] w-[200px] flex-shrink-0 flex-col overflow-hidden border-r border-border/80 bg-card shadow-[4px_0_24px_-12px_rgba(0,0,0,0.08)]",
           "transition-transform duration-200 ease-out",
           "lg:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
