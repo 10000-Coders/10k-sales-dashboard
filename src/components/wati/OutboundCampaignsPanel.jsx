@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import TablePaginationFooter from "@/components/ui/TablePaginationFooter";
 import {
   Table,
   TableBody,
@@ -154,28 +155,13 @@ export default function OutboundCampaignsPanel({ selectedId, onSelect }) {
             </Table>
           </div>
         )}
-        {(outbound.list.data?.count || 0) > 20 ? (
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Previous
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={page * 20 >= (outbound.list.data?.count || 0)}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </Button>
-          </div>
-        ) : null}
+        <TablePaginationFooter
+          page={page}
+          pageSize={20}
+          count={outbound.list.data?.count || 0}
+          onPageChange={setPage}
+          itemLabel="campaigns"
+        />
       </div>
 
       {selectedId && detail ? (
@@ -242,28 +228,13 @@ export default function OutboundCampaignsPanel({ selectedId, onSelect }) {
               </Table>
             </div>
           )}
-          {(outbound.recipients.data?.count || 0) > 50 ? (
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={recipientsPage <= 1}
-                onClick={() => setRecipientsPage((p) => Math.max(1, p - 1))}
-              >
-                Previous
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={recipientsPage * 50 >= (outbound.recipients.data?.count || 0)}
-                onClick={() => setRecipientsPage((p) => p + 1)}
-              >
-                Next
-              </Button>
-            </div>
-          ) : null}
+          <TablePaginationFooter
+            page={recipientsPage}
+            pageSize={50}
+            count={outbound.recipients.data?.count || 0}
+            onPageChange={setRecipientsPage}
+            itemLabel="recipients"
+          />
         </div>
       ) : null}
     </div>

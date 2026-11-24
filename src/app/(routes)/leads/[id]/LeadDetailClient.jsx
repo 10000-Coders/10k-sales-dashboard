@@ -19,7 +19,6 @@ import { Loader2, ArrowLeft, Phone, Mail, User, Calendar, Activity, MessageCircl
 import { cn } from "@/lib/utils";
 import { FollowUpTimer } from "@/components/FollowUpTimer";
 import { useFollowUp } from "@/context/FollowUpProvider";
-import LeadWatiActivityCard from "@/components/wati/LeadWatiActivityCard";
 import { getInquirySourceLabel } from "@/constants/leadInquirySource";
 import {
   LEAD_STATUS_OPTIONS,
@@ -370,10 +369,6 @@ export default function LeadDetailClient() {
             </CardContent>
           </Card>
       )}
-
-      {isManagerOrAdmin(user?.role) && lead?.id ? (
-        <LeadWatiActivityCard leadId={lead.id} />
-      ) : null}
 
       <Card>
         <CardHeader>

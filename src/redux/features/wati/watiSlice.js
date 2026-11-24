@@ -1,7 +1,9 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "@/axios";
 
-export const WATI_CAMPAIGNS_PAGE_SIZE = 20;
+/** Backend max page size; fetchOverview pulls every page so the table shows the whole period. */
+export const WATI_CAMPAIGNS_PAGE_SIZE = 100;
+const WATI_OVERVIEW_MAX_PAGES = 10;
 export const WATI_TABLE_PAGE_SIZE = 50;
 
 function rejectPayload(err, fallback) {
@@ -9,6 +11,16 @@ function rejectPayload(err, fallback) {
   return typeof payload === "object" && payload !== null
     ? payload
     : { detail: err.message || fallback };
+}
+
+/** Background auto-refresh requests pass `silent: true` — no spinners, keep current data. */
+function isSilent(action) {
+  return Boolean(action.meta?.arg && typeof action.meta.arg === "object" && action.meta.arg.silent);
+}
+
+function detailArgId(action) {
+  const arg = action.meta?.arg;
+  return String(typeof arg === "object" && arg ? arg.broadcastId : arg || "");
 }
 
 export const fetchOverview = createAsyncThunk(
@@ -20,6 +32,7 @@ export const fetchOverview = createAsyncThunk(
       page = 1,
       page_size = WATI_CAMPAIGNS_PAGE_SIZE,
       refresh = false,
+      // `silent: true` is read by the pending/rejected reducers via action.meta.arg.
     } = {},
     { rejectWithValue }
   ) => {
@@ -32,7 +45,24 @@ export const fetchOverview = createAsyncThunk(
       if (date_to) params.set("date_to", date_to);
       if (refresh) params.set("refresh", "1");
       const { data } = await axios.get(`/wati/campaigns/overview/?${params}`);
-      return data;
+      // All campaigns in the period: fetch remaining pages and merge rows.
+      // Totals / overview_metrics already cover the full range, so keep page 1's.
+      const results = [...(data?.results || [])];
+      const total = Number(data?.total) || 0;
+      let nextPage = Number(page) + 1;
+      while (
+        results.length < total &&
+        nextPage <= WATI_OVERVIEW_MAX_PAGES
+      ) {
+        params.set("page", String(nextPage));
+        params.delete("refresh");
+        const { data: more } = await axios.get(`/wati/campaigns/overview/?${params}`);
+        const rows = more?.results || [];
+        if (!rows.length) break;
+        results.push(...rows);
+        nextPage += 1;
+      }
+      return { ...data, page: 1, results, count: results.length };
     } catch (err) {
       return rejectWithValue(rejectPayload(err, "Failed to load WATI campaigns."));
     }
@@ -41,9 +71,15 @@ export const fetchOverview = createAsyncThunk(
 
 export const fetchCampaignDetail = createAsyncThunk(
   "wati/fetchCampaignDetail",
-  async (broadcastId, { rejectWithValue }) => {
+  /** Accepts a broadcast id, or `{ broadcastId, refresh }` to recompute from WATI. */
+  async (arg, { rejectWithValue }) => {
+    const broadcastId = typeof arg === "object" && arg ? arg.broadcastId : arg;
+    const refresh = typeof arg === "object" && arg ? Boolean(arg.refresh) : false;
     try {
-      const { data } = await axios.get(`/wati/campaigns/${encodeURIComponent(broadcastId)}/`);
+      const qs = refresh ? "?refresh=1" : "";
+      const { data } = await axios.get(
+        `/wati/campaigns/${encodeURIComponent(broadcastId)}/${qs}`
+      );
       return data;
     } catch (err) {
       return rejectWithValue(rejectPayload(err, "Failed to load campaign."));
@@ -81,6 +117,7 @@ export const fetchRecipients = createAsyncThunk(
       search = "",
       message_status = "",
       sales_outcome = "",
+      wa_response = "",
       source = "",
       date_from = "",
       date_to = "",
@@ -88,6 +125,8 @@ export const fetchRecipients = createAsyncThunk(
       page_size = WATI_TABLE_PAGE_SIZE,
       unique,
       refresh = false,
+      // "-last_activity" (newest first) | "last_activity" (oldest first) | "" (WATI order)
+      ordering = "",
     } = {},
     { rejectWithValue }
   ) => {
@@ -100,9 +139,11 @@ export const fetchRecipients = createAsyncThunk(
       if (search) params.set("search", search);
       if (message_status) params.set("message_status", message_status);
       if (sales_outcome) params.set("sales_outcome", sales_outcome);
+      if (wa_response) params.set("wa_response", wa_response);
       if (source) params.set("source", source);
       if (date_from) params.set("date_from", date_from);
       if (date_to) params.set("date_to", date_to);
+      if (ordering) params.set("ordering", ordering);
       // All campaigns → unique contacts; single campaign → full recipient list.
       if (unique === true || unique === false) {
         params.set("unique", String(unique));
@@ -180,21 +221,46 @@ export const fetchRecipientDrawer = createAsyncThunk(
   }
 );
 
-export const fetchLeadWatiActivity = createAsyncThunk(
-  "wati/fetchLeadWatiActivity",
-  async (arg, { rejectWithValue }) => {
-    const leadId = typeof arg === "object" && arg != null ? arg.leadId : arg;
-    const refresh = Boolean(typeof arg === "object" && arg != null && arg.refresh);
+/**
+ * Leads table → phone popup: every WATI campaign sent to a lead plus the full WhatsApp thread.
+ * Lead activity (local, fast) gives the campaign list + latest campaign id; the unscoped
+ * history endpoint then returns the whole conversation (all campaign templates + replies).
+ */
+export const fetchLeadChat = createAsyncThunk(
+  "wati/fetchLeadChat",
+  async ({ leadId, phone }, { rejectWithValue }) => {
     try {
-      const { data } = await axios.get(`/wati/leads/${leadId}/activity/`, {
-        params: refresh ? { refresh: 1 } : undefined,
-      });
-      return data;
+      const { data: activity } = await axios.get(`/wati/leads/${leadId}/activity/`);
+      const campaigns = Array.isArray(activity?.campaigns) ? activity.campaigns : [];
+      const broadcastId =
+        activity?.summary?.latest_broadcast_id || campaigns[0]?.broadcast_id || "";
+      const chatPhone = phone || activity?.phone || "";
+      let history = null;
+      if (broadcastId && chatPhone) {
+        const { data } = await axios.get(
+          `/wati/campaigns/${encodeURIComponent(broadcastId)}/recipients/${encodeURIComponent(
+            chatPhone
+          )}/history/`
+        );
+        history = data;
+      }
+      return {
+        activity: {
+          lead_id: activity?.lead_id ?? leadId,
+          lead_name: activity?.lead_name || "",
+          phone: activity?.phone || chatPhone,
+          sales_outcome_label: activity?.sales_outcome_label || "",
+          events: [],
+        },
+        history,
+        campaigns,
+      };
     } catch (err) {
-      return rejectWithValue(rejectPayload(err, "Failed to load WATI activity for lead."));
+      return rejectWithValue(rejectPayload(err, "Failed to load WhatsApp chat."));
     }
   }
 );
+
 
 export const fetchCampaignTypes = createAsyncThunk(
   "wati/fetchCampaignTypes",
@@ -346,11 +412,6 @@ const initialState = {
     previewName: null,
     data: null,
   },
-  leadActivity: {
-    loading: false,
-    error: null,
-    data: null,
-  },
   outbound: {
     types: [],
     typesLoading: false,
@@ -376,6 +437,9 @@ const watiSlice = createSlice({
       state.drawer.leadOrPhone = action.payload?.leadOrPhone ?? action.payload?.phone ?? null;
       state.drawer.previewName = action.payload?.previewName ?? null;
       state.drawer.error = null;
+      // Never flash the previous contact's chat while the next one loads.
+      state.drawer.data = null;
+      state.drawer.loading = true;
     },
     closeRecipientDrawer(state) {
       state.drawer.open = false;
@@ -385,6 +449,7 @@ const watiSlice = createSlice({
       state.drawer.phone = null;
       state.drawer.leadOrPhone = null;
       state.drawer.previewName = null;
+      state.drawer.requestId = null;
     },
     clearCampaignDetail(state) {
       state.detail = { loading: false, error: null, data: null };
@@ -397,7 +462,9 @@ const watiSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchOverview.pending, (state) => {
+      .addCase(fetchOverview.pending, (state, action) => {
+        // Silent polls (while snapshots sync) keep the table visible — no skeleton flash.
+        if (action.meta.arg?.silent) return;
         state.overview.loading = true;
         state.overview.error = null;
       })
@@ -406,18 +473,27 @@ const watiSlice = createSlice({
         state.overview.data = action.payload;
       })
       .addCase(fetchOverview.rejected, (state, action) => {
+        // A failed background poll keeps the last good table instead of an error state.
+        if (action.meta.arg?.silent) return;
         state.overview.loading = false;
         state.overview.error = action.payload?.detail || "Failed to load WATI campaigns.";
       })
-      .addCase(fetchCampaignDetail.pending, (state) => {
+      .addCase(fetchCampaignDetail.pending, (state, action) => {
+        // Silent = background auto-refresh on page load: keep the current view on screen.
+        if (isSilent(action)) return;
         state.detail.loading = true;
         state.detail.error = null;
+        state.detail.broadcastId = detailArgId(action);
       })
       .addCase(fetchCampaignDetail.fulfilled, (state, action) => {
-        state.detail.loading = false;
+        // A slow response for a campaign the user has already left must not replace it.
+        if (state.detail.broadcastId && detailArgId(action) !== state.detail.broadcastId) return;
+        if (!isSilent(action)) state.detail.loading = false;
         state.detail.data = action.payload;
       })
       .addCase(fetchCampaignDetail.rejected, (state, action) => {
+        if (isSilent(action)) return; // keep the last good numbers
+        if (state.detail.broadcastId && detailArgId(action) !== state.detail.broadcastId) return;
         state.detail.loading = false;
         state.detail.error = action.payload?.detail || "Failed to load campaign.";
       })
@@ -433,7 +509,10 @@ const watiSlice = createSlice({
         state.leads.loading = false;
         state.leads.error = action.payload?.detail || "Failed to load recipients.";
       })
-      .addCase(fetchRecipients.pending, (state) => {
+      .addCase(fetchRecipients.pending, (state, action) => {
+        // Newest request wins (filters changed, or a background refresh finished later).
+        state.recipients.requestId = action.meta.requestId;
+        if (isSilent(action)) return;
         state.recipients.loading = true;
         state.recipients.error = null;
         // Drop prior filter snapshot so All Campaigns tiles don't keep overall totals
@@ -446,11 +525,14 @@ const watiSlice = createSlice({
         }
       })
       .addCase(fetchRecipients.fulfilled, (state, action) => {
+        if (state.recipients.requestId && action.meta.requestId !== state.recipients.requestId) return;
         state.recipients.loading = false;
         state.recipients.data = action.payload;
       })
       .addCase(fetchRecipients.rejected, (state, action) => {
+        if (state.recipients.requestId && action.meta.requestId !== state.recipients.requestId) return;
         state.recipients.loading = false;
+        if (isSilent(action)) return; // keep the last good table
         state.recipients.error = action.payload?.detail || "Failed to load students and contacts.";
       })
       .addCase(fetchCampaignMessages.pending, (state) => {
@@ -489,17 +571,21 @@ const watiSlice = createSlice({
         state.drawer.loading = false;
         state.drawer.error = action.payload?.detail || "Failed to load recipient.";
       })
-      .addCase(fetchLeadWatiActivity.pending, (state) => {
-        state.leadActivity.loading = true;
-        state.leadActivity.error = null;
+      .addCase(fetchLeadChat.pending, (state, action) => {
+        state.drawer.loading = true;
+        state.drawer.error = null;
+        state.drawer.requestId = action.meta.requestId;
       })
-      .addCase(fetchLeadWatiActivity.fulfilled, (state, action) => {
-        state.leadActivity.loading = false;
-        state.leadActivity.data = action.payload;
+      .addCase(fetchLeadChat.fulfilled, (state, action) => {
+        // Ignore a slow response for a lead the user already closed / switched away from.
+        if (!state.drawer.open || state.drawer.requestId !== action.meta.requestId) return;
+        state.drawer.loading = false;
+        state.drawer.data = action.payload;
       })
-      .addCase(fetchLeadWatiActivity.rejected, (state, action) => {
-        state.leadActivity.loading = false;
-        state.leadActivity.error = action.payload?.detail || "Failed to load WATI activity.";
+      .addCase(fetchLeadChat.rejected, (state, action) => {
+        if (!state.drawer.open || state.drawer.requestId !== action.meta.requestId) return;
+        state.drawer.loading = false;
+        state.drawer.error = action.payload?.detail || "Failed to load WhatsApp chat.";
       })
       .addCase(fetchCampaignTypes.pending, (state) => {
         state.outbound.typesLoading = true;

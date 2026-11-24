@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
+import TablePaginationFooter from "@/components/ui/TablePaginationFooter";
 import { Loader2 } from "lucide-react";
 import WatiStatusBadge from "@/components/wati/WatiStatusBadge";
 import { formatWatiDateTime } from "@/lib/watiFormatters";
@@ -23,8 +23,6 @@ export default function CampaignHistoryTable({
   onPageChange,
   onLeadClick,
 }) {
-  const totalPages = Math.max(1, Math.ceil((count || 0) / pageSize) || 1);
-
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
@@ -91,29 +89,14 @@ export default function CampaignHistoryTable({
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={loading || page <= 1}
-          onClick={() => onPageChange?.(page - 1)}
-        >
-          Prev
-        </Button>
-        <span className="text-xs text-muted-foreground">
-          Page {page} / {totalPages}
-        </span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={loading || page >= totalPages}
-          onClick={() => onPageChange?.(page + 1)}
-        >
-          Next
-        </Button>
-      </div>
+      <TablePaginationFooter
+        page={page}
+        pageSize={pageSize}
+        count={count}
+        onPageChange={onPageChange}
+        loading={loading}
+        itemLabel="events"
+      />
     </div>
   );
 }

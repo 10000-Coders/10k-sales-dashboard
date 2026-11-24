@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { TemplateButtons, WhatsAppBody } from "@/components/wati/whatsappBubbleParts";
 import useToast from "@/hooks/useToast";
 import {
   createOutboundCampaign,
@@ -31,6 +32,27 @@ const STEPS = [
   { id: 2, label: "Content" },
   { id: 3, label: "Schedule" },
 ];
+
+/** Suggested name for a follow-up sent from a campaign page, e.g. "D28 – Not responded follow-up". */
+function suggestFollowUpName(audience) {
+  if (!audience) return "";
+  const base = String(audience.campaignName || "").trim() || "Campaign";
+  const label = String(audience.filterLabel || "").split(" · ")[0];
+  return `${base} – ${label ? `${label} follow-up` : "Follow-up"}`.replace(/\s{2,}/g, " ");
+}
+
+/** Body fields naming the recipients: Leads-page `lead_ids` or a campaign-page `audience`. */
+function recipientsPayload(audience, leadIds) {
+  if (!audience) return { lead_ids: leadIds };
+  return {
+    audience: {
+      broadcast_id: audience.broadcastId,
+      ...(audience.filters || {}),
+      exclude_phones: audience.excludePhones || [],
+      include_phones: audience.includePhones || [],
+    },
+  };
+}
 
 function isCleanCampaignName(value) {
   const trimmed = (value || "").trim();
@@ -118,7 +140,7 @@ function useTemplateHeaderMedia(template) {
   return { resolved, loading, failed, headerType, wantsMedia: Boolean(mediaUrl) || ["IMAGE", "VIDEO", "DOCUMENT"].includes(headerType) };
 }
 
-function TemplatePreviewCard({ template }) {
+function TemplatePreviewCard({ template, scrollable = false }) {
   const { resolved, loading, failed, headerType, wantsMedia } = useTemplateHeaderMedia(template);
 
   if (!template) {
@@ -131,64 +153,89 @@ function TemplatePreviewCard({ template }) {
 
   const headerText = template.header_text || template.header || "";
   const showTextHeader = headerText && (!headerType || headerType === "TEXT");
+  const buttons =
+    Array.isArray(template.buttons) && template.buttons.length
+      ? template.buttons
+      : Array.isArray(template.template_buttons)
+        ? template.template_buttons
+        : [];
+  const hasHeaderBlock = wantsMedia || loading || failed;
 
   return (
-    <div className="rounded-xl border border-border bg-[#e5ddd5] p-3 shadow-sm">
-      <div className="ml-auto max-w-[95%] overflow-hidden rounded-lg rounded-tr-sm bg-white text-sm shadow-sm">
-        {wantsMedia || loading || failed ? (
-          <div className="border-b border-border/60 bg-muted/20">
-            {loading ? (
-              <div className="flex h-36 items-center justify-center text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin" />
-              </div>
-            ) : failed || !resolved ? (
-              <div className="flex h-28 flex-col items-center justify-center gap-1 px-3 text-center text-xs text-muted-foreground">
-                <ImageOff className="h-5 w-5" />
-                <span>Header image unavailable for this template</span>
-              </div>
-            ) : headerType === "VIDEO" ? (
-              <video src={resolved} controls className="max-h-56 w-full bg-black object-contain" />
-            ) : headerType === "DOCUMENT" ? (
-              <a
-                href={resolved}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2 px-3 py-4 text-sm text-[#FF8000] hover:underline"
-              >
-                <FileText className="h-4 w-4" />
-                Open header document
-              </a>
-            ) : (
-              // IMAGE (or unknown media type with a resolved binary) — only this template's URL
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={resolved}
-                alt={template.name ? `${template.name} header` : "Template header"}
-                className="max-h-56 w-full object-cover"
-              />
-            )}
+    <div
+      className={cn(
+        "rounded-xl border border-border bg-[#efeae2] px-4 py-4 shadow-sm",
+        // Long templates scroll inside the preview instead of stretching the whole dialog.
+        scrollable && "max-h-[min(56vh,500px)] overflow-y-auto overscroll-contain"
+      )}
+    >
+      <div className="relative ml-auto w-[92%] overflow-hidden rounded-lg rounded-tr-none bg-[#d9fdd3] text-[14.2px] leading-[19px] text-[#111b21] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">
+        <div className={cn(hasHeaderBlock ? "p-[3px]" : "px-[7px] pb-[6px] pt-[6px]")}>
+          {hasHeaderBlock ? (
+            <div className="overflow-hidden rounded-[6px]">
+              {loading ? (
+                <div className="flex aspect-[1.91/1] w-full items-center justify-center bg-black/[0.05] text-[#667781]">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                </div>
+              ) : failed || !resolved ? (
+                <div className="flex aspect-[1.91/1] w-full flex-col items-center justify-center gap-1 bg-black/[0.05] px-3 text-center text-xs text-[#667781]">
+                  <ImageOff className="h-5 w-5" />
+                  <span>Header image unavailable for this template</span>
+                </div>
+              ) : headerType === "VIDEO" ? (
+                <video src={resolved} controls className="block max-h-[340px] w-full bg-black object-contain" />
+              ) : headerType === "DOCUMENT" ? (
+                <a
+                  href={resolved}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2 bg-black/[0.05] px-3 py-3 text-[13px] font-medium text-[#111b21] hover:bg-black/[0.08]"
+                >
+                  <FileText className="h-6 w-6 shrink-0 text-[#e9573f]" />
+                  Open header document
+                </a>
+              ) : (
+                // IMAGE (or unknown media type with a resolved binary) — only this template's URL
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={resolved}
+                  alt={template.name ? `${template.name} header` : "Template header"}
+                  className="block max-h-[340px] w-full object-cover"
+                />
+              )}
+            </div>
+          ) : null}
+          <div className={cn(hasHeaderBlock && "px-[4px] pb-[3px] pt-[6px]")}>
+            {showTextHeader ? (
+              <p className="mb-1 font-semibold">{headerText}</p>
+            ) : null}
+            <div>
+              {template.body ? (
+                <WhatsAppBody text={template.body} />
+              ) : (
+                <span className="text-[#667781]">No body text</span>
+              )}
+            </div>
+            {template.footer ? (
+              <p className="mt-[3px] text-[13px] leading-[17px] text-[#667781]">{template.footer}</p>
+            ) : null}
           </div>
-        ) : null}
-        <div className="px-3 py-2.5">
-          {showTextHeader ? (
-            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {headerText}
-            </p>
-          ) : null}
-          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
-            {template.body || "No body text"}
-          </p>
-          {template.footer ? (
-            <p className="mt-2 text-xs text-muted-foreground">{template.footer}</p>
-          ) : null}
         </div>
+        {/* Quick-reply / CTA buttons sit inside the bubble, split by hairlines — like the phone. */}
+        <TemplateButtons buttons={buttons} />
       </div>
-      <p className="mt-2 truncate text-center text-[11px] text-muted-foreground">{template.name}</p>
+      <p className="mt-2 truncate text-center text-[11px] text-[#667781]">{template.name}</p>
     </div>
   );
 }
 
-export default function CreateCampaignDrawer({ open, onClose, selectedLeads = [] }) {
+export default function CreateCampaignDrawer({
+  open,
+  onClose,
+  selectedLeads = [],
+  // Campaign-page follow-up: recipients resolved server-side from a campaign + filters.
+  audience = null,
+}) {
   const dispatch = useDispatch();
   const router = useRouter();
   const { showSuccessToast, showErrorToast } = useToast();
@@ -205,6 +252,7 @@ export default function CreateCampaignDrawer({ open, onClose, selectedLeads = []
   const [estimating, setEstimating] = useState(false);
 
   const leadIds = useMemo(() => selectedLeads.map((l) => l.id), [selectedLeads]);
+  const recipientCount = audience ? Number(audience.count) || 0 : leadIds.length;
   const selectedTemplate = useMemo(
     () => (outbound.templates || []).find((t) => t.name === templateName) || null,
     [outbound.templates, templateName]
@@ -220,7 +268,7 @@ export default function CreateCampaignDrawer({ open, onClose, selectedLeads = []
   useEffect(() => {
     if (!open) return;
     setStep(1);
-    setBroadcastName("");
+    setBroadcastName(suggestFollowUpName(audience));
     setCampaignType("");
     setTemplateName("");
     setParamMapping({});
@@ -228,6 +276,8 @@ export default function CreateCampaignDrawer({ open, onClose, selectedLeads = []
     setSubmitting(false);
     setEstimate(null);
     dispatch(fetchCampaignTypes());
+    // Audience is captured when the wizard opens; it must not reset the form mid-flow.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, dispatch]);
 
   useEffect(() => {
@@ -253,15 +303,15 @@ export default function CreateCampaignDrawer({ open, onClose, selectedLeads = []
     setParamMapping(next);
   }, [selectedTemplate]);
 
-  const canSend = nameValid && contentValid && leadIds.length > 0 && !submitting;
+  const canSend = nameValid && contentValid && recipientCount > 0 && !submitting;
 
   const runEstimate = async () => {
-    if (!leadIds.length) return;
+    if (!recipientCount) return;
     setEstimating(true);
     try {
       const result = await dispatch(
         estimateOutboundCampaign({
-          lead_ids: leadIds,
+          ...recipientsPayload(audience, leadIds),
           template_name: templateName,
           template_id: selectedTemplate?.id || "",
         })
@@ -269,7 +319,7 @@ export default function CreateCampaignDrawer({ open, onClose, selectedLeads = []
       setEstimate(result);
     } catch (err) {
       setEstimate({
-        recipient_count: leadIds.length,
+        recipient_count: recipientCount,
         estimate_available: false,
         estimate_error: err?.detail || "Could not load estimate; showing selection count.",
       });
@@ -299,10 +349,9 @@ export default function CreateCampaignDrawer({ open, onClose, selectedLeads = []
           campaign_type: campaignType,
           template_name: templateName,
           template_id: selectedTemplate?.id || "",
-          lead_ids: leadIds,
+          ...recipientsPayload(audience, leadIds),
           param_mapping: paramMapping,
           scheduled_at,
-          auto_unique_name: true,
         })
       ).unwrap();
       showSuccessToast(
@@ -331,7 +380,7 @@ export default function CreateCampaignDrawer({ open, onClose, selectedLeads = []
     <Dialog open={open} onClose={() => (!submitting ? onClose?.() : null)} className="relative z-50">
       <div className="fixed inset-0 bg-black/60" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4 sm:p-6">
-        <Dialog.Panel className="flex max-h-[min(900px,calc(100vh-2rem))] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-background shadow-2xl">
+        <Dialog.Panel className="flex max-h-[min(900px,calc(100vh-2rem))] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-background shadow-2xl">
           <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -339,7 +388,18 @@ export default function CreateCampaignDrawer({ open, onClose, selectedLeads = []
                 <Dialog.Title className="text-lg font-semibold">Create campaign</Dialog.Title>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                {leadIds.length} lead{leadIds.length === 1 ? "" : "s"} selected · Step {step} of 3
+                {audience ? (
+                  <>
+                    {recipientCount} recipient{recipientCount === 1 ? "" : "s"} from{" "}
+                    <span className="font-medium text-foreground">{audience.campaignName}</span>
+                    {audience.filterLabel ? ` (${audience.filterLabel})` : ""}
+                  </>
+                ) : (
+                  <>
+                    {leadIds.length} lead{leadIds.length === 1 ? "" : "s"} selected
+                  </>
+                )}{" "}
+                · Step {step} of 3
               </p>
             </div>
             <button
@@ -399,8 +459,7 @@ export default function CreateCampaignDrawer({ open, onClose, selectedLeads = []
                 <p className="text-sm text-muted-foreground">
                   Use a clear, unique name (shown in WATI Broadcast History). Example:{" "}
                   <span className="font-medium text-foreground">Nov FSD Leads – Follow-up 1</span>.
-                  Avoid double spaces; if the name already exists, a date suffix is appended
-                  automatically.
+                  Avoid double spaces. If the name already exists, choose a different one.
                 </p>
                 {broadcastName && !nameValid ? (
                   <p className="text-sm text-destructive">
@@ -411,8 +470,8 @@ export default function CreateCampaignDrawer({ open, onClose, selectedLeads = []
             )}
 
             {step === 2 && (
-              <div className="grid gap-5 lg:grid-cols-2">
-                <div className="space-y-4">
+              <div className="grid items-start gap-5 lg:grid-cols-2">
+                <div className="min-w-0 space-y-4">
                   <div className="space-y-2">
                     <Label>Campaign type</Label>
                     {outbound.typesLoading ? (
@@ -449,21 +508,34 @@ export default function CreateCampaignDrawer({ open, onClose, selectedLeads = []
                           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                         </div>
                       ) : (
-                        <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
+                        <div className="max-h-[min(40vh,22rem)] space-y-2 overflow-y-auto overflow-x-hidden overscroll-contain pr-1">
                           {(outbound.templates || []).map((t) => (
                             <button
                               key={t.id || t.name}
                               type="button"
                               onClick={() => setTemplateName(t.name)}
+                              title={t.name}
                               className={cn(
-                                "w-full rounded-lg border px-3 py-2.5 text-left text-sm hover:bg-muted/50",
+                                "block w-full min-w-0 rounded-lg border px-3 py-2.5 text-left text-sm hover:bg-muted/50",
                                 templateName === t.name && "border-[#FF8000] bg-orange-50"
                               )}
                             >
-                              <div className="font-medium">{t.name}</div>
-                              <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                              <div className="truncate font-medium">{t.name}</div>
+                              <div className="mt-0.5 line-clamp-2 break-words text-xs text-muted-foreground">
                                 {t.body || t.header || "No preview text"}
                               </div>
+                              {t.buttons?.length ? (
+                                <div className="mt-1.5 flex flex-wrap gap-1">
+                                  {t.buttons.map((b, i) => (
+                                    <span
+                                      key={`${b.text}-${i}`}
+                                      className="max-w-full truncate rounded-full border border-[#027eb5]/25 bg-[#027eb5]/[0.06] px-2 py-0.5 text-[10.5px] font-medium text-[#027eb5]"
+                                    >
+                                      {b.text}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
                             </button>
                           ))}
                           {!outbound.templates?.length ? (
@@ -481,6 +553,12 @@ export default function CreateCampaignDrawer({ open, onClose, selectedLeads = []
                       <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                         Map template variables
                       </Label>
+                      {audience ? (
+                        <p className="text-xs text-muted-foreground">
+                          WhatsApp contacts that are not in the CRM only have a name — other
+                          fields are sent blank for them.
+                        </p>
+                      ) : null}
                       <div className="space-y-2">
                         {selectedTemplate.param_names.map((name) => (
                           <div key={name} className="flex items-center gap-2">
@@ -505,9 +583,9 @@ export default function CreateCampaignDrawer({ open, onClose, selectedLeads = []
                   ) : null}
                 </div>
 
-                <div className="space-y-2">
+                <div className="min-w-0 space-y-2 lg:sticky lg:top-0">
                   <Label>Template preview</Label>
-                  <TemplatePreviewCard template={selectedTemplate} />
+                  <TemplatePreviewCard template={selectedTemplate} scrollable />
                 </div>
               </div>
             )}
@@ -523,11 +601,18 @@ export default function CreateCampaignDrawer({ open, onClose, selectedLeads = []
                   </div>
                   <div>
                     Recipients:{" "}
-                    <strong>{estimate?.recipient_count ?? leadIds.length}</strong>
+                    <strong>{estimate?.recipient_count ?? recipientCount}</strong>
                     {estimate?.skipped_invalid_or_duplicate
                       ? ` (${estimate.skipped_invalid_or_duplicate} skipped invalid/dupes)`
                       : ""}
                   </div>
+                  {audience && estimate?.crm_count != null ? (
+                    <div className="text-xs text-muted-foreground">
+                      {estimate.crm_count} CRM lead{estimate.crm_count === 1 ? "" : "s"} ·{" "}
+                      {estimate.contact_count} WhatsApp-only contact
+                      {estimate.contact_count === 1 ? "" : "s"}
+                    </div>
+                  ) : null}
                   {estimating ? (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" /> Checking recipient count…
@@ -565,7 +650,7 @@ export default function CreateCampaignDrawer({ open, onClose, selectedLeads = []
                 {selectedTemplate ? (
                   <div className="space-y-2">
                     <Label>Message preview</Label>
-                    <TemplatePreviewCard template={selectedTemplate} />
+                    <TemplatePreviewCard template={selectedTemplate} scrollable />
                   </div>
                 ) : null}
               </div>

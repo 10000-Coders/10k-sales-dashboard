@@ -11,21 +11,33 @@ import {
 import { STUDENT_CHART_COLORS } from "@/components/ui/chart-pie";
 import { formatWatiNumber } from "@/lib/watiFormatters";
 
-/** Same palette order as Students enrollment donuts. */
+/**
+ * Same palette order as Students enrollment donuts. Each slice is drawn at its own count,
+ * so hovering a slice shows exactly the legend number (counts are cumulative: a read
+ * message was also delivered and sent).
+ */
 const ENGAGEMENT_SLICES = [
   { key: "sent", label: "Sent", color: STUDENT_CHART_COLORS[0] },
   { key: "delivered", label: "Delivered", color: STUDENT_CHART_COLORS[1] },
   { key: "read", label: "Read", color: STUDENT_CHART_COLORS[2] },
-  { key: "replied", label: "Replied", color: STUDENT_CHART_COLORS[3] },
   { key: "failed", label: "Failed", color: STUDENT_CHART_COLORS[4] },
 ];
 
-const OUTCOME_SLICES = [
-  { key: "interested", label: "Interested", color: STUDENT_CHART_COLORS[0] },
-  { key: "not_interested", label: "Not Interested", color: STUDENT_CHART_COLORS[1] },
-  { key: "booked_demo", label: "Book a demo", color: STUDENT_CHART_COLORS[2] },
-  { key: "other", label: "Other", color: STUDENT_CHART_COLORS[3] },
+/** Of delivered messages: Responded (button tap or typed reply) vs Not responded. */
+const RESPONSE_SLICES = [
+  { key: "responded", label: "Responded", color: STUDENT_CHART_COLORS[3] },
+  { key: "not_responded", label: "Not responded", color: STUDENT_CHART_COLORS[1] },
 ];
+
+function buildResponseValues(metrics) {
+  const delivered = Math.max(0, Number(metrics?.delivered) || 0);
+  const responded = Math.max(0, Number(metrics?.replied) || 0);
+  return {
+    delivered,
+    responded,
+    not_responded: Math.max(delivered - responded, 0),
+  };
+}
 
 function pct(part, total) {
   if (!total) return 0;
@@ -76,16 +88,23 @@ function DonutCard({
   title,
   description,
   series,
+  ringSeries,
   chartConfig,
   centerTotal,
   centerLabel,
+  pctBase: pctBaseProp,
   loading,
   emptyMessage,
 }) {
   const sliceSum = series.reduce((sum, s) => sum + s.value, 0);
-  const pctBase = Number(centerTotal) > 0 ? Number(centerTotal) : sliceSum;
+  const pctBase =
+    Number(pctBaseProp) > 0
+      ? Number(pctBaseProp)
+      : Number(centerTotal) > 0
+        ? Number(centerTotal)
+        : sliceSum;
   const hasData = series.some((s) => s.value > 0);
-  const chartData = series.filter((s) => s.value > 0);
+  const chartData = (ringSeries || series).filter((s) => s.value > 0);
 
   return (
     <Card>
@@ -170,45 +189,29 @@ function DonutCard({
   );
 }
 
-const STATUS_CENTER = {
-  sent: { key: "sent", label: "Sent" },
-  delivered: { key: "delivered", label: "Delivered" },
-  read: { key: "read", label: "Read" },
-  replied: { key: "replied", label: "Replied" },
-  failed: { key: "failed", label: "Failed" },
-};
-
-function engagementCenter(metrics, messageStatus) {
-  const statusKey = String(messageStatus || "").toLowerCase();
-  const centerDef = STATUS_CENTER[statusKey] || STATUS_CENTER.sent;
-  let centerTotal = Number(metrics?.[centerDef.key]) || 0;
-  if (statusKey && centerTotal <= 0) {
-    centerTotal = Number(metrics?.recipients) || 0;
-  }
-  return { centerTotal, centerLabel: centerDef.label };
+/** Everyone the campaign tried to message (falls back to sent + failed). */
+function recipientsTotal(metrics) {
+  const recipients = Number(metrics?.recipients) || 0;
+  if (recipients > 0) return recipients;
+  return (Number(metrics?.sent) || 0) + (Number(metrics?.failed) || 0);
 }
 
 export default function CampaignReachSummary({
   metrics,
   loading,
-  messageStatus = "",
   className = "",
 }) {
-  const engagementConfig = useMemo(() => buildChartConfig(ENGAGEMENT_SLICES), []);
-  const outcomeConfig = useMemo(() => buildChartConfig(OUTCOME_SLICES), []);
+  const engagementConfig = useMemo(
+    () => buildChartConfig(ENGAGEMENT_SLICES),
+    []
+  );
+  const responseConfig = useMemo(() => buildChartConfig(RESPONSE_SLICES), []);
 
   const engagement = buildSeries(ENGAGEMENT_SLICES, metrics);
-  const { centerTotal: engagementTotal, centerLabel: engagementLabel } = engagementCenter(
-    metrics,
-    messageStatus
-  );
+  const engagementTotal = recipientsTotal(metrics);
 
-  const outcomeSource = metrics?.outcome_metrics || {};
-  const outcomes = buildSeries(OUTCOME_SLICES, outcomeSource);
-  const replied =
-    Number(metrics?.replied) ||
-    outcomes.reduce((sum, s) => sum + s.value, 0) ||
-    0;
+  const responseValues = buildResponseValues(metrics);
+  const response = buildSeries(RESPONSE_SLICES, responseValues);
 
   return (
     <div className={`grid gap-4 lg:grid-cols-2 ${className}`.trim()}>
@@ -218,19 +221,21 @@ export default function CampaignReachSummary({
         series={engagement}
         chartConfig={engagementConfig}
         centerTotal={engagementTotal}
-        centerLabel={engagementLabel}
+        centerLabel="Recipients"
+        pctBase={recipientsTotal(metrics)}
         loading={loading}
         emptyMessage="No engagement data for this campaign."
       />
       <DonutCard
-        title="Outcomes"
-        description="Agent response outcomes"
-        series={outcomes}
-        chartConfig={outcomeConfig}
-        centerTotal={replied}
-        centerLabel="Replied"
+        title="Response"
+        description="Of delivered messages"
+        series={response}
+        chartConfig={responseConfig}
+        centerTotal={responseValues.delivered}
+        centerLabel="Delivered"
+        pctBase={responseValues.delivered}
         loading={loading}
-        emptyMessage="No reply outcomes yet."
+        emptyMessage="No delivered messages yet."
       />
     </div>
   );

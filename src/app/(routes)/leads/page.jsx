@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import axios from "@/axios";
 import { useSalesPersons } from "@/hooks/useSalesData";
 import {
@@ -25,6 +25,18 @@ import { Button } from "@/components/ui/button";
 import { LeadFormDialog } from "@/components/LeadFormDialog";
 import { Loader2, UserPlus, Pencil, Phone, Mail, Search, ChevronDown, ChevronLeft, ChevronRight, Upload, ArrowRightLeft, BarChart3, Megaphone } from "lucide-react";
 import CreateCampaignDrawer from "@/components/wati/CreateCampaignDrawer";
+import RecipientDetailDrawer from "@/components/wati/RecipientDetailDrawer";
+import {
+  closeRecipientDrawer,
+  fetchLeadChat,
+  openRecipientDrawer,
+  WATI_CAMPAIGNS_PAGE_SIZE,
+} from "@/redux/features/wati/watiSlice";
+import { getRangeForPreset } from "@/lib/dateUtils";
+
+// Leads page background WATI sync: poll every 5s, give up after 3 minutes.
+const WATI_AUTO_SYNC_POLL_MS = 5000;
+const WATI_AUTO_SYNC_MAX_MS = 180000;
 import { LEAD_STATUS_FILTER_OPTIONS, LEAD_STATUS_STYLES } from "@/constants/leadStatus";
 import { getInquirySourceLabel, LEAD_SOURCE_FILTER_OPTIONS } from "@/constants/leadInquirySource";
 import {
@@ -83,6 +95,34 @@ const COURSE_OPTIONS = LEAD_COURSE_FILTER_OPTIONS.filter((o) => o.value);
 const IS_RELATED_OPTIONS = LEAD_IS_RELATED_FILTER_OPTIONS;
 const IS_AGENT_OPTIONS = LEAD_IS_AGENT_FILTER_OPTIONS;
 const IS_INTERESTED_OPTIONS = LEAD_IS_INTERESTED_FILTER_OPTIONS;
+
+const WATI_SENT_OPTIONS = [
+  { value: "", label: "All (WATI)" },
+  { value: "sent", label: "WATI sent" },
+  { value: "not_sent", label: "WATI not sent" },
+];
+// Based on the lead's latest campaign — same as the WATI Response column.
+const WATI_RESPONSE_OPTIONS = [
+  { value: "", label: "All responses" },
+  { value: "responded", label: "Responded" },
+  { value: "not_responded", label: "Not responded" },
+  { value: "failed", label: "Failed" },
+];
+const WATI_RESPONSE_LABELS = {
+  responded: "Responded",
+  not_responded: "Not responded",
+  failed: "Failed",
+};
+const WATI_RESPONSE_BADGE = {
+  responded: "bg-emerald-100 text-emerald-700",
+  failed: "bg-red-100 text-red-700",
+  not_responded: "bg-slate-100 text-slate-600",
+};
+const WATI_RESPONSE_BADGE_HOVER = {
+  responded: "hover:bg-emerald-200 focus-visible:ring-emerald-500",
+  failed: "hover:bg-red-200 focus-visible:ring-red-500",
+  not_responded: "hover:bg-slate-200 focus-visible:ring-slate-400",
+};
 
 function formatDate(d) {
   const dt = d ? new Date(d) : new Date();
@@ -188,8 +228,30 @@ function LeadsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const user = useSelector((state) => state.userAuth?.user);
+  const dispatch = useDispatch();
+  const chatDrawer = useSelector((state) => state.wati.drawer);
   const isManagerRole = isManager(user?.role);
   const canCampaign = canCreateWatiCampaign(user?.role);
+  // Managers / super admins: WATI badges open the lead's WhatsApp chat in a phone popup.
+  const canViewWatiChat = canCampaign;
+
+  const openLeadChat = useCallback(
+    (event, lead) => {
+      event.stopPropagation(); // the row itself still opens the lead profile
+      dispatch(
+        openRecipientDrawer({
+          phone: lead.mobile,
+          leadOrPhone: String(lead.id),
+          previewName: lead.name || null,
+        })
+      );
+      dispatch(fetchLeadChat({ leadId: lead.id, phone: lead.mobile }));
+    },
+    [dispatch]
+  );
+
+  // The popup lives in shared Redux state: close it when leaving the Leads page.
+  useEffect(() => () => dispatch(closeRecipientDrawer()), [dispatch]);
   const { persons, refetch: refetchPersons } = useSalesPersons({ enabled: isManagerRole });
   const { setUpcomingFollowUpsFromLeads } = useFollowUp();
   const { showSuccessToast, showErrorToast } = useToast();
@@ -210,6 +272,10 @@ function LeadsPageInner() {
   const [filterIsAgent, setFilterIsAgent] = useState(() => searchParams.get("is_agent") || "");
   const [filterIsInterested, setFilterIsInterested] = useState(
     () => searchParams.get("is_interested") || "",
+  );
+  const [filterWati, setFilterWati] = useState(() => searchParams.get("wati") || "");
+  const [filterWatiResponse, setFilterWatiResponse] = useState(
+    () => searchParams.get("wati_response") || "",
   );
   const [filterPerson, setFilterPerson] = useState(() => searchParams.get("person") || "");
   const [filterDateFrom, setFilterDateFrom] = useState(() => searchParams.get("date_from") || "");
@@ -267,9 +333,10 @@ function LeadsPageInner() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const fetchLeads = useCallback(async (forceRefresh = false, pageOverride) => {
+  // `silent`: background reload (after the WATI auto-sync) — keep the table on screen.
+  const fetchLeads = useCallback(async (forceRefresh = false, pageOverride, { silent = false } = {}) => {
     const effectivePage = pageOverride ?? page;
-    const cacheKey = `${filterStatus}|${filterSources.join(",")}|${filterCourses.join(",")}|${filterIsRelated}|${filterIsAgent}|${filterIsInterested}|${filterPerson}|${filterDateFrom}|${filterDateTo}|${searchDebounce}|${effectivePage}|${user?.id}`;
+    const cacheKey = `${filterStatus}|${filterSources.join(",")}|${filterCourses.join(",")}|${filterIsRelated}|${filterIsAgent}|${filterIsInterested}|${filterWati}|${filterWatiResponse}|${filterPerson}|${filterDateFrom}|${filterDateTo}|${searchDebounce}|${effectivePage}|${user?.id}`;
 
     if (forceRefresh) {
       leadsCache = { key: null, data: null, pagination: null, at: 0 };
@@ -307,8 +374,10 @@ function LeadsPageInner() {
     leadsFetchCacheKey = cacheKey;
     leadsFetchPromise = (async () => {
       try {
-        setLoading(true);
-        setError(null);
+        if (!silent) {
+          setLoading(true);
+          setError(null);
+        }
         const params = new URLSearchParams();
         params.set("page", String(effectivePage));
         params.set("page_size", String(LEADS_PAGE_SIZE));
@@ -318,6 +387,8 @@ function LeadsPageInner() {
         if (filterIsRelated) params.set("is_related", filterIsRelated);
         if (isManagerRole && filterIsAgent) params.set("is_agent", filterIsAgent);
         if (isManagerRole && filterIsInterested) params.set("is_interested", filterIsInterested);
+        if (filterWati) params.set("wati", filterWati);
+        if (filterWati === "sent" && filterWatiResponse) params.set("wati_response", filterWatiResponse);
         if (filterDateFrom) params.set("created_after", filterDateFrom);
         if (filterDateTo) params.set("created_before", filterDateTo);
         if (searchDebounce.trim()) params.set("search", searchDebounce.trim());
@@ -338,17 +409,19 @@ function LeadsPageInner() {
         const myLeadsForNotification = list.filter((l) => String(l.sales_person) === String(user?.id));
         setUpcomingFollowUpsFromLeads(myLeadsForNotification);
       } catch (err) {
-        setError(err.response?.data?.detail || "Failed to load leads.");
-        setLeads([]);
-        setPagination({ count: 0, page: 1, page_size: LEADS_PAGE_SIZE, total_pages: 0 });
+        if (!silent) {
+          setError(err.response?.data?.detail || "Failed to load leads.");
+          setLeads([]);
+          setPagination({ count: 0, page: 1, page_size: LEADS_PAGE_SIZE, total_pages: 0 });
+        }
       } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
         leadsFetchPromise = null;
         leadsFetchCacheKey = null;
       }
     })();
     await leadsFetchPromise;
-  }, [filterStatus, filterSources, filterCourses, filterIsRelated, filterIsAgent, filterIsInterested, filterPerson, filterDateFrom, filterDateTo, searchDebounce, page, isManagerRole, user?.id, setUpcomingFollowUpsFromLeads]);
+  }, [filterStatus, filterSources, filterCourses, filterIsRelated, filterIsAgent, filterIsInterested, filterWati, filterWatiResponse, filterPerson, filterDateFrom, filterDateTo, searchDebounce, page, isManagerRole, user?.id, setUpcomingFollowUpsFromLeads]);
 
   const clearFilters = useCallback(() => {
     setFilterStatus("");
@@ -357,6 +430,8 @@ function LeadsPageInner() {
     setFilterIsRelated("");
     setFilterIsAgent("");
     setFilterIsInterested("");
+    setFilterWati("");
+    setFilterWatiResponse("");
     setFilterPerson("");
     setFilterDateFrom("");
     setFilterDateTo("");
@@ -381,7 +456,7 @@ function LeadsPageInner() {
       return;
     }
     setPage(1);
-  }, [filterStatus, filterSources, filterCourses, filterIsRelated, filterIsAgent, filterIsInterested, filterPerson, filterDateFrom, filterDateTo, searchDebounce]);
+  }, [filterStatus, filterSources, filterCourses, filterIsRelated, filterIsAgent, filterIsInterested, filterWati, filterWatiResponse, filterPerson, filterDateFrom, filterDateTo, searchDebounce]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -391,6 +466,8 @@ function LeadsPageInner() {
     if (filterIsRelated) params.set("is_related", filterIsRelated);
     if (isManagerRole && filterIsAgent) params.set("is_agent", filterIsAgent);
     if (isManagerRole && filterIsInterested) params.set("is_interested", filterIsInterested);
+    if (filterWati) params.set("wati", filterWati);
+    if (filterWati === "sent" && filterWatiResponse) params.set("wati_response", filterWatiResponse);
     if (isManagerRole && filterPerson) params.set("person", filterPerson);
     if (filterDateFrom) params.set("date_from", filterDateFrom);
     if (filterDateTo) params.set("date_to", filterDateTo);
@@ -413,6 +490,8 @@ function LeadsPageInner() {
     filterIsRelated,
     filterIsAgent,
     filterIsInterested,
+    filterWati,
+    filterWatiResponse,
     filterPerson,
     filterDateFrom,
     filterDateTo,
@@ -425,6 +504,46 @@ function LeadsPageInner() {
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
+
+  const fetchLeadsRef = useRef(fetchLeads);
+  fetchLeadsRef.current = fetchLeads;
+
+  // Managers: every time the Leads page opens / reloads, sync recent WATI campaigns in the
+  // background (same as Refresh on the campaigns page), then quietly reload the rows so the
+  // WATI Campaigns / Response columns show the latest data. Server skips campaigns that are
+  // already syncing or synced in the last minute, so reloads don't pile up work.
+  useEffect(() => {
+    if (!canViewWatiChat) return undefined;
+    let cancelled = false;
+    const range = getRangeForPreset("last30");
+    const overviewUrl = (refresh) => {
+      const params = new URLSearchParams({
+        page: "1",
+        page_size: String(WATI_CAMPAIGNS_PAGE_SIZE),
+        date_from: range.from,
+        date_to: range.to,
+      });
+      if (refresh) params.set("refresh", "1");
+      return `/wati/campaigns/overview/?${params}`;
+    };
+    (async () => {
+      try {
+        let { data } = await axios.get(overviewUrl(true));
+        const startedAt = Date.now();
+        while (!cancelled && data?.syncing && Date.now() - startedAt < WATI_AUTO_SYNC_MAX_MS) {
+          await new Promise((resolve) => setTimeout(resolve, WATI_AUTO_SYNC_POLL_MS));
+          if (cancelled) return;
+          ({ data } = await axios.get(overviewUrl(false)));
+        }
+        if (!cancelled) await fetchLeadsRef.current(true, undefined, { silent: true });
+      } catch {
+        /* background freshness only — the page already shows the last known data */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canViewWatiChat]);
 
   const totalPages = Math.max(1, pagination.total_pages || 1);
   const totalCount = pagination.count ?? 0;
@@ -522,6 +641,7 @@ function LeadsPageInner() {
     "Sales Person",
     "Activity Count",
     "WATI Campaign Count",
+    "WATI Latest Response",
   ];
   const isExcelDateRangeValid = useMemo(() => {
     if (!filterDateFrom || !filterDateTo) return false;
@@ -552,6 +672,8 @@ function LeadsPageInner() {
       if (filterIsRelated) params.set("is_related", filterIsRelated);
       if (isManagerRole && filterIsAgent) params.set("is_agent", filterIsAgent);
       if (isManagerRole && filterIsInterested) params.set("is_interested", filterIsInterested);
+      if (filterWati) params.set("wati", filterWati);
+      if (filterWati === "sent" && filterWatiResponse) params.set("wati_response", filterWatiResponse);
       params.set("created_after", filterDateFrom);
       params.set("created_before", filterDateTo);
       if (searchDebounce.trim()) params.set("search", searchDebounce.trim());
@@ -571,6 +693,7 @@ function LeadsPageInner() {
         "Sales Person": lead.sales_person_name || "",
         "Activity Count": lead.activities_count ?? 0,
         "WATI Campaign Count": lead.wati_campaigns_count ?? 0,
+        "WATI Latest Response": WATI_RESPONSE_LABELS[lead.wati_last_response] || "",
       }));
       const excelSheetData = XLSX.utils.json_to_sheet(sheetRows, { header: headerRow });
       const workbook = XLSX.utils.book_new();
@@ -613,6 +736,18 @@ function LeadsPageInner() {
                 <BarChart3 className="h-4 w-4 text-muted-foreground" />
                 Source analytics
               </Link>
+              {canCampaign ? (
+                !campaignSelectMode ? (
+                  <Button type="button" className="gap-2" onClick={enterCampaignSelectMode}>
+                    <Megaphone className="h-4 w-4" />
+                    Select for campaign
+                  </Button>
+                ) : (
+                  <Button type="button" variant="outline" onClick={exitCampaignSelectMode}>
+                    Exit selection
+                  </Button>
+                )
+              ) : null}
             </div>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
               <button
@@ -635,20 +770,6 @@ function LeadsPageInner() {
               </Button>
             </div>
           </div>
-          {canCampaign ? (
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-              {!campaignSelectMode ? (
-                <Button type="button" className="gap-2" onClick={enterCampaignSelectMode}>
-                  <Megaphone className="h-4 w-4" />
-                  Select for campaign
-                </Button>
-              ) : (
-                <Button type="button" variant="outline" onClick={exitCampaignSelectMode}>
-                  Exit selection
-                </Button>
-              )}
-            </div>
-          ) : null}
           {showCampaignCheckboxes ? (
             <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5">
               <span className="text-sm font-medium">
@@ -778,6 +899,32 @@ function LeadsPageInner() {
               >
                 {IS_INTERESTED_OPTIONS.map((o) => (
                   <option key={o.value || "all-interested"} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            )}
+            <select
+              value={filterWati}
+              onChange={(e) => {
+                setFilterWati(e.target.value);
+                if (e.target.value !== "sent") setFilterWatiResponse("");
+              }}
+              className={cn(FILTER_SELECT_CLASS, "min-w-[140px]")}
+              aria-label="Filter by WATI campaign sent"
+            >
+              {WATI_SENT_OPTIONS.map((o) => (
+                <option key={o.value || "all-wati"} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            {filterWati === "sent" && (
+              <select
+                value={filterWatiResponse}
+                onChange={(e) => setFilterWatiResponse(e.target.value)}
+                className={cn(FILTER_SELECT_CLASS, "min-w-[150px]")}
+                aria-label="Filter by WATI response (latest campaign)"
+                title="Response to the lead's latest WATI campaign"
+              >
+                {WATI_RESPONSE_OPTIONS.map((o) => (
+                  <option key={o.value || "all-wati-response"} value={o.value}>{o.label}</option>
                 ))}
               </select>
             )}
@@ -933,7 +1080,8 @@ function LeadsPageInner() {
                     <TableHead className={cn("min-w-[72px] text-center", LEAD_TABLE_HEAD)}>Transfers</TableHead>
                     <TableHead className={cn("min-w-[112px]", LEAD_TABLE_HEAD)}>Next follow-up</TableHead>
                     <TableHead className={cn("min-w-[120px]", LEAD_TABLE_HEAD)}>Last activity</TableHead>
-                    <TableHead className={cn("min-w-[140px]", LEAD_TABLE_HEAD)}>WATI Last Activity</TableHead>
+                    <TableHead className={cn("min-w-[110px] text-center", LEAD_TABLE_HEAD)}>WATI Campaigns</TableHead>
+                    <TableHead className={cn("min-w-[120px]", LEAD_TABLE_HEAD)}>WATI Response</TableHead>
                     <TableHead className={cn("w-12 text-right", LEAD_TABLE_HEAD)} />
                   </TableRow>
                 </TableHeader>
@@ -1106,28 +1254,76 @@ function LeadsPageInner() {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className={cn("text-muted-foreground", LEAD_TABLE_CELL)}>
-                        {(() => {
-                          const campaignName = (lead.wati_last_campaign_name || "").trim();
-                          const campaignCount = lead.wati_campaigns_count ?? 0;
-                          return (
-                            <div className="flex min-w-0 flex-col gap-0.5">
-                              <span
-                                className="whitespace-nowrap text-sm"
-                                title={campaignName || undefined}
-                              >
-                                {formatDateTime(lead.wati_last_activity_at)}
-                              </span>
-                              <span
-                                className="text-xs text-muted-foreground/80"
-                                title="WATI campaigns sent to this lead"
-                              >
-                                {campaignCount === 1 ? "1 campaign" : `${campaignCount} campaigns`}
-                              </span>
-                            </div>
-                          );
-                        })()}
-                      </TableCell>
+                      {(() => {
+                        const campaignName = (lead.wati_last_campaign_name || "").trim();
+                        const campaignCount = lead.wati_campaigns_count ?? 0;
+                        const response = lead.wati_last_response;
+                        const deliveryStatus = (lead.wati_last_status || "").trim();
+                        const latestHint = [
+                          campaignName ? `Latest campaign: ${campaignName}` : "",
+                          deliveryStatus ? `Delivery: ${deliveryStatus}` : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" · ");
+                        return (
+                          <>
+                            <TableCell className={cn(LEAD_TABLE_CELL, "text-center")}>
+                              {campaignCount > 0 && canViewWatiChat ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => openLeadChat(e, lead)}
+                                  className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-sky-100 px-2 text-xs font-medium tabular-nums text-sky-800 underline-offset-2 transition-colors hover:bg-sky-200 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                                  title={`View WhatsApp chat · ${campaignCount} WATI campaign${campaignCount === 1 ? "" : "s"}${
+                                    campaignName ? ` · latest: ${campaignName}` : ""
+                                  }`}
+                                  aria-label={`View WhatsApp chat for ${lead.name || "lead"}`}
+                                >
+                                  {campaignCount}
+                                </button>
+                              ) : campaignCount > 0 ? (
+                                <span
+                                  className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-sky-100 px-2 text-xs font-medium tabular-nums text-sky-800"
+                                  title={`${campaignCount} WATI campaign${campaignCount === 1 ? "" : "s"}${
+                                    campaignName ? ` · latest: ${campaignName}` : ""
+                                  }`}
+                                >
+                                  {campaignCount}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className={LEAD_TABLE_CELL}>
+                              {response && canViewWatiChat ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => openLeadChat(e, lead)}
+                                  className={cn(
+                                    "inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium underline-offset-2 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2",
+                                    WATI_RESPONSE_BADGE[response] || WATI_RESPONSE_BADGE.not_responded,
+                                    WATI_RESPONSE_BADGE_HOVER[response] || WATI_RESPONSE_BADGE_HOVER.not_responded
+                                  )}
+                                  title={["View WhatsApp chat", latestHint].filter(Boolean).join(" · ")}
+                                >
+                                  {WATI_RESPONSE_LABELS[response] || "Not responded"}
+                                </button>
+                              ) : response ? (
+                                <span
+                                  className={cn(
+                                    "inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium",
+                                    WATI_RESPONSE_BADGE[response] || WATI_RESPONSE_BADGE.not_responded
+                                  )}
+                                  title={latestHint || undefined}
+                                >
+                                  {WATI_RESPONSE_LABELS[response] || "Not responded"}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                          </>
+                        );
+                      })()}
                       <TableCell
                         className="text-right"
                         onClick={(e) => e.stopPropagation()}
@@ -1217,6 +1413,15 @@ function LeadsPageInner() {
             open={campaignDrawerOpen}
             onClose={() => setCampaignDrawerOpen(false)}
             selectedLeads={selectedLeads}
+          />
+          <RecipientDetailDrawer
+            open={chatDrawer.open}
+            loading={chatDrawer.loading}
+            error={chatDrawer.error}
+            data={chatDrawer.data}
+            previewName={chatDrawer.previewName}
+            previewPhone={chatDrawer.phone}
+            onClose={() => dispatch(closeRecipientDrawer())}
           />
         </>
       ) : null}
