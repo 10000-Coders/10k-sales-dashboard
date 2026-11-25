@@ -67,7 +67,7 @@ export function LeadFormDialog({ open, onClose, lead = null, currentUserId, onSu
     () =>
       studentOptions.map((student) => ({
         value: String(student.id),
-        label: `${student.student_name}${student.batch_name ? ` - ${student.batch_name}` : ""}`,
+        label: student.student_name || "",
       })),
     [studentOptions]
   );

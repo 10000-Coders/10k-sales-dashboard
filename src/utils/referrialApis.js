@@ -1,4 +1,4 @@
-import coreApi from '@/lib/coreApi';
+import axios from '@/axios';
 import { sortUniqueBatchNames } from '@/utils/sortBatchNames';
 
 const appendArrayParam = (queryParams, key, value = []) => {
@@ -56,20 +56,18 @@ const buildStudentQueryParams = (params = {}) => {
     return queryParams.toString();
 };
 
+/** Mentor/core students via sales API (shared DB). Uses sales JWT. */
 export const getAllStudents = async (params = {}, config = {}) => {
     const queryString = buildStudentQueryParams(params);
-    const response = await coreApi.get(`/mentor/students/all/?${queryString}`, config);
+    const response = await axios.get(`/mentor-students/?${queryString}`, config);
     return response.data;
 };
 
-/** All batches for dropdowns via mentor API (no 50-item cap), returned in sorted order. */
+/** Mentor/core batch names via sales API, returned in sorted order. */
 export async function getAllBatchNames(config = {}) {
-    const response = await coreApi.get('/mentor/batches/all/', config);
-    const results = Array.isArray(response.data?.results) ? response.data.results : [];
-    const names = results
-        .filter((batch) => !batch?.is_deleted)
-        .map((batch) => batch.batch_name);
-    return sortUniqueBatchNames(names);
+    const response = await axios.get('/batches/', config);
+    const names = Array.isArray(response.data) ? response.data : [];
+    return sortUniqueBatchNames(names.filter(Boolean));
 }
 
 export default getAllStudents;
