@@ -13,6 +13,7 @@ import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Loader2 } from "lucide-
 import WatiStatusBadge from "@/components/wati/WatiStatusBadge";
 import { formatWatiDate, formatWatiDateTime, formatWatiNumber } from "@/lib/watiFormatters";
 import { cn } from "@/lib/utils";
+import { MAX_SELECTED_CAMPAIGNS } from "@/components/wati/CampaignWorkspaceFilters";
 
 /** Columns after Created. `pct` = show "(x% of delivered)" hint. */
 const METRIC_COLUMNS = [
@@ -164,6 +165,8 @@ export default function CampaignsTable({
   /** { [id]: row } — kept by the parent so selection survives reloads. */
   selected = {},
   onSelectedChange,
+  /** Opens the ticked campaigns together (combined contact list + follow-up). */
+  onOpenSelected,
 }) {
   const [sort, setSort] = useState({ key: "created", dir: "desc" });
 
@@ -203,6 +206,21 @@ export default function CampaignsTable({
   const footerLabel = selectedCount ? (
     <span className="inline-flex items-center gap-2">
       Σ {selectedCount} selected
+      {onOpenSelected ? (
+        <button
+          type="button"
+          className="text-xs font-medium text-[#FF8000] underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:no-underline"
+          disabled={selectedCount > MAX_SELECTED_CAMPAIGNS}
+          title={
+            selectedCount > MAX_SELECTED_CAMPAIGNS
+              ? `Up to ${MAX_SELECTED_CAMPAIGNS} campaigns can be opened together`
+              : undefined
+          }
+          onClick={() => onOpenSelected(Object.keys(selected))}
+        >
+          Open selected ({selectedCount})
+        </button>
+      ) : null}
       <button
         type="button"
         className="text-xs font-normal text-primary underline-offset-2 hover:underline"

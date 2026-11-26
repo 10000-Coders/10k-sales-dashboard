@@ -50,10 +50,7 @@ export const fetchOverview = createAsyncThunk(
       const results = [...(data?.results || [])];
       const total = Number(data?.total) || 0;
       let nextPage = Number(page) + 1;
-      while (
-        results.length < total &&
-        nextPage <= WATI_OVERVIEW_MAX_PAGES
-      ) {
+      while (results.length < total && nextPage <= WATI_OVERVIEW_MAX_PAGES) {
         params.set("page", String(nextPage));
         params.delete("refresh");
         const { data: more } = await axios.get(`/wati/campaigns/overview/?${params}`);
@@ -71,11 +68,20 @@ export const fetchOverview = createAsyncThunk(
 
 export const fetchCampaignDetail = createAsyncThunk(
   "wati/fetchCampaignDetail",
-  /** Accepts a broadcast id, or `{ broadcastId, refresh }` to recompute from WATI. */
+  /**
+   * Accepts a broadcast id, or `{ broadcastId, refresh }` to recompute from WATI.
+   * Several ids ("a,b,c") load the combined (summed) donuts for the selected campaigns.
+   */
   async (arg, { rejectWithValue }) => {
     const broadcastId = typeof arg === "object" && arg ? arg.broadcastId : arg;
     const refresh = typeof arg === "object" && arg ? Boolean(arg.refresh) : false;
     try {
+      if (String(broadcastId || "").includes(",")) {
+        const params = new URLSearchParams({ ids: String(broadcastId) });
+        if (refresh) params.set("refresh", "1");
+        const { data } = await axios.get(`/wati/campaigns/combined/?${params}`);
+        return data;
+      }
       const qs = refresh ? "?refresh=1" : "";
       const { data } = await axios.get(
         `/wati/campaigns/${encodeURIComponent(broadcastId)}/${qs}`
@@ -83,28 +89,6 @@ export const fetchCampaignDetail = createAsyncThunk(
       return data;
     } catch (err) {
       return rejectWithValue(rejectPayload(err, "Failed to load campaign."));
-    }
-  }
-);
-
-export const fetchCampaignLeads = createAsyncThunk(
-  "wati/fetchCampaignLeads",
-  async (
-    { broadcastId, search = "", page = 1, page_size = WATI_TABLE_PAGE_SIZE },
-    { rejectWithValue }
-  ) => {
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        page_size: String(page_size),
-      });
-      if (search) params.set("search", search);
-      const { data } = await axios.get(
-        `/wati/campaigns/${encodeURIComponent(broadcastId)}/leads/?${params}`
-      );
-      return data;
-    } catch (err) {
-      return rejectWithValue(rejectPayload(err, "Failed to load campaign recipients."));
     }
   }
 );
@@ -157,42 +141,6 @@ export const fetchRecipients = createAsyncThunk(
       return data;
     } catch (err) {
       return rejectWithValue(rejectPayload(err, "Failed to load students and contacts."));
-    }
-  }
-);
-
-export const fetchCampaignMessages = createAsyncThunk(
-  "wati/fetchCampaignMessages",
-  async ({ broadcastId, page = 1, page_size = WATI_TABLE_PAGE_SIZE }, { rejectWithValue }) => {
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        page_size: String(page_size),
-      });
-      const { data } = await axios.get(
-        `/wati/campaigns/${encodeURIComponent(broadcastId)}/messages/?${params}`
-      );
-      return data;
-    } catch (err) {
-      return rejectWithValue(rejectPayload(err, "Failed to load campaign messages."));
-    }
-  }
-);
-
-export const fetchCampaignHistory = createAsyncThunk(
-  "wati/fetchCampaignHistory",
-  async ({ broadcastId, page = 1, page_size = WATI_TABLE_PAGE_SIZE }, { rejectWithValue }) => {
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        page_size: String(page_size),
-      });
-      const { data } = await axios.get(
-        `/wati/campaigns/${encodeURIComponent(broadcastId)}/history/?${params}`
-      );
-      return data;
-    } catch (err) {
-      return rejectWithValue(rejectPayload(err, "Failed to load campaign history."));
     }
   }
 );
@@ -261,7 +209,6 @@ export const fetchLeadChat = createAsyncThunk(
   }
 );
 
-
 export const fetchCampaignTypes = createAsyncThunk(
   "wati/fetchCampaignTypes",
   async (_, { rejectWithValue }) => {
@@ -313,65 +260,6 @@ export const createOutboundCampaign = createAsyncThunk(
   }
 );
 
-export const fetchOutboundCampaigns = createAsyncThunk(
-  "wati/fetchOutboundCampaigns",
-  async ({ page = 1, page_size = 20 } = {}, { rejectWithValue }) => {
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        page_size: String(page_size),
-      });
-      const { data } = await axios.get(`/wati/outbound-campaigns/?${params}`);
-      return data;
-    } catch (err) {
-      return rejectWithValue(rejectPayload(err, "Failed to load outbound campaigns."));
-    }
-  }
-);
-
-export const fetchOutboundCampaignDetail = createAsyncThunk(
-  "wati/fetchOutboundCampaignDetail",
-  async (campaignId, { rejectWithValue }) => {
-    try {
-      const { data } = await axios.get(`/wati/outbound-campaigns/${campaignId}/`);
-      return data;
-    } catch (err) {
-      return rejectWithValue(rejectPayload(err, "Failed to load outbound campaign."));
-    }
-  }
-);
-
-export const fetchOutboundRecipients = createAsyncThunk(
-  "wati/fetchOutboundRecipients",
-  async ({ campaignId, page = 1, page_size = 50, status = "" } = {}, { rejectWithValue }) => {
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        page_size: String(page_size),
-      });
-      if (status) params.set("status", status);
-      const { data } = await axios.get(
-        `/wati/outbound-campaigns/${campaignId}/recipients/?${params}`
-      );
-      return data;
-    } catch (err) {
-      return rejectWithValue(rejectPayload(err, "Failed to load outbound recipients."));
-    }
-  }
-);
-
-export const cancelOutboundCampaign = createAsyncThunk(
-  "wati/cancelOutboundCampaign",
-  async (campaignId, { rejectWithValue }) => {
-    try {
-      const { data } = await axios.delete(`/wati/outbound-campaigns/${campaignId}/`);
-      return data;
-    } catch (err) {
-      return rejectWithValue(rejectPayload(err, "Failed to cancel campaign."));
-    }
-  }
-);
-
 const initialState = {
   overview: {
     loading: false,
@@ -383,22 +271,7 @@ const initialState = {
     error: null,
     data: null,
   },
-  leads: {
-    loading: false,
-    error: null,
-    data: null,
-  },
   recipients: {
-    loading: false,
-    error: null,
-    data: null,
-  },
-  messages: {
-    loading: false,
-    error: null,
-    data: null,
-  },
-  history: {
     loading: false,
     error: null,
     data: null,
@@ -419,9 +292,6 @@ const initialState = {
     templates: [],
     templatesLoading: false,
     templatesError: null,
-    list: { loading: false, error: null, data: null },
-    detail: { loading: false, error: null, data: null },
-    recipients: { loading: false, error: null, data: null },
     createLoading: false,
     createError: null,
   },
@@ -450,14 +320,6 @@ const watiSlice = createSlice({
       state.drawer.leadOrPhone = null;
       state.drawer.previewName = null;
       state.drawer.requestId = null;
-    },
-    clearCampaignDetail(state) {
-      state.detail = { loading: false, error: null, data: null };
-      state.leads = { loading: false, error: null, data: null };
-      state.recipients = { loading: false, error: null, data: null };
-      state.messages = { loading: false, error: null, data: null };
-      state.history = { loading: false, error: null, data: null };
-      state.drawer = { ...initialState.drawer };
     },
   },
   extraReducers: (builder) => {
@@ -497,18 +359,6 @@ const watiSlice = createSlice({
         state.detail.loading = false;
         state.detail.error = action.payload?.detail || "Failed to load campaign.";
       })
-      .addCase(fetchCampaignLeads.pending, (state) => {
-        state.leads.loading = true;
-        state.leads.error = null;
-      })
-      .addCase(fetchCampaignLeads.fulfilled, (state, action) => {
-        state.leads.loading = false;
-        state.leads.data = action.payload;
-      })
-      .addCase(fetchCampaignLeads.rejected, (state, action) => {
-        state.leads.loading = false;
-        state.leads.error = action.payload?.detail || "Failed to load recipients.";
-      })
       .addCase(fetchRecipients.pending, (state, action) => {
         // Newest request wins (filters changed, or a background refresh finished later).
         state.recipients.requestId = action.meta.requestId;
@@ -534,30 +384,6 @@ const watiSlice = createSlice({
         state.recipients.loading = false;
         if (isSilent(action)) return; // keep the last good table
         state.recipients.error = action.payload?.detail || "Failed to load students and contacts.";
-      })
-      .addCase(fetchCampaignMessages.pending, (state) => {
-        state.messages.loading = true;
-        state.messages.error = null;
-      })
-      .addCase(fetchCampaignMessages.fulfilled, (state, action) => {
-        state.messages.loading = false;
-        state.messages.data = action.payload;
-      })
-      .addCase(fetchCampaignMessages.rejected, (state, action) => {
-        state.messages.loading = false;
-        state.messages.error = action.payload?.detail || "Failed to load messages.";
-      })
-      .addCase(fetchCampaignHistory.pending, (state) => {
-        state.history.loading = true;
-        state.history.error = null;
-      })
-      .addCase(fetchCampaignHistory.fulfilled, (state, action) => {
-        state.history.loading = false;
-        state.history.data = action.payload;
-      })
-      .addCase(fetchCampaignHistory.rejected, (state, action) => {
-        state.history.loading = false;
-        state.history.error = action.payload?.detail || "Failed to load history.";
       })
       .addCase(fetchRecipientDrawer.pending, (state) => {
         state.drawer.loading = true;
@@ -615,56 +441,15 @@ const watiSlice = createSlice({
         state.outbound.createLoading = true;
         state.outbound.createError = null;
       })
-      .addCase(createOutboundCampaign.fulfilled, (state, action) => {
+      .addCase(createOutboundCampaign.fulfilled, (state) => {
         state.outbound.createLoading = false;
-        state.outbound.detail.data = action.payload;
       })
       .addCase(createOutboundCampaign.rejected, (state, action) => {
         state.outbound.createLoading = false;
         state.outbound.createError = action.payload?.detail || "Failed to create campaign.";
-      })
-      .addCase(fetchOutboundCampaigns.pending, (state) => {
-        state.outbound.list.loading = true;
-        state.outbound.list.error = null;
-      })
-      .addCase(fetchOutboundCampaigns.fulfilled, (state, action) => {
-        state.outbound.list.loading = false;
-        state.outbound.list.data = action.payload;
-      })
-      .addCase(fetchOutboundCampaigns.rejected, (state, action) => {
-        state.outbound.list.loading = false;
-        state.outbound.list.error = action.payload?.detail || "Failed to load outbound campaigns.";
-      })
-      .addCase(fetchOutboundCampaignDetail.pending, (state) => {
-        state.outbound.detail.loading = true;
-        state.outbound.detail.error = null;
-      })
-      .addCase(fetchOutboundCampaignDetail.fulfilled, (state, action) => {
-        state.outbound.detail.loading = false;
-        state.outbound.detail.data = action.payload;
-      })
-      .addCase(fetchOutboundCampaignDetail.rejected, (state, action) => {
-        state.outbound.detail.loading = false;
-        state.outbound.detail.error = action.payload?.detail || "Failed to load campaign.";
-      })
-      .addCase(fetchOutboundRecipients.pending, (state) => {
-        state.outbound.recipients.loading = true;
-        state.outbound.recipients.error = null;
-      })
-      .addCase(fetchOutboundRecipients.fulfilled, (state, action) => {
-        state.outbound.recipients.loading = false;
-        state.outbound.recipients.data = action.payload;
-      })
-      .addCase(fetchOutboundRecipients.rejected, (state, action) => {
-        state.outbound.recipients.loading = false;
-        state.outbound.recipients.error =
-          action.payload?.detail || "Failed to load recipients.";
-      })
-      .addCase(cancelOutboundCampaign.fulfilled, (state, action) => {
-        state.outbound.detail.data = action.payload;
       });
   },
 });
 
-export const { openRecipientDrawer, closeRecipientDrawer, clearCampaignDetail } = watiSlice.actions;
+export const { openRecipientDrawer, closeRecipientDrawer } = watiSlice.actions;
 export default watiSlice.reducer;

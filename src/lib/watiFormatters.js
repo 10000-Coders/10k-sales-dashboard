@@ -41,16 +41,3 @@ export function watiStatusTone(status) {
   }
   return "neutral";
 }
-
-export function truncateId(value, keep = 10) {
-  const s = String(value || "");
-  if (s.length <= keep + 1) return s || "—";
-  return `${s.slice(0, keep)}…`;
-}
-
-export function ratePercent(part, whole) {
-  const p = Number(part) || 0;
-  const w = Number(whole) || 0;
-  if (!w) return 0;
-  return Math.round((p / w) * 100);
-}

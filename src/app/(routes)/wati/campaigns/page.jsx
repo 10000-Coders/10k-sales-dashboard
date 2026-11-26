@@ -94,6 +94,12 @@ function WatiCampaignsPageInner() {
 
   const debouncedSearch = useDebounce(search, 400);
   const isAll = !selectedCampaign || selectedCampaign === "all";
+  // `selectedCampaign` is "all", one id, or "id1,id2,…" (combined view of several campaigns).
+  const selectedCampaignIds = useMemo(
+    () => (isAll ? [] : String(selectedCampaign).split(",").filter(Boolean)),
+    [isAll, selectedCampaign]
+  );
+  const isMulti = selectedCampaignIds.length > 1;
   const showReplyColumn = !isAll && waResponse === "responded";
   const replyFilter = showReplyColumn ? waReply : "";
 
@@ -222,6 +228,12 @@ function WatiCampaignsPageInner() {
     setRefreshing(true);
     try {
       const campaignId = selectedCampaign && selectedCampaign !== "all" ? selectedCampaign : "";
+      // Single campaign: the detail refresh rebuilds the contact list from WATI (and re-checks
+      // "failed" contacts against their chats) — load the table only after it finishes, so
+      // the table shows the corrected statuses instead of a half-rebuilt list.
+      if (campaignId) {
+        await dispatch(fetchCampaignDetail({ broadcastId: campaignId, refresh: true }));
+      }
       await Promise.all([
         // All view: enqueue a background WATI sync for this page's campaigns.
         // Single campaign: only that campaign is recomputed (detail refresh below).
@@ -252,9 +264,6 @@ function WatiCampaignsPageInner() {
               })
             )
           : Promise.resolve(),
-        campaignId
-          ? dispatch(fetchCampaignDetail({ broadcastId: campaignId, refresh: true }))
-          : Promise.resolve(),
       ]);
       pollStartedAtRef.current = Date.now();
       setPollExpired(false);
@@ -277,20 +286,31 @@ function WatiCampaignsPageInner() {
     recipientOrdering,
   ]);
 
+  /** Accepts one id, "all", or an array of ids (multi-select / "Open selected"). */
   const handleCampaignChange = useCallback(
     (value) => {
-      const next = value || "all";
+      const ids = Array.isArray(value)
+        ? value.map(String).filter(Boolean)
+        : value && value !== "all"
+          ? [String(value)]
+          : [];
+      const next = ids.length ? ids.join(",") : "all";
+      // Adding/removing campaigns keeps the student filters; going to or from the All view
+      // (a different screen) starts them fresh.
+      const crossesAll = next === "all" || isAll;
       setSelectedCampaign(next);
       setRecipientsPage(1);
-      setSearch("");
-      setAppliedSearch("");
-      setWaResponse("");
-      setWaReply("");
-      setReplyOptions([]);
+      if (crossesAll) {
+        setSearch("");
+        setAppliedSearch("");
+        setWaResponse("");
+        setWaReply("");
+        setReplyOptions([]);
+      }
       dispatch(closeRecipientDrawer());
       syncCampaignUrl(next);
     },
-    [dispatch, syncCampaignUrl]
+    [dispatch, syncCampaignUrl, isAll]
   );
 
   const handlePresetChange = useCallback((value) => {
@@ -322,16 +342,21 @@ function WatiCampaignsPageInner() {
       value: String(r.id),
       label: r.name || r.id,
     }));
-    if (
-      !isAll &&
-      selectedCampaign &&
-      !opts.some((o) => o.value === String(selectedCampaign))
-    ) {
-      const name = detail.data?.name || selectedCampaign;
-      opts.unshift({ value: String(selectedCampaign), label: name });
+    // Selected campaigns outside the loaded date range still need a named option.
+    const namesFromDetail = {};
+    if (isMulti) {
+      (detail.data?.campaigns || []).forEach((c) => {
+        if (c?.id) namesFromDetail[String(c.id)] = c.name || c.id;
+      });
+    } else if (detail.data?.id) {
+      namesFromDetail[String(detail.data.id)] = detail.data.name || detail.data.id;
     }
+    selectedCampaignIds
+      .filter((id) => !opts.some((o) => o.value === id))
+      .reverse()
+      .forEach((id) => opts.unshift({ value: id, label: namesFromDetail[id] || id }));
     return opts;
-  }, [overview.data?.results, isAll, selectedCampaign, detail.data?.name]);
+  }, [overview.data?.results, isMulti, selectedCampaignIds, detail.data]);
 
   // Student filters only apply to a single campaign; ignore them on the All view.
   const filtersActive =
@@ -431,9 +456,18 @@ function WatiCampaignsPageInner() {
 
   const followUpAudience = useMemo(() => {
     if (isAll) return null;
+    const combinedNames = isMulti
+      ? (detail.data?.campaigns || []).map((c) => c?.name).filter(Boolean)
+      : [];
     return {
-      broadcastId: String(selectedCampaign),
-      campaignName: detail.data?.name || String(selectedCampaign),
+      // Several campaigns → the backend combines them to one row (and one send) per person.
+      broadcastId: isMulti ? null : String(selectedCampaign),
+      broadcastIds: isMulti ? selectedCampaignIds : null,
+      campaignName: isMulti
+        ? combinedNames.length
+          ? combinedNames.join(" + ")
+          : `${selectedCampaignIds.length} campaigns`
+        : detail.data?.name || String(selectedCampaign),
       filters: {
         search: appliedSearch,
         message_status: messageStatus,
@@ -450,8 +484,11 @@ function WatiCampaignsPageInner() {
     };
   }, [
     isAll,
+    isMulti,
     selectedCampaign,
+    selectedCampaignIds,
     detail.data?.name,
+    detail.data?.campaigns,
     appliedSearch,
     messageStatus,
     waResponse,
@@ -466,7 +503,8 @@ function WatiCampaignsPageInner() {
     (row) => {
       const phone = row.phone;
       const leadOrPhone = row.lead_id != null ? String(row.lead_id) : phone;
-      const broadcastId = row.broadcast_id || (!isAll ? selectedCampaign : null);
+      // Combined rows carry the person's best campaign — open that campaign's chat.
+      const broadcastId = row.broadcast_id || (!isAll && !isMulti ? selectedCampaign : null);
       if ((!phone && !leadOrPhone) || !broadcastId) return;
       const previewName =
         row.display_name || row.lead_name || (phone ? `Contact · ${phone}` : null);
@@ -481,7 +519,7 @@ function WatiCampaignsPageInner() {
         })
       );
     },
-    [dispatch, isAll, selectedCampaign]
+    [dispatch, isAll, isMulti, selectedCampaign]
   );
 
   return (
@@ -507,7 +545,9 @@ function WatiCampaignsPageInner() {
               <CardDescription>
                 {isAll
                   ? "Campaign outcomes for the selected period. Click a campaign to see its recipients."
-                  : "Recipients for this campaign with message status and response."}
+                  : isMulti
+                    ? `People across ${selectedCampaignIds.length} selected campaigns, one row per person.`
+                    : "Recipients for this campaign with message status and response."}
               </CardDescription>
             </div>
             <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
@@ -539,8 +579,8 @@ function WatiCampaignsPageInner() {
 
       <CampaignWorkspaceFilters
         campaignOptions={campaignOptions}
-        selectedCampaign={selectedCampaign}
-        onCampaignChange={handleCampaignChange}
+        selectedCampaigns={selectedCampaignIds}
+        onCampaignsChange={handleCampaignChange}
         preset={preset}
         onPresetChange={handlePresetChange}
         dateFrom={dateFrom}
@@ -595,6 +635,7 @@ function WatiCampaignsPageInner() {
               onRowClick={(row) => handleCampaignChange(String(row.id))}
               selected={selectedCampaignRows}
               onSelectedChange={setSelectedCampaignRows}
+              onOpenSelected={(ids) => handleCampaignChange(ids)}
             />
           </div>
         </>
@@ -607,11 +648,18 @@ function WatiCampaignsPageInner() {
             metrics={reachMetrics}
             loading={reachLoading}
           />
+          {isMulti ? (
+            <p className="-mt-3 text-xs text-muted-foreground">
+              Charts add up the messages of all {selectedCampaignIds.length} campaigns. The list
+              below counts people: someone in 3 of these campaigns is 3 messages but 1 person.
+            </p>
+          ) : null}
           <div className="space-y-2">
             <h2 className="text-sm font-semibold text-foreground">Students &amp; contacts</h2>
             <p className="text-xs text-muted-foreground">
-              Recipients for this campaign with message status and response. Tick or untick rows
-              to choose who gets a follow-up campaign.
+              {isMulti
+                ? "Each person once. Responded = replied to any selected campaign; Not responded = replied to none; Failed = failed in every one. Tick or untick rows to choose who gets a follow-up campaign — each person gets it once."
+                : "Recipients for this campaign with message status and response. Tick or untick rows to choose who gets a follow-up campaign."}
             </p>
             <div className="flex flex-col gap-2 rounded-lg border border-orange-200 bg-orange-50/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 text-xs text-foreground">
@@ -666,7 +714,7 @@ function WatiCampaignsPageInner() {
               onPageChange={setRecipientsPage}
               onRowClick={openDrawerFor}
               showSearch={false}
-              showCampaign={false}
+              showCampaign={isMulti}
               selectable
               isRowSelected={isRowSelected}
               onToggleRow={handleToggleRow}

@@ -1,15 +1,10 @@
 "use client";
 
 import { useMemo, useRef, useState, useEffect } from "react";
-import Select, { components as selectComponents } from "react-select";
 import { ChevronDown, Info, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import {
-  formSelectMenuPortalTarget,
-  formSelectStyles,
-} from "@/lib/reactSelectStyles";
 import { LEAD_SOURCE_FILTER_OPTIONS } from "@/constants/leadInquirySource";
 
 export const WATI_DATE_PRESETS = [
@@ -66,51 +61,14 @@ function FilterChevron({ open }) {
   );
 }
 
-/** Campaign picker stays searchable (react-select) but matches the h-9 filter controls. */
-const campaignSelectStyles = {
-  ...formSelectStyles,
-  control: (base, state) => ({
-    ...(typeof formSelectStyles.control === "function"
-      ? formSelectStyles.control(base, state)
-      : base),
-    minHeight: 36,
-    height: 36,
-    borderRadius: "calc(var(--radius) - 2px)",
-    backgroundColor: "hsl(var(--background))",
-    cursor: "pointer",
-  }),
-  valueContainer: (base) => ({ ...base, padding: "0 12px" }),
-  indicatorsContainer: (base) => ({ ...base, height: 34 }),
-  dropdownIndicator: (base) => ({ ...base, padding: "0 12px 0 4px" }),
-  menu: (base) => ({ ...base, marginTop: 4 }),
-  option: (base, state) => ({
-    ...base,
-    fontSize: "0.875rem",
-    cursor: "pointer",
-    color: "hsl(var(--foreground))",
-    fontWeight: state.isSelected ? 500 : 400,
-    backgroundColor: state.isSelected || state.isFocused ? "rgb(241 245 249)" : "transparent",
-  }),
-};
-
-function CampaignDropdownIndicator(props) {
-  return (
-    <selectComponents.DropdownIndicator {...props}>
-      <FilterChevron open={props.selectProps.menuIsOpen} />
-    </selectComponents.DropdownIndicator>
-  );
-}
-
-const CAMPAIGN_SELECT_COMPONENTS = {
-  IndicatorSeparator: null,
-  DropdownIndicator: CampaignDropdownIndicator,
-};
+/** Most campaigns that can be combined at once (backend MAX_SELECTED_CAMPAIGNS). */
+export const MAX_SELECTED_CAMPAIGNS = 10;
 
 /**
  * Shared dropdown shell: bordered h-9 trigger + rotating chevron + panel that fades/scales in.
  * Closes on outside click and Escape.
  */
-function FilterDropdown({ id, label, displayLabel, className, children }) {
+function FilterDropdown({ id, label, displayLabel, className, panelClassName, header, children }) {
   const [open, setOpen] = useState(false);
   const [shown, setShown] = useState(false);
   const rootRef = useRef(null);
@@ -160,9 +118,11 @@ function FilterDropdown({ id, label, displayLabel, className, children }) {
           <div
             className={cn(
               "absolute left-0 top-full z-50 mt-1 w-full min-w-[200px] origin-top rounded-md border border-input bg-white shadow-md transition duration-150 ease-out dark:bg-slate-900",
-              shown ? "scale-100 opacity-100" : "scale-95 opacity-0"
+              shown ? "scale-100 opacity-100" : "scale-95 opacity-0",
+              panelClassName
             )}
           >
+            {header}
             <ul className="max-h-[240px] overflow-auto py-1" role="listbox">
               {children({ close: () => setOpen(false) })}
             </ul>
@@ -251,10 +211,115 @@ function SourceMultiSelect({ selected = [], onChange, className }) {
   );
 }
 
+/**
+ * Campaign picker — same tick-to-toggle dropdown as Source. Nothing ticked = All campaigns;
+ * one = that campaign; several = combined view. A search box narrows long campaign lists.
+ */
+function CampaignMultiSelect({ options = [], selected = [], onChange, className }) {
+  const [query, setQuery] = useState("");
+  const atMax = selected.length >= MAX_SELECTED_CAMPAIGNS;
+
+  const displayLabel = useMemo(() => {
+    if (!selected.length) return ALL_CAMPAIGN_OPTION.label;
+    if (selected.length === 1) {
+      return options.find((o) => o.value === selected[0])?.label ?? selected[0];
+    }
+    return `${selected.length} campaigns selected`;
+  }, [selected, options]);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((o) => String(o.label || "").toLowerCase().includes(q));
+  }, [options, query]);
+
+  const toggle = (value) => {
+    if (selected.includes(value)) {
+      onChange?.(selected.filter((v) => v !== value));
+    } else if (!atMax) {
+      onChange?.([...selected, value]);
+    }
+  };
+
+  return (
+    <FilterDropdown
+      id="wati-campaign-select"
+      label="Campaign"
+      displayLabel={displayLabel}
+      className={className}
+      panelClassName="min-w-[300px]"
+      header={
+        <div className="space-y-1 border-b border-input p-2">
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search campaigns…"
+              className="h-8 pl-8 text-sm"
+              aria-label="Search campaigns"
+              autoFocus
+            />
+          </div>
+          {atMax ? (
+            <p className="px-1 text-xs text-muted-foreground">
+              Up to {MAX_SELECTED_CAMPAIGNS} campaigns can be combined.
+            </p>
+          ) : null}
+        </div>
+      }
+    >
+      {() => (
+        <>
+          <li>
+            <button
+              type="button"
+              className={cn(OPTION_CLASS, selected.length === 0 && OPTION_SELECTED_CLASS)}
+              onClick={() => onChange?.([])}
+            >
+              {ALL_CAMPAIGN_OPTION.label}
+            </button>
+          </li>
+          {visible.map((o) => {
+            const isSelected = selected.includes(o.value);
+            const disabled = !isSelected && atMax;
+            return (
+              <li key={o.value}>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  title={o.label}
+                  className={cn(
+                    OPTION_CLASS,
+                    "truncate",
+                    isSelected && OPTION_SELECTED_CLASS,
+                    disabled && "cursor-not-allowed opacity-50 hover:bg-transparent"
+                  )}
+                  onClick={() => toggle(o.value)}
+                >
+                  {o.label}
+                </button>
+              </li>
+            );
+          })}
+          {!visible.length ? (
+            <li className="px-3 py-2 text-sm text-muted-foreground">No campaigns match.</li>
+          ) : null}
+        </>
+      )}
+    </FilterDropdown>
+  );
+}
+
 export default function CampaignWorkspaceFilters({
   campaignOptions = [],
-  selectedCampaign,
-  onCampaignChange,
+  // [] = All campaigns, [id] = one campaign, [id, id, …] = combined view.
+  selectedCampaigns = [],
+  onCampaignsChange,
   preset,
   onPresetChange,
   dateFrom,
@@ -275,11 +340,7 @@ export default function CampaignWorkspaceFilters({
   filterSources = [],
   onFilterSourcesChange,
 }) {
-  const selectOptions = [ALL_CAMPAIGN_OPTION, ...campaignOptions];
-  const value =
-    selectOptions.find((o) => o.value === (selectedCampaign || "all")) ||
-    ALL_CAMPAIGN_OPTION;
-  const isAllCampaigns = !selectedCampaign || selectedCampaign === "all";
+  const isAllCampaigns = selectedCampaigns.length === 0;
   const showReplyFilter = waResponse === "responded";
   const replySelectOptions = useMemo(() => {
     const opts = [
@@ -297,23 +358,12 @@ export default function CampaignWorkspaceFilters({
   }, [waReplyOptions, waReply]);
 
   const campaignPicker = (
-    <div className="w-full space-y-1.5 sm:w-[220px]">
-      <Label htmlFor="wati-campaign-select" className="text-xs text-muted-foreground">
-        Campaign
-      </Label>
-      <Select
-        inputId="wati-campaign-select"
-        options={selectOptions}
-        value={value}
-        onChange={(opt) => onCampaignChange?.(opt?.value || "all")}
-        styles={campaignSelectStyles}
-        components={CAMPAIGN_SELECT_COMPONENTS}
-        menuPortalTarget={formSelectMenuPortalTarget}
-        isSearchable
-        placeholder="Select campaign…"
-        classNamePrefix="wati-campaign"
-      />
-    </div>
+    <CampaignMultiSelect
+      options={campaignOptions}
+      selected={selectedCampaigns}
+      onChange={onCampaignsChange}
+      className="w-full sm:w-[240px]"
+    />
   );
 
   return (
@@ -433,8 +483,8 @@ export default function CampaignWorkspaceFilters({
       {isAllCampaigns ? (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          Student search, message status, WA response and source filters apply when a single
-          campaign is open.
+          Student search, message status, WA response and source filters apply once you pick one
+          or more campaigns.
         </p>
       ) : null}
     </div>

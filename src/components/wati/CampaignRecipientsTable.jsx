@@ -339,8 +339,11 @@ function CompactRecipientRow({
         </TableCell>
       ) : null}
       {showCampaign ? (
-        <TableCell className="max-w-[160px] truncate font-medium">
-          {row.campaign_name || row.broadcast_id || "—"}
+        <TableCell
+          className="max-w-[160px] truncate font-medium"
+          title={n > 1 ? `In ${n} of the selected campaigns` : row.campaign_name || undefined}
+        >
+          {n > 1 ? `${n} campaigns` : row.campaign_name || row.broadcast_id || "—"}
         </TableCell>
       ) : null}
       <TableCell className="max-w-[200px]">

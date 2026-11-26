@@ -36,7 +36,11 @@ const STEPS = [
 /** Suggested name for a follow-up sent from a campaign page, e.g. "D28 – Not responded follow-up". */
 function suggestFollowUpName(audience) {
   if (!audience) return "";
-  const base = String(audience.campaignName || "").trim() || "Campaign";
+  const combined = Array.isArray(audience.broadcastIds) && audience.broadcastIds.length > 1;
+  // Joined names of several campaigns get too long for a broadcast name.
+  const base = combined
+    ? `${audience.broadcastIds.length} campaigns`
+    : String(audience.campaignName || "").trim() || "Campaign";
   const label = String(audience.filterLabel || "").split(" · ")[0];
   return `${base} – ${label ? `${label} follow-up` : "Follow-up"}`.replace(/\s{2,}/g, " ");
 }
@@ -46,7 +50,10 @@ function recipientsPayload(audience, leadIds) {
   if (!audience) return { lead_ids: leadIds };
   return {
     audience: {
-      broadcast_id: audience.broadcastId,
+      // Several selected campaigns → one combined audience, one send per person.
+      ...(Array.isArray(audience.broadcastIds) && audience.broadcastIds.length > 1
+        ? { broadcast_ids: audience.broadcastIds }
+        : { broadcast_id: audience.broadcastId }),
       ...(audience.filters || {}),
       exclude_phones: audience.excludePhones || [],
       include_phones: audience.includePhones || [],
