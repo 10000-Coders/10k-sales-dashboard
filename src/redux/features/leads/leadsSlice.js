@@ -4,7 +4,7 @@ import { logout } from "@/redux/features/user/userAuth";
 
 export const REASSIGN_PAGE_SIZE = 50;
 /** Must match backend sales.bulk_lead_utils.MAX_BULK_LEAD_COUNT */
-export const MAX_BULK_LEAD_IMPORT = 200;
+export const MAX_BULK_LEAD_IMPORT = 2000;
 
 export const bulkCreateLeads = createAsyncThunk(
   "leads/bulkCreateLeads",
